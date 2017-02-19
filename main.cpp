@@ -1,42 +1,8 @@
+#include "ep/flush.h"
+
 #include <boost/math/special_functions/binomial.hpp>
 
-#include <stdint.h>
-#include <type_traits>
-
 namespace ep {
-
-constexpr auto NNumbers = 13;
-constexpr auto NSuits = 4;
-
-template<int N, int K> struct PartialPermutations {
-    constexpr static auto value = N * PartialPermutations<N - 1, K - 1>::value;
-};
-template<int N> struct PartialPermutations<N, 0> {
-    constexpr static auto value = 1;
-};
-
-static_assert(12 == PartialPermutations<4, 2>::value, "");
-
-template<int N, int K, bool> struct Choose_impl {
-    constexpr static uint64_t value = 0;
-};
-template<int N, int K> struct Choose_impl<N, K, true> {
-    constexpr static auto value =
-        Choose_impl<N - 1, K - 1, K <= N>::value +
-        Choose_impl<N - 1, K, K <= N>::value;
-};
-template<int N> struct Choose_impl<N, 0, true> {
-    constexpr static uint64_t value = 1;
-};
-
-template<int N, int K>
-using Choose =
-    Choose_impl<N, K, K <= N>;
-
-static_assert(2 == Choose<2, 1>::value, "");
-static_assert(6 == Choose<4, 2>::value, "");
-static_assert(286 == Choose<13, 3>::value, "");
-static_assert(1326 == Choose<52, 2>::value, "");
 
 struct MonotoneFlop {
     constexpr static auto equivalents = NSuits;
@@ -128,7 +94,7 @@ constexpr uint64_t bibitPopCounts(uint64_t v) {
 }
 
 constexpr uint64_t nibblePopCounts(uint64_t c) {   
-    return ((c >> 2) & b1) + (c & detail::b1);
+    return ((c >> 2) & detail::b1) + (c & detail::b1);
 }
 
 constexpr uint64_t bytePopCounts(uint64_t v) {
