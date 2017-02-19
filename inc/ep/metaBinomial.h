@@ -4,11 +4,6 @@
 
 namespace ep {
 
-/// Number of numbers in the card set
-constexpr auto NNumbers = 13;
-/// Number of suits
-constexpr auto NSuits = 4;
-
 /// K-permutations of N elements
 template<int N, int K> struct PartialPermutations {
     constexpr static auto value = N * PartialPermutations<N - 1, K - 1>::value;
