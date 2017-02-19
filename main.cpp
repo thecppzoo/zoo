@@ -1,5 +1,6 @@
 #include "ep/metaBinomial.h"
 #include "ep/core/Swar.h"
+#include "ep/core/metaLog.h"
 
 #include <boost/math/special_functions/binomial.hpp>
 
@@ -10,9 +11,25 @@ constexpr auto NNumbers = 13;
 /// Number of suits
 constexpr auto NSuits = 4;
 
+constexpr auto SuitBits = 1 << core::metaLogCeiling(NNumbers);
+static_assert(16 == SuitBits, "");
+constexpr auto NumberBits = 1 << core::metaLogCeiling(NSuits);
+static_assert(4 == NumberBits, "");
+
+template<int NBits> struct IntegralWide_impl;
+template<> struct IntegralWide_impl<16> { using type = uint16_t; };
+template<> struct IntegralWide_impl<4> { using type = uint8_t; };
+
+template<int NBits>
+using IntegralWide = typename IntegralWide_impl<NBits>::type;
+
+using WholeSuit = IntegralWide<SuitBits>;
+using AllNumbers = IntegralWide<NumberBits>;
+
 struct MonotoneFlop {
     constexpr static auto equivalents = NSuits;
     constexpr static auto element_count = Choose<NNumbers, 3>::value;
+    constexpr static auto max_repetitions = 0;
 };
 
 /// \todo There are several subcategories here:
@@ -21,11 +38,13 @@ struct TwoToneFlop {
     constexpr static auto equivalents = PartialPermutations<NSuits, 2>::value;
     constexpr static auto element_count =
         NNumbers * Choose<NNumbers, 2>::value;
+    constexpr static auto max_repetitions = 1;
 };
 
 struct RainbowFlop {
     constexpr static auto equivalents = Choose<NSuits, 3>::value;
     constexpr static auto element_count = NNumbers*NNumbers*NNumbers;
+    constexpr static auto max_repetitions = 2;
 };
 
 template<typename...> struct Count {
@@ -69,6 +88,36 @@ union CSet {
     constexpr CSet(uint64_t v): whole(v) {}
     constexpr CSet(uint64_t v, void *): suits(toArray(v)) {}
 };
+
+constexpr uint64_t numberCounts(uint64_t arg) {
+    return core::popcount<core::metaLogCeiling(NumberBits) - 1>(arg);
+}
+
+constexpr uint64_t flushCounts(uint64_t arg) {
+    return core::popcount<core::metaLogCeiling(SuitBits) - 1>(arg);
+}
+
+struct FlushCounts {
+    uint64_t whole;
+
+    constexpr FlushCounts(uint64_t orig): whole(flushCounts(orig)) {}
+    constexpr uint64_t counts() const noexcept { return whole; }
+};
+
+struct CardsMonotoneFlop: MonotoneFlop {
+    WholeSuit numbers;
+    AllNumbers suit;
+    
+    CardsMonotoneFlop(WholeSuit ws, AllNumbers su): numbers(ws), suit(su) {}
+};
+
+void classify(CSet cards) {
+    FlushCounts fc(cards.whole);
+    constexpr auto twoOrMoreSameSuitMask = ~core::makeBitmask<SuitBits>(3ull);
+    static_assert(0x3000300030003ull == ~twoOrMoreSameSuitMask, "");
+    auto twoOrMoreSameSuit = fc.whole & twoOrMoreSameSuitMask;
+    //if()
+}
 
 }
 
