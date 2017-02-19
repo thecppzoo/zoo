@@ -1,4 +1,5 @@
 #include "ep/flush.h"
+#include "ep/core/Swar.h"
 
 #include <boost/math/special_functions/binomial.hpp>
 
@@ -65,49 +66,6 @@ union CSet {
 };
 
 }
-
-template<typename T, int Progression, int Remaining> struct BitmaskMaker {
-    constexpr static T repeat(T v) {
-        return
-            BitmaskMaker<T, Progression, Remaining - 1>::repeat(v | (v << Progression));
-    }
-};
-template<typename T, int P> struct BitmaskMaker<T, P, 0> {
-    constexpr static T repeat(T v) { return v; }
-};
-
-template<int size, typename T>
-constexpr T makeBitmask(T v) {
-    return BitmaskMaker<T, size, sizeof(T)*8/size>::repeat(v);
-}
-
-namespace detail {
-    constexpr auto b0 = makeBitmask<2>(1ull);
-    constexpr auto b1 = makeBitmask<4>(3ull);
-    constexpr auto b2 = makeBitmask<8>(0xFull);
-    constexpr auto b3 = makeBitmask<16>(0xFFull);
-    constexpr auto multiplierNibble = makeBitmask<4>(1ull);
-}
-
-constexpr uint64_t bibitPopCounts(uint64_t v) {
-    return v - ((v >> 1) & detail::b0);
-}
-
-constexpr uint64_t nibblePopCounts(uint64_t c) {   
-    return ((c >> 2) & detail::b1) + (c & detail::b1);
-}
-
-constexpr uint64_t bytePopCounts(uint64_t v) {
-    return ((v >> 4) & detail::b2) + (v & detail::b2);
-}
-
-constexpr uint64_t popCounts16bit(uint64_t v) {
-    return ((v >> 8) & detail::b3) + (v & detail::b3);
-}
-
-auto what = nibblePopCounts(0xF754);
-
-uint64_t popcounts(uint64_t v) { return nibblePopCounts(v); }
 
 int main(int argc, char** argv) {
     return 0;

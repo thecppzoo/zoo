@@ -1,71 +1,15 @@
-#include "ep/flush.h"
+#pragma once
 
-#include <boost/math/special_functions/binomial.hpp>
-
-namespace ep {
-
-struct MonotoneFlop {
-    constexpr static auto equivalents = NSuits;
-    constexpr static auto element_count = Choose<NNumbers, 3>::value;
-};
-
-/// \todo There are several subcategories here:
-/// The card with the non-repeated suit is highest, pairs high, middle, pairs low, lowest
-struct TwoToneFlop {
-    constexpr static auto equivalents = PartialPermutations<NSuits, 2>::value;
-    constexpr static auto element_count =
-        NNumbers * Choose<NNumbers, 2>::value;
-};
-
-struct RainbowFlop {
-    constexpr static auto equivalents = Choose<NSuits, 3>::value;
-    constexpr static auto element_count = NNumbers*NNumbers*NNumbers;
-};
-
-template<typename...> struct Count {
-    constexpr static uint64_t value = 0;
-};
-template<typename H, typename... Tail>
-struct Count<H, Tail...> {
-    constexpr static uint64_t value =
-        H::equivalents*H::element_count + Count<Tail...>::value;
-};
-
-static_assert(4 * Choose<13, 3>::value == Count<MonotoneFlop>::value, "");
-static_assert(12*13*Choose<NNumbers, 2>::value == Count<TwoToneFlop>::value, "");
-static_assert(4*13*13*13 == Count<RainbowFlop>::value, "");
-static_assert(
-    Choose<52, 3>::value == Count<MonotoneFlop, TwoToneFlop, RainbowFlop>::value,
-    ""
-);
-
-}
-
+/// \file Swar.h SWAR operations
 
 #include <stdint.h>
-#include <array>
 
-constexpr std::array<uint16_t, 4> toArray(uint64_t v) {
-    using us = uint16_t;
-    return {
-        us(v & 0xFFFF), us((v >> 16) & 0xFFFF),
-        us((v >> 32) & 0xFFFF), us((v >> 48) & 0xFFFF)
-    };
-}
+namespace ep { namespace core {
 
-namespace ep {
-
-union CSet {
-    uint64_t whole;
-    std::array<uint16_t, 4> suits;
-
-    constexpr CSet(): whole(0) {}
-    constexpr CSet(uint64_t v): whole(v) {}
-    constexpr CSet(uint64_t v, void *): suits(toArray(v)) {}
-};
-
-}
-
+/// Repeats the given pattern in the whole of the argument
+/// \tparam T the desired integral type
+/// \tparam Progression how big the pattern is
+/// \tparam Remaining how many more times to copy the pattern
 template<typename T, int Progression, int Remaining> struct BitmaskMaker {
     constexpr static T repeat(T v) {
         return
@@ -76,12 +20,15 @@ template<typename T, int P> struct BitmaskMaker<T, P, 0> {
     constexpr static T repeat(T v) { return v; }
 };
 
+/// Front end to \c BitmaskMaker with the repeating count set to the whole size
 template<int size, typename T>
 constexpr T makeBitmask(T v) {
     return BitmaskMaker<T, size, sizeof(T)*8/size>::repeat(v);
 }
 
+/// Core implementation details
 namespace detail {
+    //template<int level> 
     constexpr auto b0 = makeBitmask<2>(1ull);
     constexpr auto b1 = makeBitmask<4>(3ull);
     constexpr auto b2 = makeBitmask<8>(0xFull);
@@ -107,9 +54,4 @@ constexpr uint64_t popCounts16bit(uint64_t v) {
 
 auto what = nibblePopCounts(0xF754);
 
-uint64_t popcounts(uint64_t v) { return nibblePopCounts(v); }
-
-int main(int argc, char** argv) {
-    return 0;
-}
-
+}}
