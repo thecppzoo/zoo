@@ -28,30 +28,31 @@ constexpr T makeBitmask(T v) {
 
 /// Core implementation details
 namespace detail {
-    //template<int level> 
-    constexpr auto b0 = makeBitmask<2>(1ull);
-    constexpr auto b1 = makeBitmask<4>(3ull);
-    constexpr auto b2 = makeBitmask<8>(0xFull);
-    constexpr auto b3 = makeBitmask<16>(0xFFull);
-    constexpr auto multiplierNibble = makeBitmask<4>(1ull);
+    template<int level>
+    constexpr auto popcountMask =
+        makeBitmask<1 << (level + 1)>(
+            BitmaskMaker<uint64_t, 1, (1 << level) - 1>::repeat(1)
+        );
+
+    static_assert(makeBitmask<2>(1ull) == popcountMask<0>, "");
 }
 
-constexpr uint64_t bibitPopCounts(uint64_t v) {
-    return v - ((v >> 1) & detail::b0);
+template<int level>
+constexpr uint64_t popcount(uint64_t arg) {
+    auto v = popcount<level - 1>(arg);
+    constexpr auto shifter = 1 << level;
+    return
+        ((v >> shifter) & detail::popcountMask<level>) +
+        (v & detail::popcountMask<level>);
+}
+/// Hamming weight of each bit pair
+template<>
+constexpr uint64_t popcount<0>(uint64_t v) {
+    return v - ((v >> 1) & detail::popcountMask<0>);
 }
 
-constexpr uint64_t nibblePopCounts(uint64_t c) {   
-    return ((c >> 2) & detail::b1) + (c & detail::b1);
-}
-
-constexpr uint64_t bytePopCounts(uint64_t v) {
-    return ((v >> 4) & detail::b2) + (v & detail::b2);
-}
-
-constexpr uint64_t popCounts16bit(uint64_t v) {
-    return ((v >> 8) & detail::b3) + (v & detail::b3);
-}
-
-auto what = nibblePopCounts(0xF754);
+static_assert(0x210 == popcount<0>(0x320), "");
+static_assert(0x4321 == popcount<1>(0xF754), "");
+static_assert(0x50004 == popcount<3>(0x3E001122), "");
 
 }}
