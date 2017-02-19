@@ -1,9 +1,14 @@
-#include "ep/flush.h"
+#include "ep/metaBinomial.h"
 #include "ep/core/Swar.h"
 
 #include <boost/math/special_functions/binomial.hpp>
 
 namespace ep {
+
+/// Number of numbers in the card set
+constexpr auto NNumbers = 13;
+/// Number of suits
+constexpr auto NSuits = 4;
 
 struct MonotoneFlop {
     constexpr static auto equivalents = NSuits;
