@@ -72,6 +72,13 @@ template<int Size, typename T = uint64_t> struct SWAR {
         constexpr auto filter = (T(1) << Size) - 1;
         return filter & (m_v >> (Size * position));
     }
+
+    constexpr void clearAt(int position) {
+        constexpr auto filter = (T(1) << Size) - 1;
+        auto invertedMask = filter << (Size * position);
+        auto mask = ~invertedMask;
+        m_v &= mask;
+    }
 protected:
     T m_v;
 };
