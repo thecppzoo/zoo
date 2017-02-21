@@ -67,6 +67,11 @@ template<int Size, typename T = uint64_t> struct SWAR {
     constexpr SWAR operator|(SWAR o) { return SWAR(m_v | o.m_v); }
 
     constexpr bool operator==(SWAR o) { return m_v == o.m_v; }
+
+    constexpr T at(int position) {
+        constexpr auto filter = (T(1) << Size) - 1;
+        return filter & (m_v >> (Size * position));
+    }
 protected:
     T m_v;
 };
@@ -84,8 +89,6 @@ constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     rv &= msbMask;
     return SWAR<Size, T>(rv >> msbPos);
 }
-
-template<unsigned> struct Tr;
 
 static_assert(
     0x10110001 == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),

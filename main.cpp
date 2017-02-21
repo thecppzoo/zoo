@@ -114,20 +114,61 @@ constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
     return ss.greaterEqual<5>();
 }
 
+uint64_t isStraight(unsigned numberSet) {
+    auto rv = numberSet;
+    rv &= (rv << 1);  // two
+    if(!rv) { return rv; }
+    rv &= (rv << 1); // three in sequence
+    if(!rv) { return rv; }
+    rv &= (rv << 1); // four in sequence
+    if(!rv) { return rv; }
+    if((1 << (NNumbers - 1)) & numberSet) {
+        // the argument had an ace
+        rv |= 1 << 4;
+    }
+    rv &= (rv << 1);
+    return rv;
+}
+
 /// \todo optimize this
 int winner(CSet community, CSet p1, CSet p2) {
     p1 = p1 | community;
     p2 = p2 | community;
     auto p1Suits = makeCounted(p1.m_bySuit);
     auto p1Flushes = flushes(p1Suits);
-    if(p1Flushes) {
+    if(__builtin_expect(bool(p1Flushes), false)) {
         auto p2Suits = p2.suitCounts();
         auto p2Flushes = flushes(p2Suits);
-        if(p2Flushes) {
-            // p2 loses except p2 is full house or four of a kind
+        if(__builtin_expect(!bool(p2Flushes), true)) {
+            // p2 not a flush, loses except if full house or four of a kind
             auto p2Repetitions = makeCounted(p2.m_byNumber);
             auto p2threeOfAKinds = p2Repetitions.greaterEqual<3>();
-            if(!p2threeOfAKinds) { return 1; }
+            if(!__builtin_expect(bool(p2threeOfAKinds), false)) { return 1; }
+            auto highestThreeOfAKindPos =
+                (63 - __builtin_clzll(p2threeOfAKinds.counts().value())) >> NumberBits;
+            auto highestCount =
+                p2Repetitions.counts().at(highestThreeOfAKindPos);
+            if(__builtin_expect(3 < highestCount, false)) {
+                // p2 has a three-of-a-kind.  Does it have a four-of-a-kind?
+                
+                // p2 has a four of a kind.  Can't be straight flush
+                auto p1Repetitions = makeCounted(p1.m_byNumber);
+                auto p1FourOfAKinds = p1Repetitions.greaterEqual<4>();
+                if(__builtin_expect(bool(p1FourOfAKinds), false)) {
+                    // p1 is also a four-of-a-kind, 
+                    auto p1HighestFourOfAKindPos =
+                        (63 - __builtin_clz(p1FourOfAKinds.counts().value())) >> NumberBits;
+                    if(highestThreeOfAKindPos < p1HighestFourOfAKindPos) {
+                        return 1;
+                    }
+                    // need to check whether p1 is a straight flush
+                    auto p1FlushSuit = (63 - __builtin_clzll(p1Flushes.counts().value())) >> SuitBits;
+                    auto flushNumbers = p1.m_bySuit.at(p1FlushSuit);
+                    if(__builtin_expect(isStraight(flushNumbers), false)) {
+                        return 1; // p1 has worse four-of-a-kind but wins on straight-flush
+                    }
+                }
+            }
         }
     }
     return -1;
@@ -136,6 +177,7 @@ int winner(CSet community, CSet p1, CSet p2) {
 }
 
 int main(int argc, char** argv) {
+    //auto v = ep::core::greaterEqualSWAR<3>(ep::core::SWAR<4, uint32_t>(0x32451027)).value();
     return 0;
 }
 
