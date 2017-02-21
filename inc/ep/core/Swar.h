@@ -65,6 +65,8 @@ template<int Size, typename T = uint64_t> struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
     constexpr SWAR operator|(SWAR o) { return SWAR(m_v | o.m_v); }
+
+    constexpr bool operator==(SWAR o) { return m_v == o.m_v; }
 protected:
     T m_v;
 };
@@ -75,10 +77,19 @@ constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     static_assert(metaLogCeiling(N) < Size, "N is too big for this technique");
     constexpr auto msbPos  = Size - 1;
     constexpr auto msb = T(1) << msbPos;
-    constexpr auto subtraend = makeBitmask<Size, uint64_t>(N);
-    auto adjusted = v.value() | msb;
+    constexpr auto msbMask = makeBitmask<Size, T>(msb);
+    constexpr auto subtraend = makeBitmask<Size, T>(N);
+    auto adjusted = v.value() | msbMask;
     auto rv = adjusted - subtraend;
+    rv &= msbMask;
     return SWAR<Size, T>(rv >> msbPos);
 }
+
+template<unsigned> struct Tr;
+
+static_assert(
+    0x10110001 == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),
+    ""
+);
 
 }}
