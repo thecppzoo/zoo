@@ -2,7 +2,7 @@
 
 /// \file Swar.h SWAR operations
 
-#include <stdint.h>
+#include "metaLog.h"
 
 namespace ep { namespace core {
 
@@ -48,11 +48,37 @@ constexpr uint64_t popcount(uint64_t arg) {
 /// Hamming weight of each bit pair
 template<>
 constexpr uint64_t popcount<0>(uint64_t v) {
+    // 00: 00; 00
+    // 01: 01; 01
+    // 10: 01; 01
+    // 11: 10; 10
     return v - ((v >> 1) & detail::popcountMask<0>);
 }
 
 static_assert(0x210 == popcount<0>(0x320), "");
 static_assert(0x4321 == popcount<1>(0xF754), "");
 static_assert(0x50004 == popcount<3>(0x3E001122), "");
+
+template<int Size, typename T = uint64_t> struct SWAR {
+    SWAR() = default;
+    constexpr explicit SWAR(T v): m_v(v) {}
+
+    constexpr T value() const noexcept { return m_v; }
+    constexpr SWAR operator|(SWAR o) { return SWAR(m_v | o.m_v); }
+protected:
+    T m_v;
+};
+
+template<int N, int Size, typename T>
+constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
+    static_assert(1 < N, "N is too small");
+    static_assert(metaLogCeiling(N) < Size, "N is too big for this technique");
+    constexpr auto msbPos  = Size - 1;
+    constexpr auto msb = T(1) << msbPos;
+    constexpr auto subtraend = makeBitmask<Size, uint64_t>(N);
+    auto adjusted = v.value() | msb;
+    auto rv = adjusted - subtraend;
+    return SWAR<Size, T>(rv >> msbPos);
+}
 
 }}

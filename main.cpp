@@ -16,15 +16,33 @@ static_assert(16 == SuitBits, "");
 constexpr auto NumberBits = 1 << core::metaLogCeiling(NSuits);
 static_assert(4 == NumberBits, "");
 
-template<int NBits> struct IntegralWide_impl;
-template<> struct IntegralWide_impl<16> { using type = uint16_t; };
-template<> struct IntegralWide_impl<4> { using type = uint8_t; };
+using SWARSuit = core::SWAR<SuitBits>;
+using SWARNumber = core::SWAR<NumberBits>;
 
-template<int NBits>
-using IntegralWide = typename IntegralWide_impl<NBits>::type;
+template<int Size, typename T>
+struct Counted {
+    Counted() = default;
+    constexpr Counted(core::SWAR<Size, T> bits):
+        m_counts(
+            core::popcount<core::metaLogCeiling(Size - 1) - 1>(bits.value())
+        )
+    {}
 
-using WholeSuit = IntegralWide<SuitBits>;
-using AllNumbers = IntegralWide<NumberBits>;
+    constexpr core::SWAR<Size, T> counts() { return m_counts; }
+
+    template<int N>
+    constexpr Counted greaterEqual() {
+        return core::greaterEqualSWAR<N>(m_counts);
+    }
+    constexpr operator bool() { return m_counts.value(); }
+
+    protected:
+    core::SWAR<Size, T> m_counts;
+};
+
+template<int Size, typename T>
+constexpr Counted<Size, T>
+makeCounted(core::SWAR<Size, T> bits) { return bits; }
 
 struct MonotoneFlop {
     constexpr static auto equivalents = NSuits;
@@ -80,43 +98,39 @@ constexpr std::array<uint16_t, 4> toArray(uint64_t v) {
 
 namespace ep {
 
-union CSet {
-    uint64_t whole;
-    std::array<uint16_t, 4> suits;
+struct CSet {
+    SWARSuit m_bySuit;
+    SWARNumber m_byNumber;
 
-    constexpr CSet(): whole(0) {}
-    constexpr CSet(uint64_t v): whole(v) {}
-    constexpr CSet(uint64_t v, void *): suits(toArray(v)) {}
+    constexpr CSet operator|(CSet o) {
+        return { m_bySuit | o.m_bySuit, m_byNumber | m_byNumber };
+    }
+
+    constexpr auto suitCounts() { return makeCounted(m_bySuit); }
+    constexpr auto numberCounts() { return makeCounted(m_byNumber); }
 };
 
-constexpr uint64_t numberCounts(uint64_t arg) {
-    return core::popcount<core::metaLogCeiling(NumberBits) - 1>(arg);
+constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
+    return ss.greaterEqual<5>();
 }
 
-constexpr uint64_t flushCounts(uint64_t arg) {
-    return core::popcount<core::metaLogCeiling(SuitBits) - 1>(arg);
-}
-
-struct FlushCounts {
-    uint64_t whole;
-
-    constexpr FlushCounts(uint64_t orig): whole(flushCounts(orig)) {}
-    constexpr uint64_t counts() const noexcept { return whole; }
-};
-
-struct CardsMonotoneFlop: MonotoneFlop {
-    WholeSuit numbers;
-    AllNumbers suit;
-    
-    CardsMonotoneFlop(WholeSuit ws, AllNumbers su): numbers(ws), suit(su) {}
-};
-
-void classify(CSet cards) {
-    FlushCounts fc(cards.whole);
-    constexpr auto twoOrMoreSameSuitMask = ~core::makeBitmask<SuitBits>(3ull);
-    static_assert(0x3000300030003ull == ~twoOrMoreSameSuitMask, "");
-    auto twoOrMoreSameSuit = fc.whole & twoOrMoreSameSuitMask;
-    //if()
+/// \todo optimize this
+int winner(CSet community, CSet p1, CSet p2) {
+    p1 = p1 | community;
+    p2 = p2 | community;
+    auto p1Suits = makeCounted(p1.m_bySuit);
+    auto p1Flushes = flushes(p1Suits);
+    if(p1Flushes) {
+        auto p2Suits = p2.suitCounts();
+        auto p2Flushes = flushes(p2Suits);
+        if(p2Flushes) {
+            // p2 loses except p2 is full house or four of a kind
+            auto p2Repetitions = makeCounted(p2.m_byNumber);
+            auto p2threeOfAKinds = p2Repetitions.greaterEqual<3>();
+            if(!p2threeOfAKinds) { return 1; }
+        }
+    }
+    return -1;
 }
 
 }
