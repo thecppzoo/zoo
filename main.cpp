@@ -2,7 +2,9 @@
 #include "ep/core/Swar.h"
 #include "ep/core/metaLog.h"
 
-#include <boost/math/special_functions/binomial.hpp>
+#include <iostream>
+
+//#include <boost/math/special_functions/binomial.hpp>
 
 namespace ep {
 
@@ -128,16 +130,17 @@ struct CSet {
     constexpr auto suitCounts() { return makeCounted(m_bySuit); }
     constexpr auto numberCounts() { return makeCounted(m_byNumber); }
 
-    constexpr unsigned numberSet() {
-        auto orig = m_bySuit.value();
+    constexpr static unsigned numberSet(uint64_t orig) {
         auto rv = orig;
         for(auto ndx = NSuits; --ndx;) {
-            orig >>= NumberBits;
+            orig = orig >> SuitBits;
             rv |= orig;
         }
-        constexpr auto isolateMask = (uint64_t(1) << NumberBits) - 1;
+        constexpr auto isolateMask = (uint64_t(1) << NNumbers) - 1;
         return rv & isolateMask;
     }
+
+    constexpr unsigned numberSet() { return numberSet(m_bySuit.value()); }
 };
 
 constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
@@ -146,7 +149,8 @@ constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
 
 #define RARE(v) if(__builtin_expect(bool(v), false))
 
-uint64_t isStraight(unsigned numberSet) {
+unsigned isStraight(unsigned numberSet) {
+    constexpr auto NumberOfHandCards = 7;
     auto rv = numberSet;
     // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
     // =========================
@@ -168,6 +172,53 @@ uint64_t isStraight(unsigned numberSet) {
         // the argument had an ace, insert it as if for card number 1
         rv |= (1 << (NNumbers - 4));
     }
+    rv &= (rv >> 1);
+    return rv;
+}
+
+std::ostream &pRanks(std::ostream &out, unsigned ranks) {
+    auto letters = "AKQJT98765432!@#$%^&*()";
+    for(auto ndx = 32; ndx--; ) {
+        if(ranks & (1 << ndx)) { out << letters[ndx]; }
+        else { out << '-'; }
+    }
+    return out;
+}
+
+inline unsigned uncheckStraight(unsigned numberSet);
+
+inline unsigned straightFrontCheck(unsigned rankSet) {
+    constexpr auto mask = (1 << 9) | (1 << 4);
+    if(rankSet & mask) { return uncheckStraight(rankSet); }
+    /*auto notStraight = isStraight(rankSet);
+    if(notStraight) {
+        static auto count = 5;
+        if(5 == count) { pRanks(std::cerr, mask) << '\n' << std::endl; }
+        if(--count < 0) { return 0; }
+        pRanks(std::cerr, rankSet) << " | ";
+        pRanks(std::cerr, notStraight) << std::endl;
+    }*/
+    return 0;
+}
+
+inline unsigned uncheckStraight(unsigned numberSet) {
+    constexpr auto NumberOfHandCards = 7;
+    auto rv = numberSet;
+    auto hasAce = (1 & numberSet) ? (1 << (NNumbers - 4)) : 0;
+    // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
+    // =========================
+    // 2 3 4 5 6 7 8 9 T J Q K A
+    // - 2 3 4 5 6 7 8 9 T J Q K &
+    // - - 2 3 4 6 5 6 7 8 9 T J &
+    // - - - 2 3 4 5 6 7 8 9 T J &
+    // - - - A - - - - - - - - - |
+    // - - - A 2 3 4 5 6 7 8 9 T &
+    
+    
+    rv &= (rv >> 1);  // two
+    rv &= (rv >> 1); // three in sequence
+    rv &= (rv >> 1); // four in sequence
+    rv |= hasAce;
     rv &= (rv >> 1);
     return rv;
 }
@@ -344,7 +395,7 @@ int winner(CSet community, CSet p1, CSet p2) {
     p1 = p1 | community;
     auto p1Suits = makeCounted(p1.m_bySuit);
     auto p1Flushes = flushes(p1Suits);
-    p2 = p2 | community;
+    p2 = p2 | community ;
     auto p2Suits = p2.suitCounts();
     auto p2Flushes = flushes(p2Suits);
     // xoptx in the case of flushes, three of a kind, etc., there
@@ -469,8 +520,93 @@ int winner(CSet community, CSet p1, CSet p2) {
 
 }
 
+#include <iostream>
+#include <chrono>
+#include <utility>
+#include "ep/Floyd.h"
+
+template<typename Callable, typename... Args>
+long benchmark(Callable &&call, Args &&... arguments) {
+    auto now = std::chrono::high_resolution_clock::now();
+    call(std::forward<Args>(arguments)...);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto diff = std::chrono::duration_cast<std::chrono::microseconds>(end - now);
+    return diff.count();
+}
+
+uint64_t (*sampleGen)(std::mt19937 &generator) =
+    [](std::mt19937 &generator) { return ep::floydSample<ep::NNumbers*ep::NSuits, 7>(generator); };
+unsigned (*checkStraight)(uint64_t) = [](uint64_t) -> unsigned { return 0; };
+unsigned straights;
+
+void experiment(unsigned count, std::mt19937 &generator) {
+    while(count--) {
+        auto cards =// ep::floydSample<ep::NNumbers*ep::NSuits, 7>(generator);
+            sampleGen(generator);
+        if(checkStraight(cards)) { ++straights; }
+    }
+};
+
+auto names = "AKQJT98765432";
+
+std::ostream &operator<<(std::ostream &out, ep::core::SWAR<4, uint64_t> s) {
+    auto suites = "chsd";
+    auto set = s.value();
+    while(set) {
+        auto bit = __builtin_ctzll(set);
+        auto mask = uint64_t(1) << bit;
+        out << names[bit / 4] << suites[bit % 4];
+        set ^= mask;
+    }
+    return out;
+}
+
 int main(int argc, char** argv) {
-    //auto v = ep::core::greaterEqualSWAR<3>(ep::core::SWAR<4, uint32_t>(0x32451027)).value();
+    std::random_device device;
+    std::mt19937 generator(device());
+    auto count = 1 << 24;
+    straights = 0;
+    auto reallyCheck =
+        [](uint64_t cards) -> unsigned {
+            return ep::uncheckStraight(ep::CSet::numberSet(cards));
+        };
+    auto toakCheck = [](uint64_t cards) {
+        ep::core::SWAR<4, uint64_t> nibbles(cards);
+        auto counts = ep::makeCounted(nibbles);
+        auto toaks = counts.greaterEqual<3>();
+        if(toaks) {
+            static auto count = 5;
+            if(0 < --count) {
+                std::cout << nibbles << ' ' << names[toaks.bestIndex()] << std::endl;
+            }
+        }
+        return unsigned(bool(toaks));
+    };
+    auto empty = benchmark(experiment, count, generator);
+    //checkStraight = reallyCheck;
+    checkStraight = toakCheck;
+    auto nonEmpty = benchmark(experiment, count, generator);
+    auto normal = straights;
+    auto diff = 1.0*(nonEmpty - empty);
+
+    /*checkStraight = [](uint64_t cards) {
+        return ep::straightFrontCheck(ep::CSet::numberSet(cards));
+    };
+    straights = 0;
+    auto frontCheck = benchmark(experiment, count, generator);
+    auto fronted = straights;
+    straights = 0;
+    checkStraight = [](uint64_t cards) {
+        return ep::uncheckStraight(ep::CSet::numberSet(cards));
+    };
+    auto unchecked = benchmark(experiment, count, generator);
+    auto uncheckCount = straights;*/
+    std::cout << empty << std::endl;
+    std::cout << normal << ' ' << nonEmpty << ' ' << diff/empty << ' ' << count/diff << std::endl;
+    /*auto diff2 = 1.0*(frontCheck - empty);
+    std::cout << fronted << ' ' << frontCheck << ' ' << diff2/diff << std::endl;
+    auto diff3 = 1.0*(unchecked - empty);
+    std::cout << uncheckCount << ' ' << unchecked << ' ' << diff3/diff << std::endl;*/
     return 0;
 }
 
