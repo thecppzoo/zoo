@@ -16,7 +16,7 @@ long benchmark(Callable &&call, Args &&... arguments) {
 }
 
 uint64_t (*sampleGen)(std::mt19937 &generator) =
-    [](std::mt19937 &generator) { return ep::floydSample<ep::NNumbers*ep::NSuits, 7>(generator); };
+    [](std::mt19937 &generator) { return ep::floydSample<ep::NRanks*ep::NSuits, 7>(generator); };
 unsigned (*checkStraight)(uint64_t) = [](uint64_t) -> unsigned { return 0; };
 unsigned straights;
 

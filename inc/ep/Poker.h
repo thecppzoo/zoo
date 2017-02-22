@@ -5,17 +5,17 @@
 namespace ep {
 
 /// Number of numbers in the card set
-constexpr auto NNumbers = 13;
+constexpr auto NRanks = 13;
 /// Number of suits
 constexpr auto NSuits = 4;
 
-constexpr auto SuitBits = 1 << core::metaLogCeiling(NNumbers);
+constexpr auto SuitBits = 1 << core::metaLogCeiling(NRanks);
 static_assert(16 == SuitBits, "");
-constexpr auto NumberBits = 1 << core::metaLogCeiling(NSuits);
-static_assert(4 == NumberBits, "");
+constexpr auto RankBits = 1 << core::metaLogCeiling(NSuits);
+static_assert(4 == RankBits, "");
 
 using SWARSuit = core::SWAR<SuitBits>;
-using SWARNumber = core::SWAR<NumberBits>;
+using SWARRank = core::SWAR<RankBits>;
 
 constexpr int positiveIndex1Better(int index1, int index2) {
     return index2 - index1;
@@ -63,7 +63,7 @@ makeCounted(core::SWAR<Size, T> bits) { return bits; }
 
 struct MonotoneFlop {
     constexpr static auto equivalents = NSuits;
-    constexpr static auto element_count = Choose<NNumbers, 3>::value;
+    constexpr static auto element_count = Choose<NRanks, 3>::value;
     constexpr static auto max_repetitions = 0;
 };
 
@@ -72,13 +72,13 @@ struct MonotoneFlop {
 struct TwoToneFlop {
     constexpr static auto equivalents = PartialPermutations<NSuits, 2>::value;
     constexpr static auto element_count =
-        NNumbers * Choose<NNumbers, 2>::value;
+        NRanks * Choose<NRanks, 2>::value;
     constexpr static auto max_repetitions = 1;
 };
 
 struct RainbowFlop {
     constexpr static auto equivalents = Choose<NSuits, 3>::value;
-    constexpr static auto element_count = NNumbers*NNumbers*NNumbers;
+    constexpr static auto element_count = NRanks*NRanks*NRanks;
     constexpr static auto max_repetitions = 2;
 };
 
@@ -92,7 +92,7 @@ struct Count<H, Tail...> {
 };
 
 static_assert(4 * Choose<13, 3>::value == Count<MonotoneFlop>::value, "");
-static_assert(12*13*Choose<NNumbers, 2>::value == Count<TwoToneFlop>::value, "");
+static_assert(12*13*Choose<NRanks, 2>::value == Count<TwoToneFlop>::value, "");
 static_assert(4*13*13*13 == Count<RainbowFlop>::value, "");
 static_assert(
     Choose<52, 3>::value == Count<MonotoneFlop, TwoToneFlop, RainbowFlop>::value,
@@ -101,7 +101,7 @@ static_assert(
 
 struct CSet {
     SWARSuit m_bySuit;
-    SWARNumber m_byNumber;
+    SWARRank m_byNumber;
 
     constexpr CSet operator|(CSet o) {
         return { m_bySuit | o.m_bySuit, m_byNumber | m_byNumber };
@@ -116,7 +116,7 @@ struct CSet {
             orig = orig >> SuitBits;
             rv |= orig;
         }
-        constexpr auto isolateMask = (uint64_t(1) << NNumbers) - 1;
+        constexpr auto isolateMask = (uint64_t(1) << NRanks) - 1;
         return rv & isolateMask;
     }
 
@@ -150,7 +150,7 @@ unsigned isStraight(unsigned numberSet) {
     if(!rv) { return rv; }
     RARE(1 & numberSet) {
         // the argument had an ace, insert it as if for card number 1
-        rv |= (1 << (NNumbers - 4));
+        rv |= (1 << (NRanks - 4));
     }
     rv &= (rv >> 1);
     return rv;
@@ -175,7 +175,7 @@ inline unsigned straightFrontCheck(unsigned rankSet) {
 inline unsigned uncheckStraight(unsigned numberSet) {
     constexpr auto NumberOfHandCards = 7;
     auto rv = numberSet;
-    auto hasAce = (1 & numberSet) ? (1 << (NNumbers - 4)) : 0;
+    auto hasAce = (1 & numberSet) ? (1 << (NRanks - 4)) : 0;
     // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
     // =========================
     // 2 3 4 5 6 7 8 9 T J Q K A
