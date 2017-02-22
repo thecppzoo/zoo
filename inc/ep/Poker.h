@@ -1,8 +1,6 @@
 #include "ep/metaBinomial.h"
-#include "ep/core/Swar.h"
+#include "PokerTypes.h"
 #include "ep/core/metaLog.h"
-
-#include <iostream>
 
 namespace ep {
 
@@ -156,15 +154,6 @@ unsigned isStraight(unsigned numberSet) {
     }
     rv &= (rv >> 1);
     return rv;
-}
-
-std::ostream &pRanks(std::ostream &out, unsigned ranks) {
-    auto letters = "AKQJT98765432!@#$%^&*()";
-    for(auto ndx = 32; ndx--; ) {
-        if(ranks & (1 << ndx)) { out << letters[ndx]; }
-        else { out << '-'; }
-    }
-    return out;
 }
 
 inline unsigned uncheckStraight(unsigned numberSet);
