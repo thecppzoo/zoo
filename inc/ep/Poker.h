@@ -1,21 +1,10 @@
-#include "ep/metaBinomial.h"
+#pragma once
+
 #include "PokerTypes.h"
+#include "ep/metaBinomial.h"
 #include "ep/core/metaLog.h"
 
 namespace ep {
-
-/// Number of numbers in the card set
-constexpr auto NRanks = 13;
-/// Number of suits
-constexpr auto NSuits = 4;
-
-constexpr auto SuitBits = 1 << core::metaLogCeiling(NRanks);
-static_assert(16 == SuitBits, "");
-constexpr auto RankBits = 1 << core::metaLogCeiling(NSuits);
-static_assert(4 == RankBits, "");
-
-using SWARSuit = core::SWAR<SuitBits>;
-using SWARRank = core::SWAR<RankBits>;
 
 constexpr int positiveIndex1Better(int index1, int index2) {
     return index2 - index1;
@@ -48,9 +37,7 @@ struct Counted {
     }
 
     constexpr Counted clearAt(int index) {
-        auto rv = m_counts;
-        rv.clearAt(index);
-        return rv;
+        return m_counts.clear(index);
     }
 
     protected:

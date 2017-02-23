@@ -77,22 +77,26 @@ constexpr uint64_t popcount_builtin(uint64_t v) {
     return rv;
 }
 
-template<bool> struct Selector_impl {
-    template<int Level>
-    constexpr static uint64_t execute(uint64_t v) {
-        return popcount_logic<Level>(v);
-    }
-};
-template<> struct Selector_impl<true> {
-    template<int Level>
-    constexpr static uint64_t execute(uint64_t v) {
-        return popcount_builtin<Level - 2>(v);
-    }
-};
+namespace detail {
+
+    template<bool> struct Selector_impl {
+        template<int Level>
+        constexpr static uint64_t execute(uint64_t v) {
+            return popcount_logic<Level>(v);
+        }
+    };
+    template<> struct Selector_impl<true> {
+        template<int Level>
+        constexpr static uint64_t execute(uint64_t v) {
+            return popcount_builtin<Level - 2>(v);
+        }
+    };
+
+}
 
 template<int Level>
 constexpr uint64_t popcount(uint64_t a) {
-    return Selector_impl<2 < Level>::template execute<Level>(a);
+    return detail::Selector_impl<2 < Level>::template execute<Level>(a);
 }
 //template<>
 //constexpr uint64_t popcount<3>(uint64_t a) {
@@ -116,11 +120,11 @@ template<int Size, typename T = uint64_t> struct SWAR {
         return filter & (m_v >> (Size * position));
     }
 
-    constexpr void clearAt(int position) {
+    constexpr SWAR clear(int position) {
         constexpr auto filter = (T(1) << Size) - 1;
         auto invertedMask = filter << (Size * position);
         auto mask = ~invertedMask;
-        m_v &= mask;
+        return SWAR(m_v & mask);
     }
 protected:
     T m_v;
