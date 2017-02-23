@@ -37,23 +37,66 @@ namespace detail {
     static_assert(makeBitmask<2>(1ull) == popcountMask<0>, "");
 }
 
-template<int level>
-constexpr uint64_t popcount(uint64_t arg) {
-    auto v = popcount<level - 1>(arg);
-    constexpr auto shifter = 1 << level;
+template<int Bits> struct UInteger_impl;
+template<> struct UInteger_impl<8> { using type = uint8_t; };
+template<> struct UInteger_impl<16> { using type = uint16_t; };
+template<> struct UInteger_impl<32> { using type = uint32_t; };
+template<> struct UInteger_impl<64> { using type = uint64_t; };
+
+template<int Bits> using UInteger = typename UInteger_impl<Bits>::type;
+
+template<int Level>
+constexpr uint64_t popcount_logic(uint64_t arg) {
+    auto v = popcount_logic<Level - 1>(arg);
+    constexpr auto shifter = 1 << Level;
     return
-        ((v >> shifter) & detail::popcountMask<level>) +
-        (v & detail::popcountMask<level>);
+        ((v >> shifter) & detail::popcountMask<Level>) +
+        (v & detail::popcountMask<Level>);
 }
 /// Hamming weight of each bit pair
 template<>
-constexpr uint64_t popcount<0>(uint64_t v) {
+constexpr uint64_t popcount_logic<0>(uint64_t v) {
     // 00: 00; 00
     // 01: 01; 01
     // 10: 01; 01
     // 11: 10; 10
     return v - ((v >> 1) & detail::popcountMask<0>);
 }
+
+template<int Level>
+constexpr uint64_t popcount_builtin(uint64_t v) {
+    using UI = UInteger<1 << (Level + 3)>;
+    constexpr auto times = 8*sizeof(v);
+    uint64_t rv = 0;
+    for(auto n = times; n; ) {
+        n -= 8*sizeof(UI);
+        UI tmp = v >> n;
+        tmp = __builtin_popcountll(tmp);
+        rv |= uint64_t(tmp) << n;
+    }
+    return rv;
+}
+
+template<bool> struct Selector_impl {
+    template<int Level>
+    constexpr static uint64_t execute(uint64_t v) {
+        return popcount_logic<Level>(v);
+    }
+};
+template<> struct Selector_impl<true> {
+    template<int Level>
+    constexpr static uint64_t execute(uint64_t v) {
+        return popcount_builtin<Level - 2>(v);
+    }
+};
+
+template<int Level>
+constexpr uint64_t popcount(uint64_t a) {
+    return Selector_impl<2 < Level>::template execute<Level>(a);
+}
+//template<>
+//constexpr uint64_t popcount<3>(uint64_t a) {
+    
 
 static_assert(0x210 == popcount<0>(0x320), "");
 static_assert(0x4321 == popcount<1>(0xF754), "");
