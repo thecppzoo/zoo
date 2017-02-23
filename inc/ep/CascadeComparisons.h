@@ -3,6 +3,27 @@
 #include "Poker.h"
 
 namespace ep {
+    
+struct ComparisonResult {
+    int ifDecided;
+    bool decided;
+};
+
+struct FullHouseResult {
+    bool isFullHouse;
+    int bestThreeOfAKind, bestPair;
+};
+
+inline FullHouseResult isFullHouse(RankCounts counts) {
+    auto toaks = counts.greaterEqual<3>();
+    RARE(toaks) {
+        auto bestTOAK = toaks.bestIndex();
+        auto withoutBestTOAK = counts.clearAt(bestTOAK);
+        auto fullPairs = withoutBestTOAK.greaterEqual<2>();
+        RARE(fullPairs) { return { true, bestTOAK, fullPairs.bestIndex() }; }
+    }
+    return { false, 0, 0 };
+}
 
 unsigned straightsDoingChecks(unsigned rankSet) {
     constexpr auto NumberOfHandCards = 7;
@@ -269,6 +290,72 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
         return 1;
     }
     // double pairs and pairs
+    return 0;
+}
+
+inline int bestFullHouse(FullHouseResult p1, FullHouseResult p2) {
+    return
+        positiveIndex1Better(
+            p1.bestPair + (p1.bestThreeOfAKind << 4),
+            p2.bestPair + (p2.bestThreeOfAKind << 4)
+        );
+}
+
+inline int winner(CSet community, CSet p1, CSet p2) {
+    // There are three independent criteria
+    // n-of-a-kind, straights and flushes
+    // since flushes dominate straigts, and have in texas holdem about the
+    // same probability than straights, the first inconditional check is
+    // for flushes.
+    // xoptx all the comparison operations should not be unary but binary
+    // in the player cards and community, this would allow calculating the
+    // community cards only once.
+    p1 = p1 | community;
+    auto p1Suits = p1.suitCounts();
+    auto p1Flushes = flushes(p1Suits);
+    p2 = p2 | community ;
+    auto p2Suits = p2.suitCounts();
+    auto p2Flushes = flushes(p2Suits);
+
+    auto p1ranks = p1.rankCounts();
+    auto p2ranks = p2.rankCounts();
+
+    auto p1toaks = noaks<3>(p1ranks);
+    auto p2toaks = noaks<3>(p2ranks);
+
+    //auto p1str = straights(p1.rankSet());
+    //auto p2str = straights(p2.rankSet());
+
+    RARE(p1toaks) {
+        RARE(p2toaks) {
+            auto p1foaks = noaks<4>(p1ranks);
+            auto p2foaks = noaks<4>(p2ranks);
+            RARE(p1foaks) {
+                static_assert(TotalHand - 3 < 5, "Four of a kind does not imply there is no straight");
+                RARE(p2foaks) {
+                    return bestFourOfAKind(p1ranks, p2ranks, p1foaks, p2foaks);
+                }
+                RARE(straightFlush(p2, p2Flushes)) { return -1; }
+                return 1;
+            }
+            RARE(p2foaks) {
+                RARE(straightFlush(p1, p2Flushes)) { return 1; }
+                return -1;
+            }
+            // no four of a kind
+            auto p1fh = isFullHouse(p1ranks);
+            RARE(p1fh.isFullHouse) {
+                static_assert(TotalHand < 8, "There can be full house and straight flush");
+                auto p2fh = isFullHouse(p2ranks);
+                RARE(p2fh.isFullHouse) { return bestFullHouse(p1fh, p2fh); }
+                RARE(straightFlush(p2, p2Flushes)) { return -1; }
+                return 1;
+            }
+            // no four of a kind, no full house either hand
+            RARE(p1Flushes) {
+            }
+        }
+    }
     return 0;
 }
 
