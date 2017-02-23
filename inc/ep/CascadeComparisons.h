@@ -3,9 +3,48 @@
 #include "Poker.h"
 
 namespace ep {
-    
+
+inline int bestFlush(unsigned p1, unsigned p2) {
+    return positiveIndex1Better(p1, p2);
+}
+
+inline int bestStraight(unsigned s1, unsigned s2) {
+    return positiveIndex1Better(s1, s2);
+}
+
+inline int bestKickers(
+    RankCounts p1s, RankCounts p2s
+) {
+    return
+        positiveIndex1Better(
+            p1s.greaterEqual<1>().counts().value(),
+            p2s.greaterEqual<1>().counts().value()
+        );
+}
+
+inline int bestKicker(RankCounts p1s, RankCounts p2s) {
+    return bestKickers(p1s, p2s);
+}
+
+inline int bestFourOfAKind(
+    RankCounts p1s, RankCounts p2s,
+    RankCounts p1foaks, RankCounts p2foaks
+) {
+    auto p1BestNdx = p1foaks.best();
+    auto p2BestNdx = p2foaks.best();
+    auto diff = positiveIndex1Better(p1BestNdx, p2BestNdx);
+    if(diff) { return diff; }
+    return bestKicker(p1s.clearAt(p1BestNdx), p2s.clearAt(p2BestNdx));
+}
+
+inline unsigned straightFlush(CSet cards, SuitCounts ss) {
+    static_assert(TotalHand < 2*5, "Assumes only one flush");
+    auto ndx = ss.best();
+    return straights(cards.m_bySuit.at(ndx));
+}
+
 struct ComparisonResult {
-    int ifDecided;
+    int64_t ifDecided;
     bool decided;
 };
 
@@ -17,10 +56,10 @@ struct FullHouseResult {
 inline FullHouseResult isFullHouse(RankCounts counts) {
     auto toaks = counts.greaterEqual<3>();
     RARE(toaks) {
-        auto bestTOAK = toaks.bestIndex();
+        auto bestTOAK = toaks.best();
         auto withoutBestTOAK = counts.clearAt(bestTOAK);
         auto fullPairs = withoutBestTOAK.greaterEqual<2>();
-        RARE(fullPairs) { return { true, bestTOAK, fullPairs.bestIndex() }; }
+        RARE(fullPairs) { return { true, bestTOAK, fullPairs.best() }; }
     }
     return { false, 0, 0 };
 }
@@ -70,12 +109,12 @@ inline ComparisonResult winnerPotentialFullHouseGivenThreeOfAKind(
     RankCounts p1s, RankCounts p2s,
     RankCounts p1toaks, RankCounts p2toaks
 ) {
-    auto p1BestThreeOfAKindIndex = p1toaks.bestIndex();
+    auto p1BestThreeOfAKindIndex = p1toaks.best();
     auto p1WithoutBestThreeOfAKind = p1s.clearAt(p1BestThreeOfAKindIndex);
     auto p1FullPairs = p1WithoutBestThreeOfAKind.greaterEqual<2>();
     RARE(p1FullPairs) { // p1 is full house
         RARE(p2toaks) {
-            auto p2BestThreeOfAKindIndex = p2toaks.bestIndex();
+            auto p2BestThreeOfAKindIndex = p2toaks.best();
             auto bestDominantIndex =
                 positiveIndex1Better(
                     p1BestThreeOfAKindIndex, p2BestThreeOfAKindIndex
@@ -92,7 +131,7 @@ inline ComparisonResult winnerPotentialFullHouseGivenThreeOfAKind(
                 if(bestDominantIndex) { return { bestDominantIndex, true }; }
                 return {
                     positiveIndex1Better(
-                        p1FullPairs.bestIndex(), p2FullPairs.bestIndex()
+                        p1FullPairs.best(), p2FullPairs.best()
                     ),
                     true
                 };
@@ -101,7 +140,7 @@ inline ComparisonResult winnerPotentialFullHouseGivenThreeOfAKind(
         return { 1, true };
     }
     // p1 is not a full-house
-    auto p2BestThreeOfAKindIndex = p2toaks.bestIndex();
+    auto p2BestThreeOfAKindIndex = p2toaks.best();
     auto p2WithoutBestThreeOfAKind = p2s.clearAt(p2BestThreeOfAKindIndex);
     auto p2FullPairs = p2WithoutBestThreeOfAKind.greaterEqual<2>();
     RARE(p2FullPairs) { return { -1, true }; }
@@ -136,7 +175,7 @@ inline ComparisonResult winnerPotentialFullHouseOrFourOfAKind(
                 );
         }
         // p2 lacks three of a kind, can not be full-house nor four-of-a-kind
-        auto p1BestThreeOfAKindIndex = p1ThreeOfAKinds.bestIndex();
+        auto p1BestThreeOfAKindIndex = p1ThreeOfAKinds.best();
         auto p1WithoutBestThreeOfAKind = p1s.clearAt(p1BestThreeOfAKindIndex);
         auto p1FullPairs = p1WithoutBestThreeOfAKind.greaterEqual<2>();
         RARE(p1FullPairs) { return { 1, true }; }
@@ -145,7 +184,7 @@ inline ComparisonResult winnerPotentialFullHouseOrFourOfAKind(
         // neither is full house or better, undecided
     } // p1 lacks three of a kind, can not be full-house nor four-of-a-kind
     else RARE(p2ThreeOfAKinds) {
-        auto p2BestThreeOfAKindIndex = p2ThreeOfAKinds.bestIndex();
+        auto p2BestThreeOfAKindIndex = p2ThreeOfAKinds.best();
         auto p2WithoutBestThreeOfAKind = p2s.clearAt(p2BestThreeOfAKindIndex);
         auto p2FullPairs = p2s.greaterEqual<2>();
         RARE(p2FullPairs) { return { -1, true }; }
@@ -182,10 +221,10 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
         RARE(p2Flushes) {
             // p2 also has a flush, there is the need to check for either being
             // a straight flush
-            auto p1FlushSuit = p1Flushes.bestIndex();
+            auto p1FlushSuit = p1Flushes.best();
             auto p1Flush = p1.m_bySuit.at(p1FlushSuit);
             auto p1Straights = straights(p1Flush);
-            auto p2FlushSuit = p2Flushes.bestIndex();
+            auto p2FlushSuit = p2Flushes.best();
             auto p2Flush = p2.m_bySuit.at(p2FlushSuit);
             auto p2Straights = straights(p2Flush);
             RARE(p1Straights) { // p1 is straight flush
@@ -230,7 +269,7 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
     auto p1s = p1.rankCounts();
     auto p2s = p2.rankCounts();
     RARE(p2Flushes) {
-        auto p2FlushSuit = p2Flushes.bestIndex();
+        auto p2FlushSuit = p2Flushes.best();
         auto p2Flush = p2.m_bySuit.at(p2FlushSuit);
         auto p2Straights = straights(p2Flush);
         RARE(p2Straights) { return -1; } // p2 is straight flush
@@ -277,14 +316,9 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
             RARE(potentialFull.decided) { return potentialFull.ifDecided; }
             // no full house or better
             auto
-                p1Toak = p1toaks.bestIndex(),
-                p2Toak = p2toaks.bestIndex();
+                p1Toak = p1toaks.best(),
+                p2Toak = p2toaks.best();
             auto diff = positiveIndex1Better(p1Toak, p2Toak);
-            RARE(!diff) {
-                auto p1WithoutToak = p1s.clearAt(p1Toak);
-                auto p2WithoutToak = p2s.clearAt(p2Toak);
-                return bestKickers<2>(p1WithoutToak, p2WithoutToak);
-            }
             return diff;
         }
         return 1;

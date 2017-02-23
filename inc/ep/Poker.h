@@ -5,12 +5,8 @@
 
 namespace ep {
 
-constexpr int positiveIndex1Better(int index1, int index2) {
+constexpr int64_t positiveIndex1Better(uint64_t index1, uint64_t index2) {
     return index2 - index1;
-}
-
-int bestBit(uint64_t val) {
-    return __builtin_ctzll(val);
 }
 
 template<int Size, typename T>
@@ -30,9 +26,8 @@ struct Counted_impl {
     }
     constexpr operator bool() { return m_counts.value(); }
 
-    // \note Best is smaller number
-    constexpr int bestIndex() {
-        return bestBit(m_counts.value()) / Size;
+    constexpr int best() {
+        return m_counts.top();
     }
 
     constexpr Counted_impl clearAt(int index) { return m_counts.clear(index); }
@@ -92,78 +87,156 @@ constexpr RankCounts noaks(RankCounts rs) {
 #define RARE(v) if(__builtin_expect(bool(v), false))
 #define LIKELY_NOT(v) if(__builtin_expect(!bool(v), true))
 
+// \note Again the Egyptian multiplication algorithm,
+// including Ace-as-1 7 operations instead of the 10 in the naive method
 inline unsigned straights(unsigned rv) {
     // xoptx is it better hasAce = (1 & rv) << (NRanks - 4) ?
     // xoptx what about rv |= ... ?
-    auto hasAce = (1 & rv) ? (1 << (NRanks - 4)) : 0;
-    // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
+    constexpr auto acep = 1 << (NRanks - 1);
+    auto hasAce = (acep & rv) ? (1 << 3) : 0;
+    // 0 1 2 3 4 5 6 7 8 9 0 1 2
     // =========================
     // 2 3 4 5 6 7 8 9 T J Q K A
-    // - 2 3 4 5 6 7 8 9 T J Q K &
-    // - - 2 3 4 6 5 6 7 8 9 T J &
-    // - - - 2 3 4 5 6 7 8 9 T J &
-    // - - - A - - - - - - - - - |
-    // - - - A 2 3 4 5 6 7 8 9 T &
-    
-    
-    rv &= (rv >> 1);  // two
-    rv &= (rv >> 1); // three in sequence
-    rv &= (rv >> 1); // four in sequence
-    rv |= hasAce;
-    rv &= (rv >> 1);
-    return rv;
+    // -------------------------
+    // - 2 3 4 5 6 7 8 9 T J Q K   sK = rv << 1
+    // -------------------------
+    // 2 3 4 5 6 7 8 9 T J Q K A
+    // - 2 3 4 5 6 7 8 9 T J Q K   rAK = rv & sK
+    // -------------------------
+    // - - - A 2 3 4 5 6 7 8 9 T   rT = hasAce | (rv << 4)
+    // -------------------------
+    // - - - 3 4 5 6 7 8 9 T J Q
+    // - - - 2 3 4 5 6 7 8 9 T J   rQJ = rAK << 2
+    // -------------------------
+    // 2 3 4 5 6 7 8 9 T J Q K A
+    // - 2 3 4 5 6 7 8 9 T J Q K
+    // - - - 3 4 5 6 7 8 9 T J Q
+    // - - - 2 3 4 5 6 7 8 9 T J   rAKQJ = rAK & rQJ
+    // -------------------------
+    auto sk = rv << 1;
+    auto rak = rv & sk;
+    auto rt = hasAce | (rv << 4);
+    auto rqj = rak << 2;
+    auto rakqj = rak & rqj;
+    return rakqj & rt;
 }
 
-inline int bestFlush(unsigned p1, unsigned p2) {
-    for(auto count = 5; count--; ) {
-        auto
-            bestP1 = bestBit(p1),
-            bestP2 = bestBit(p2);
-        auto diff = positiveIndex1Better(bestP1, bestP2);
-        if(diff) { return diff; }
+enum BestHand {
+    HIGH_CARDS = 0, PAIR, TWO_PAIRS, THREE_OF_A_KIND, STRAIGHT, FLUSH,
+    FULL_HOUSE, FOUR_OF_A_KIND, STRAIGHT_FLUSH
+};
+
+union HandRank {
+    uint32_t code;
+    struct {
+        unsigned
+            hand: 4,
+            high: 14,
+            low: 14;
+    };
+};
+
+inline uint32_t handRankCode(BestHand h, uint16_t high, uint16_t low) {
+    HandRank rv;
+    rv.hand = h;
+    rv.high = high;
+    rv.low = low;
+    return rv.code;
+}
+
+inline unsigned reverseBits(unsigned input) { return input; }
+
+uint32_t handRank(CSet hand) {
+    auto rankCounts = hand.rankCounts();
+    auto suitCounts = hand.suitCounts();
+    auto ranks = hand.rankSet();
+    auto toaks = noaks<3>(rankCounts);
+    uint32_t rv = 0;
+    RARE(toaks) {
+        auto foaks = noaks<4>(rankCounts);
+        RARE(foaks) {
+            static_assert(TotalHand < 8, "There can be four-of-a-kind and straight-flush");
+            auto foak = foaks.best();
+            auto without = rankCounts.clearAt(foak);
+            return handRankCode(FOUR_OF_A_KIND, without.best(), 0);
+        }
+        auto toak = toaks.best();
+        auto without = rankCounts.clearAt(toak);
+        auto pairs = noaks<2>(without);
+        RARE(pairs) {
+            static_assert(TotalHand < 8, "There can be full-house and straight-flush");
+            return handRankCode(FULL_HOUSE, toak, pairs.best());
+        }
+        ranks ^= (1 << toak);
+        auto next = core::msb(ranks);
+        auto low = 1 << next;
+        ranks ^= low;
+        low |= 1 << core::msb(ranks);
+        rv = handRankCode(THREE_OF_A_KIND, toak, low);
     }
-    return 0;
-}
-
-inline int bestStraight(unsigned s1, unsigned s2) {
-    return positiveIndex1Better(bestBit(s1), bestBit(s2));
-}
-
-template<int N>
-inline int bestKickers(
-    RankCounts p1s, RankCounts p2s
-) {
-    for(auto counter = N;;) {
-        auto p1Best = p1s.bestIndex();
-        auto rv = positiveIndex1Better(p1Best, p2s.bestIndex());
-        if(rv) { return rv; }
-        if(!--counter) { break; }
-        // xoptx
-        p1s = p1s.clearAt(p1Best);
-        p2s = p2s.clearAt(p1Best);
+    auto flushes = suitCounts.greaterEqual<5>();
+    RARE(flushes) {
+        static_assert(TotalHand < 2*5, "No two flushes");
+        auto suit = flushes.best();
+        auto royal = hand.m_bySuit.at(suit);
+        auto isIt = straights(royal);
+        RARE(isIt) {
+            return handRankCode(STRAIGHT_FLUSH, core::msb(isIt), 0);
+        }
+        for(auto count = suitCounts.counts().at(suit) - 5; count--; ) {
+            royal &= (royal - 1); // turns off lsb
+        }
+        return handRankCode(FLUSH, royal, 0);
     }
-    return 0;
+    auto str = straights(ranks);
+    RARE(str) {
+        return handRankCode(STRAIGHT, core::msb(str), 0);
+    }
+    RARE(rv) { return rv; }
+    auto pairs = rankCounts.greaterEqual<2>();
+    if(pairs) {
+        auto top = pairs.best();
+        auto without = pairs.clearAt(top);
+        if(without) {
+            auto bottom = without.best();
+            auto high = (1 << top) | (1 << bottom);
+            ranks ^= high;
+            return handRankCode(TWO_PAIRS, high, core::msb(ranks));
+        }
+        auto high = 1 << top;
+        ranks ^= high;
+        auto next1 = 1 << core::msb(ranks);
+        ranks ^= next1;
+        auto next2 = 1 << core::msb(ranks);
+        ranks ^= next2;
+        return handRankCode(PAIR, high, next1 | next2 | core::msb(ranks));
+    }
+    for(auto count = TotalHand - 5; count--; ) {
+        ranks &= ranks - 1;
+    }
+    return handRankCode(HIGH_CARDS, ranks, 0);
 }
 
-inline int bestKicker(RankCounts p1s, RankCounts p2s) {
-    return bestKickers<1>(p1s, p2s);
 }
 
-inline int bestFourOfAKind(
-    RankCounts p1s, RankCounts p2s,
-    RankCounts p1foaks, RankCounts p2foaks
-) {
-    auto p1BestNdx = p1foaks.bestIndex();
-    auto p2BestNdx = p2foaks.bestIndex();
-    auto diff = positiveIndex1Better(p1BestNdx, p2BestNdx);
-    if(diff) { return diff; }
-    return bestKicker(p1s.clearAt(p1BestNdx), p2s.clearAt(p2BestNdx));
-}
-
-inline unsigned straightFlush(CSet cards, SuitCounts ss) {
-    static_assert(TotalHand < 2*5, "Assumes only one flush");
-    auto ndx = ss.bestIndex();
-    return straights(cards.m_bySuit.at(ndx));
-}
-
-}
+#if 0
+A  B  C  D  E  F  G  H  I  J  K  L  M  N  r0
+-----------------------------------------
+B  C  D  E  F  G  H  I  J  K  L  M  N  -  r0s1 = r0 << 1 1, 0
+-----------------------------------------
+A  B  C  D  E  F  G  H  I  J  K  L  M  N 
+B  C  D  E  F  G  H  I  J  K  L  M  N  -  r1 = r0 & r0s1 1, 1
+-----------------------------------------        
+C  D  E  F  G  H  I  J  K  L  M  N  -  -
+D  E  F  G  H  I  J  K  L  M  N  -  -  -  r1s2 = r1 << 2 2, 1
+-----------------------------------------
+A  B  C  D  E  F  G  H  I  J  K  L  M  N
+B  C  D  E  F  G  H  I  J  K  L  M  N  -
+C  D  E  F  G  H  I  J  K  L  M  N  -  -
+D  E  F  G  H  I  J  K  L  M  N  -  -  -  r2 = r1 & r1s2 2, 2
+-----------------------------------------
+E  F  G  H  I  J  K  L  M  N  -  -  -  -  r0s4 = r0 << 4 3, 2
+-----------------------------------------
+        result                            r2 & r0s4      3, 3
+ 
+#endif

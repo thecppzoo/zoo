@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
         if(toaks) {
             static auto count = 5;
             if(0 < --count) {
-                std::cout << nibbles << ' ' << names[toaks.bestIndex()] << std::endl;
+                std::cout << nibbles << ' ' << names[toaks.best()] << std::endl;
             }
         }
         return unsigned(bool(toaks));

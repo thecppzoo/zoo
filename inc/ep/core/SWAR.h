@@ -106,6 +106,10 @@ static_assert(0x210 == popcount<0>(0x320), "");
 static_assert(0x4321 == popcount<1>(0xF754), "");
 static_assert(0x50004 == popcount<3>(0x3E001122), "");
 
+template<typename T> constexpr T msb(T v) {
+    return 8*sizeof(T) - 1 - __builtin_clzll(v);
+}
+
 template<int Size, typename T = uint64_t> struct SWAR {
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -130,7 +134,8 @@ template<int Size, typename T = uint64_t> struct SWAR {
         return SWAR(m_v & mask);
     }
 
-    constexpr int lsb() { return __builtin_ctzll(m_v) / Size; }
+    constexpr int top() { return msb(m_v); }
+    constexpr int fastIndex() { return __builtin_ctzll(m_v) / Size; }
 
     constexpr SWAR set(int index, int bit) {
         return SWAR(m_v | (T(1) << (index * Size + bit)));
@@ -141,7 +146,7 @@ protected:
 
 template<int N, int Size, typename T>
 constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
-    static_assert(1 < N, "N is too small");
+    static_assert(1 < Size, "Degenerated SWAR");
     static_assert(metaLogCeiling(N) < Size, "N is too big for this technique");
     constexpr auto msbPos  = Size - 1;
     constexpr auto msb = T(1) << msbPos;
