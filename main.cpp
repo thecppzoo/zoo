@@ -1,5 +1,6 @@
 #include "ep/Poker.h"
 #include "ep/Poker_io.h"
+#include "ep/CascadeComparisons.h"
 
 #include <iostream>
 #include <chrono>
@@ -49,11 +50,11 @@ int main(int argc, char** argv) {
     straights = 0;
     auto reallyCheck =
         [](uint64_t cards) -> unsigned {
-            return ep::straights(ep::CSet::numberSet(cards));
+            return ep::straights(ep::CSet::rankSet(cards));
         };
     auto toakCheck = [](uint64_t cards) {
         ep::core::SWAR<4, uint64_t> nibbles(cards);
-        auto counts = ep::makeCounted(nibbles);
+        ep::RankCounts counts = nibbles;
         auto toaks = counts.greaterEqual<3>();
         if(toaks) {
             static auto count = 5;
@@ -73,14 +74,14 @@ int main(int argc, char** argv) {
     auto diff = 1.0*(nonEmpty - empty);
 
     /*checkStraight = [](uint64_t cards) {
-        return ep::straightFrontCheck(ep::CSet::numberSet(cards));
+        return ep::straightFrontCheck(ep::CSet::rankSet(cards));
     };
     straights = 0;
     auto frontCheck = benchmark(experiment, count, generator);
     auto fronted = straights;
     straights = 0;
     checkStraight = [](uint64_t cards) {
-        return ep::uncheckStraight(ep::CSet::numberSet(cards));
+        return ep::uncheckStraight(ep::CSet::rankSet(cards));
     };
     auto unchecked = benchmark(experiment, count, generator);
     auto uncheckCount = straights;*/

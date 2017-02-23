@@ -4,9 +4,9 @@
 
 namespace ep {
 
-unsigned straightsDoingChecks(unsigned numberSet) {
+unsigned straightsDoingChecks(unsigned rankSet) {
     constexpr auto NumberOfHandCards = 7;
-    auto rv = numberSet;
+    auto rv = rankSet;
     // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
     // =========================
     // 2 3 4 5 6 7 8 9 T J Q K A
@@ -23,7 +23,7 @@ unsigned straightsDoingChecks(unsigned numberSet) {
     if(!rv) { return rv; }
     rv &= (rv >> 1); // four in sequence
     if(!rv) { return rv; }
-    RARE(1 & numberSet) {
+    RARE(1 & rankSet) {
         // the argument had an ace, insert it as if for card number 1
         rv |= (1 << (NRanks - 4));
     }
@@ -46,8 +46,8 @@ inline unsigned straightFrontCheck(unsigned rankSet) {
 }
     
 inline ComparisonResult winnerPotentialFullHouseGivenThreeOfAKind(
-    Counted<NSuits, uint64_t> p1s, Counted<NSuits, uint64_t> p2s,
-    Counted<NSuits, uint64_t> p1toaks, Counted<NSuits, uint64_t> p2toaks
+    RankCounts p1s, RankCounts p2s,
+    RankCounts p1toaks, RankCounts p2toaks
 ) {
     auto p1BestThreeOfAKindIndex = p1toaks.bestIndex();
     auto p1WithoutBestThreeOfAKind = p1s.clearAt(p1BestThreeOfAKindIndex);
@@ -89,7 +89,7 @@ inline ComparisonResult winnerPotentialFullHouseGivenThreeOfAKind(
 }
 
 inline ComparisonResult winnerPotentialFullHouseOrFourOfAKind(
-    Counted<NSuits, uint64_t> p1s, Counted<NSuits, uint64_t> p2s
+    RankCounts p1s, RankCounts p2s
 ) {
     // xoptx How can any be full house or four of a kind?
     // xoptx What is the optimal sequence of checks?
@@ -147,7 +147,7 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
     // in the player cards and community, this would allow calculating the
     // community cards only once.
     p1 = p1 | community;
-    auto p1Suits = makeCounted(p1.m_bySuit);
+    auto p1Suits = p1.suitCounts();
     auto p1Flushes = flushes(p1Suits);
     p2 = p2 | community ;
     auto p2Suits = p2.suitCounts();
@@ -181,8 +181,8 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
             // Both are flush but none straight flush
             // xoptx How can any be full house or four of a kind?
             // xoptx What is the optimal sequence of checks?
-            auto p1NumberCounts = makeCounted(p1.m_byNumber);
-            auto p2NumberCounts = makeCounted(p2.m_byNumber);
+            auto p1NumberCounts = p1.rankCounts();
+            auto p2NumberCounts = p2.rankCounts();
             auto fullHouseOrFourOfAKind =
                 winnerPotentialFullHouseOrFourOfAKind(
                     p1NumberCounts, p2NumberCounts
@@ -195,8 +195,8 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
         }
         // p2 is not a flush and p1 is a flush
         // xoptx this check seems premature, only if p2 is a full house is justified
-        auto p1s = makeCounted(p1.m_byNumber);
-        auto p2s = makeCounted(p2.m_byNumber);
+        auto p1s = p1.rankCounts();
+        auto p2s = p2.rankCounts();
         auto fullHouseOrFourOfAKind =
             winnerPotentialFullHouseOrFourOfAKind(p1s, p2s);
         RARE(fullHouseOrFourOfAKind.decided) {
@@ -206,8 +206,8 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
         return 1;
     }
     // p1 is no flush
-    auto p1s = makeCounted(p1.m_byNumber);
-    auto p2s = makeCounted(p2.m_byNumber);
+    auto p1s = p1.rankCounts();
+    auto p2s = p2.rankCounts();
     RARE(p2Flushes) {
         auto p2FlushSuit = p2Flushes.bestIndex();
         auto p2Flush = p2.m_bySuit.at(p2FlushSuit);
@@ -221,9 +221,9 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
         return -1;
     }
     // No flushes
-    auto p1Set = p1.numberSet();
+    auto p1Set = p1.rankSet();
     auto p1Straights = straights(p1Set);
-    auto p2Set = p2.numberSet();
+    auto p2Set = p2.rankSet();
     auto p2Straights = straights(p2Set);
     RARE(p1Straights | p2Straights) {
         auto fhofoak = winnerPotentialFullHouseOrFourOfAKind(p1s, p2s);
@@ -240,7 +240,7 @@ int winnerCascade(CSet community, CSet p1, CSet p2) {
     auto p2Pairs = p2s.greaterEqual<2>();
     RARE(!p1Pairs) {
         RARE(!p2Pairs) {
-            return bestFlush(p1.numberSet(), p2.numberSet());
+            return bestFlush(p1.rankSet(), p2.rankSet());
         }
         return -1;
     }

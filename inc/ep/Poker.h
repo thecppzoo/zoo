@@ -14,9 +14,9 @@ int bestBit(uint64_t val) {
 }
 
 template<int Size, typename T>
-struct Counted {
-    Counted() = default;
-    constexpr Counted(core::SWAR<Size, T> bits):
+struct Counted_impl {
+    Counted_impl() = default;
+    constexpr Counted_impl(core::SWAR<Size, T> bits):
         m_counts(
             core::popcount<core::metaLogCeiling(Size - 1) - 1>(bits.value())
         )
@@ -25,7 +25,7 @@ struct Counted {
     constexpr core::SWAR<Size, T> counts() { return m_counts; }
 
     template<int N>
-    constexpr Counted greaterEqual() {
+    constexpr Counted_impl greaterEqual() {
         return core::greaterEqualSWAR<N>(m_counts);
     }
     constexpr operator bool() { return m_counts.value(); }
@@ -35,57 +35,62 @@ struct Counted {
         return bestBit(m_counts.value()) / Size;
     }
 
-    constexpr Counted clearAt(int index) { return m_counts.clear(index); }
+    constexpr Counted_impl clearAt(int index) { return m_counts.clear(index); }
 
     protected:
     core::SWAR<Size, T> m_counts;
 };
 
-template<int Size, typename T>
-constexpr Counted<Size, T>
-makeCounted(core::SWAR<Size, T> bits) { return bits; }
+using RankCounts = Counted_impl<RankSize, uint64_t>;
+using SuitCounts = Counted_impl<SuitSize, uint64_t>;
 
 struct CSet {
     SWARSuit m_bySuit;
-    SWARRank m_byNumber;
+    SWARRank m_byRank;
 
     constexpr CSet operator|(CSet o) {
-        return { m_bySuit | o.m_bySuit, m_byNumber | m_byNumber };
+        return { m_bySuit | o.m_bySuit, m_byRank | m_byRank };
     }
 
     constexpr CSet operator&(CSet o) {
-        return { m_bySuit & o.m_bySuit, m_byNumber & m_byNumber };
+        return { m_bySuit & o.m_bySuit, m_byRank & m_byRank };
     }
 
     constexpr CSet operator^(CSet o) {
-        return { m_bySuit ^ o.m_bySuit, m_byNumber ^ m_byNumber };
+        return { m_bySuit ^ o.m_bySuit, m_byRank ^ m_byRank };
     }
 
-    constexpr auto suitCounts() { return makeCounted(m_bySuit); }
-    constexpr auto numberCounts() { return makeCounted(m_byNumber); }
+    constexpr SuitCounts suitCounts() { return {m_bySuit}; }
+    constexpr RankCounts rankCounts() { return m_byRank; }
 
-    constexpr static unsigned numberSet(uint64_t orig) {
+    constexpr static unsigned rankSet(uint64_t orig) {
         auto rv = orig;
         for(auto ndx = NSuits; --ndx;) {
-            orig = orig >> SuitBits;
+            orig = orig >> SuitSize;
             rv |= orig;
         }
         constexpr auto isolateMask = (uint64_t(1) << NRanks) - 1;
         return rv & isolateMask;
     }
 
-    constexpr unsigned numberSet() { return numberSet(m_bySuit.value()); }
+    constexpr unsigned rankSet() { return rankSet(m_bySuit.value()); }
 
     constexpr CSet include(int rank, int suit) {
-        return { m_bySuit.set(suit, rank), m_byNumber.set(rank, suit) };
+        return { m_bySuit.set(suit, rank), m_byRank.set(rank, suit) };
     }
 };
 
-constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
+constexpr SuitCounts flushes(SuitCounts  ss) {
     return ss.greaterEqual<5>();
 }
 
+template<int N>
+constexpr RankCounts noaks(RankCounts rs) {
+    return rs.greaterEqual<N>();
+}
+
 #define RARE(v) if(__builtin_expect(bool(v), false))
+#define LIKELY_NOT(v) if(__builtin_expect(!bool(v), true))
 
 inline unsigned straights(unsigned rv) {
     // xoptx is it better hasAce = (1 & rv) << (NRanks - 4) ?
@@ -115,14 +120,14 @@ struct ComparisonResult {
 };
 
 inline int bestKicker(
-    Counted<NSuits, uint64_t> p1s, Counted<NSuits, uint64_t> p2s
+    RankCounts p1s, RankCounts p2s
 ) {
     return positiveIndex1Better(p1s.bestIndex(), p2s.bestIndex());
 }
 
 inline int bestFourOfAKind(
-    Counted<NSuits, uint64_t> p1s, Counted<NSuits, uint64_t> p2s,
-    Counted<NSuits, uint64_t> p1foaks, Counted<NSuits, uint64_t> p2foaks
+    RankCounts p1s, RankCounts p2s,
+    RankCounts p1foaks, RankCounts p2foaks
 ) {
     auto p1BestNdx = p1foaks.bestIndex();
     auto p2BestNdx = p2foaks.bestIndex();
@@ -151,7 +156,7 @@ struct FullHouseResult {
     int bestThreeOfAKind, bestPair;
 };
 
-inline FullHouseResult isFullHouse(Counted<NSuits, uint64_t> counts) {
+inline FullHouseResult isFullHouse(RankCounts counts) {
     auto toaks = counts.greaterEqual<3>();
     RARE(toaks) {
         auto bestTOAK = toaks.bestIndex();
@@ -164,7 +169,7 @@ inline FullHouseResult isFullHouse(Counted<NSuits, uint64_t> counts) {
 
 template<int N>
 inline int bestKickers(
-    Counted<NSuits, uint64_t> p1s, Counted<NSuits, uint64_t> p2s
+    RankCounts p1s, RankCounts p2s
 ) {
     for(auto counter = N;;) {
         auto p1Best = p1s.bestIndex();
@@ -176,6 +181,61 @@ inline int bestKickers(
         p2s = p2s.clearAt(p1Best);
     }
     return 0;
+}
+
+inline unsigned straightFlush(CSet cards, SuitCounts ss) {
+    static_assert(TotalHand < 2*5, "Assumes only one flush");
+    auto ndx = ss.bestIndex();
+    return straights(cards.m_bySuit.at(ndx));
+}
+
+inline int winner(CSet community, CSet p1, CSet p2) {
+    // There are three independent criteria
+    // n-of-a-kind, straights and flushes
+    // since flushes dominate straigts, and have in texas holdem about the
+    // same probability than straights, the first inconditional check is
+    // for flushes.
+    // xoptx all the comparison operations should not be unary but binary
+    // in the player cards and community, this would allow calculating the
+    // community cards only once.
+    p1 = p1 | community;
+    auto p1Suits = p1.suitCounts();
+    auto p1Flushes = flushes(p1Suits);
+    p2 = p2 | community ;
+    auto p2Suits = p2.suitCounts();
+    auto p2Flushes = flushes(p2Suits);
+
+    auto p1ranks = p1.rankCounts();
+    auto p2ranks = p2.rankCounts();
+
+    auto p1toaks = noaks<3>(p1ranks);
+    auto p2toaks = noaks<3>(p2ranks);
+
+    auto p1str = straights(p1.rankSet());
+    auto p2str = straights(p2.rankSet());
+
+    RARE(p1toaks) {
+        RARE(p2toaks) {
+            auto p1foaks = noaks<4>(p1ranks);
+            auto p2foaks = noaks<4>(p2ranks);
+            RARE(p1foaks) {
+                static_assert(TotalHand - 3 < 5, "Four of a kind does not imply there is no straight");
+                RARE(p2foaks) {
+                    return bestFourOfAKind(p1ranks, p2ranks, p1foaks, p2foaks);
+                }
+                LIKELY_NOT(p2Flushes) {
+                    return 1;
+                }
+                static_assert(TotalHand < 2*5, "There can be two flushes");
+                auto royal = straights(p2.m_bySuit.at(p2Flushes.bestIndex()));
+                RARE(royal) {
+                    return -1;
+                }
+                return 1;
+            }
+            RARE(p2foaks) {}
+        }
+    }
 }
 
 }

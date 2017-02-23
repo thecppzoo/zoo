@@ -16,10 +16,14 @@ constexpr auto NSuits = 4;
 
 };
 
-constexpr auto SuitBits = 1 << core::metaLogCeiling(NRanks);
-constexpr auto RankBits = 1 << core::metaLogCeiling(NSuits);
+constexpr auto SuitSize = 1 << core::metaLogCeiling(NRanks);
+constexpr auto RankSize = 1 << core::metaLogCeiling(NSuits);
 
-using SWARSuit = core::SWAR<SuitBits>;
-using SWARRank = core::SWAR<RankBits>;
+using SWARSuit = core::SWAR<SuitSize>;
+using SWARRank = core::SWAR<RankSize>;
+
+constexpr auto NCommunity = 5;
+constexpr auto NPlayer = 2;
+constexpr auto TotalHand = NCommunity + NPlayer;
 
 }
