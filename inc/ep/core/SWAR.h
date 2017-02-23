@@ -111,7 +111,10 @@ template<int Size, typename T = uint64_t> struct SWAR {
     constexpr explicit SWAR(T v): m_v(v) {}
 
     constexpr T value() const noexcept { return m_v; }
+
     constexpr SWAR operator|(SWAR o) { return SWAR(m_v | o.m_v); }
+    constexpr SWAR operator&(SWAR o) { return SWAR(m_v & o.m_v); }
+    constexpr SWAR operator^(SWAR o) { return SWAR(m_v ^ o.m_v); }
 
     constexpr bool operator==(SWAR o) { return m_v == o.m_v; }
 
@@ -125,6 +128,12 @@ template<int Size, typename T = uint64_t> struct SWAR {
         auto invertedMask = filter << (Size * position);
         auto mask = ~invertedMask;
         return SWAR(m_v & mask);
+    }
+
+    constexpr int lsb() { return __builtin_ctzll(m_v) / Size; }
+
+    constexpr SWAR set(int index, int bit) {
+        return SWAR(m_v | (T(1) << (index * Size + bit)));
     }
 protected:
     T m_v;

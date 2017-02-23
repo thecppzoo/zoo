@@ -53,6 +53,14 @@ struct CSet {
         return { m_bySuit | o.m_bySuit, m_byNumber | m_byNumber };
     }
 
+    constexpr CSet operator&(CSet o) {
+        return { m_bySuit & o.m_bySuit, m_byNumber & m_byNumber };
+    }
+
+    constexpr CSet operator^(CSet o) {
+        return { m_bySuit ^ o.m_bySuit, m_byNumber ^ m_byNumber };
+    }
+
     constexpr auto suitCounts() { return makeCounted(m_bySuit); }
     constexpr auto numberCounts() { return makeCounted(m_byNumber); }
 
@@ -67,6 +75,10 @@ struct CSet {
     }
 
     constexpr unsigned numberSet() { return numberSet(m_bySuit.value()); }
+
+    constexpr CSet include(int rank, int suit) {
+        return { m_bySuit.set(suit, rank), m_byNumber.set(rank, suit) };
+    }
 };
 
 constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
@@ -75,7 +87,7 @@ constexpr Counted<SuitBits, uint64_t> flushes(Counted<SuitBits, uint64_t>  ss) {
 
 #define RARE(v) if(__builtin_expect(bool(v), false))
 
-unsigned isStraight(unsigned numberSet) {
+unsigned straightsDoingChecks(unsigned numberSet) {
     constexpr auto NumberOfHandCards = 7;
     auto rv = numberSet;
     // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
@@ -102,12 +114,12 @@ unsigned isStraight(unsigned numberSet) {
     return rv;
 }
 
-inline unsigned uncheckStraight(unsigned numberSet);
+inline unsigned straights(unsigned numberSet);
 
 inline unsigned straightFrontCheck(unsigned rankSet) {
     constexpr auto mask = (1 << 9) | (1 << 4);
-    if(rankSet & mask) { return uncheckStraight(rankSet); }
-    /*auto notStraight = isStraight(rankSet);
+    if(rankSet & mask) { return straights(rankSet); }
+    /*auto notStraight = straights(rankSet);
     if(notStraight) {
         static auto count = 5;
         if(5 == count) { pRanks(std::cerr, mask) << '\n' << std::endl; }
@@ -118,10 +130,10 @@ inline unsigned straightFrontCheck(unsigned rankSet) {
     return 0;
 }
 
-inline unsigned uncheckStraight(unsigned numberSet) {
-    constexpr auto NumberOfHandCards = 7;
-    auto rv = numberSet;
-    auto hasAce = (1 & numberSet) ? (1 << (NRanks - 4)) : 0;
+inline unsigned straights(unsigned rv) {
+    // xoptx is it better hasAce = (1 & rv) << (NRanks - 4) ?
+    // xoptx what about rv |= ... ?
+    auto hasAce = (1 & rv) ? (1 << (NRanks - 4)) : 0;
     // 2 1 0 9 8 7 6 5 4 3 2 1 0 bit index
     // =========================
     // 2 3 4 5 6 7 8 9 T J Q K A
@@ -326,10 +338,10 @@ int winner(CSet community, CSet p1, CSet p2) {
             // a straight flush
             auto p1FlushSuit = p1Flushes.bestIndex();
             auto p1Flush = p1.m_bySuit.at(p1FlushSuit);
-            auto p1Straights = isStraight(p1Flush);
+            auto p1Straights = straights(p1Flush);
             auto p2FlushSuit = p2Flushes.bestIndex();
             auto p2Flush = p2.m_bySuit.at(p2FlushSuit);
-            auto p2Straights = isStraight(p2Flush);
+            auto p2Straights = straights(p2Flush);
             RARE(p1Straights) { // p1 is straight flush
                 // note: never needed to calculate number repetitions!
                 RARE(p2Straights) { // both are
@@ -374,7 +386,7 @@ int winner(CSet community, CSet p1, CSet p2) {
     RARE(p2Flushes) {
         auto p2FlushSuit = p2Flushes.bestIndex();
         auto p2Flush = p2.m_bySuit.at(p2FlushSuit);
-        auto p2Straights = isStraight(p2Flush);
+        auto p2Straights = straights(p2Flush);
         RARE(p2Straights) { return -1; } // p2 is straight flush
         auto fullHouseOrFourOfAKind =
             winnerPotentialFullHouseOrFourOfAKind(p1s, p2s);
@@ -385,9 +397,9 @@ int winner(CSet community, CSet p1, CSet p2) {
     }
     // No flushes
     auto p1Set = p1.numberSet();
-    auto p1Straights = isStraight(p1Set);
+    auto p1Straights = straights(p1Set);
     auto p2Set = p2.numberSet();
-    auto p2Straights = isStraight(p2Set);
+    auto p2Straights = straights(p2Set);
     RARE(p1Straights | p2Straights) {
         auto fhofoak = winnerPotentialFullHouseOrFourOfAKind(p1s, p2s);
         RARE(fhofoak.decided) { return fhofoak.ifDecided; }

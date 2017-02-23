@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
     straights = 0;
     auto reallyCheck =
         [](uint64_t cards) -> unsigned {
-            return ep::uncheckStraight(ep::CSet::numberSet(cards));
+            return ep::straights(ep::CSet::numberSet(cards));
         };
     auto toakCheck = [](uint64_t cards) {
         ep::core::SWAR<4, uint64_t> nibbles(cards);
