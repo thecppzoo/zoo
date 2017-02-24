@@ -144,7 +144,7 @@ union HandRank {
 
 inline unsigned reverseBits(unsigned input) { return input; }
 
-HandRank handRank(CSet hand) {
+inline HandRank handRank(CSet hand) {
     auto rankCounts = hand.rankCounts();
     auto suitCounts = hand.suitCounts();
     auto ranks = hand.rankSet();

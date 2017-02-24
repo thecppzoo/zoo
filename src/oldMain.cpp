@@ -43,7 +43,7 @@ std::ostream &operator<<(std::ostream &out, ep::core::SWAR<4, uint64_t> s) {
     return out;
 }
 
-int main(int argc, char** argv) {
+int maino(int argc, char** argv) {
     std::random_device device;
     std::mt19937 generator(device());
     auto count = 1 << 24;

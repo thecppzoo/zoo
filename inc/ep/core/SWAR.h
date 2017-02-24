@@ -134,7 +134,7 @@ template<int Size, typename T = uint64_t> struct SWAR {
         return SWAR(m_v & mask);
     }
 
-    constexpr int top() { return msb(m_v); }
+    constexpr int top() { return msb(m_v) / Size; }
     constexpr int fastIndex() { return __builtin_ctzll(m_v) / Size; }
 
     constexpr SWAR set(int index, int bit) {
