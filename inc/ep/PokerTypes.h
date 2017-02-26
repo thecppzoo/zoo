@@ -45,6 +45,18 @@ enum Ranks {
     r2 = 0, r3, r4, r5, r6, r7, r8, r9, rT, rJ, rQ, rK, rA
 };
 
+inline int operator|(Ranks r1, Ranks r2) {
+    return (1 << r1) | (1 << r2);
+}
+
+inline int operator|(int rv, Ranks rank) {
+    return rv | (1 << rank);
+}
+
+inline int operator|=(int &rv, Ranks rank) {
+    return rv |= (1 << rank);
+}
+
 enum Suits {
     sS = 0, sH, sC, sD
 };

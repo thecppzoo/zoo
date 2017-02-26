@@ -3,6 +3,7 @@
 /// \file Swar.h SWAR operations
 
 #include "metaLog.h"
+#include <type_traits>
 
 namespace ep { namespace core {
 
@@ -106,7 +107,8 @@ static_assert(0x210 == popcount<0>(0x320), "");
 static_assert(0x4321 == popcount<1>(0xF754), "");
 static_assert(0x50004 == popcount<3>(0x3E001122), "");
 
-template<typename T> constexpr T msb(T v) {
+template<typename T> constexpr typename std::make_signed<T>::type msb(T v) {
+    if(!v) { return -1; }
     return 8*sizeof(T) - 1 - __builtin_clzll(v);
 }
 

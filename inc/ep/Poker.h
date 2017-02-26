@@ -4,6 +4,7 @@
 
 namespace ep {
 
+
 constexpr int64_t positiveIndex1Better(uint64_t index1, uint64_t index2) {
     return index1 - index2;
 }
@@ -23,13 +24,17 @@ struct Counted_impl {
     constexpr Counted_impl greaterEqual() {
         return core::greaterEqualSWAR<N>(m_counts);
     }
-    constexpr operator bool() { return m_counts.value(); }
+    constexpr operator bool() const { return m_counts.value(); }
 
     constexpr int best() {
         return m_counts.top();
     }
 
-    constexpr Counted_impl clearAt(int index) { return m_counts.clear(index); }
+    constexpr Counted_impl clearAt(int index) {
+        auto rv = Counted_impl();
+        rv.m_counts = m_counts.clear(index);
+        return rv;
+    }
 
     protected:
     core::SWAR<Size, T> m_counts;
@@ -88,21 +93,21 @@ constexpr RankCounts noaks(RankCounts rs) {
 
 // \note Again the Egyptian multiplication algorithm,
 // including Ace-as-1 7 operations instead of the 10 in the naive method
-inline unsigned straights(unsigned rv) {
+inline unsigned straights(unsigned ranks) {
     // xoptx is it better hasAce = (1 & rv) << (NRanks - 4) ?
     // xoptx what about rv |= ... ?
     constexpr auto acep = 1 << (NRanks - 1);
-    auto hasAce = (acep & rv) ? (1 << 3) : 0;
+    auto hasAce = (acep & ranks) ? (1 << 3) : 0;
     // 0 1 2 3 4 5 6 7 8 9 0 1 2
     // =========================
     // 2 3 4 5 6 7 8 9 T J Q K A
     // -------------------------
-    // - 2 3 4 5 6 7 8 9 T J Q K   sK = rv << 1
+    // - 2 3 4 5 6 7 8 9 T J Q K   sK = ranks << 1
     // -------------------------
     // 2 3 4 5 6 7 8 9 T J Q K A
-    // - 2 3 4 5 6 7 8 9 T J Q K   rAK = rv & sK
+    // - 2 3 4 5 6 7 8 9 T J Q K   rAK = ranks & sK
     // -------------------------
-    // - - - A 2 3 4 5 6 7 8 9 T   rT = hasAce | (rv << 4)
+    // - - - A 2 3 4 5 6 7 8 9 T   rT = hasAce | (ranks << 4)
     // -------------------------
     // - - - 3 4 5 6 7 8 9 T J Q
     // - - - 2 3 4 5 6 7 8 9 T J   rQJ = rAK << 2
@@ -112,9 +117,9 @@ inline unsigned straights(unsigned rv) {
     // - - - 3 4 5 6 7 8 9 T J Q
     // - - - 2 3 4 5 6 7 8 9 T J   rAKQJ = rAK & rQJ
     // -------------------------
-    auto sk = rv << 1;
-    auto rak = rv & sk;
-    auto rt = hasAce | (rv << 4);
+    auto sk = ranks << 1;
+    auto rak = ranks & sk;
+    auto rt = hasAce | (ranks << 4);
     auto rqj = rak << 2;
     auto rakqj = rak & rqj;
     return rakqj & rt;
@@ -163,7 +168,8 @@ inline HandRank handRank(CSet hand) {
         auto pairs = noaks<2>(without);
         RARE(pairs) {
             static_assert(TotalHand < 8, "There can be full-house and straight-flush");
-            return { FULL_HOUSE, (1 << toak) | (1 << pairs.best()), 0 };
+            auto pair = pairs.best();
+            return { FULL_HOUSE, (1 << toak), (1 << pair) };
         }
         auto high = 1 << toak;
         ranks ^= high;
