@@ -90,5 +90,26 @@ TEST_CASE("Simple operations", "[basic]") {
         REQUIRE((0 | rA) == dtfh.high);
         REQUIRE((0 | r3) == dtfh.low);
         REQUIRE(fhhr.code < dtfh.code);
+
+        auto fivesOverKingThree = ep::SWARRank(s5 | h5 | d5 | sK | c3 | h2);
+        ep::CSet toak = { ep::convert(fivesOverKingThree), fivesOverKingThree };
+        auto toakHR = ep::handRank(toak);
+        REQUIRE(ep::THREE_OF_A_KIND == toakHR.hand);
+        REQUIRE((0 | r5) == toakHR.high);
+        REQUIRE((rK | r3) == toakHR.low); // successfully ignores the h2
+
+        auto tensAndSixesWithEightHigh = ep::SWARRank(sT | dT | c6 | s6 | h8 | s2);
+        ep::CSet twoPairs = { ep::convert(tensAndSixesWithEightHigh), tensAndSixesWithEightHigh };
+        auto twoPHR = ep::handRank(twoPairs);
+        REQUIRE(ep::TWO_PAIRS == twoPHR.hand);
+        REQUIRE((rT | r6) == twoPHR.high);
+        REQUIRE((0 | r8) == twoPHR.low);
+
+        auto threesOverKQJ = ep::SWARRank(hK | dQ | cJ | s3 | d3 | s2);
+        ep::CSet pair = { ep::convert(threesOverKQJ), threesOverKQJ };
+        auto pairHR = ep::handRank(pair);
+        REQUIRE(ep::PAIR == pairHR.hand);
+        REQUIRE((0 | r3) == pairHR.high);
+        REQUIRE((rK | rQ | rJ) == pairHR.low);
     }
 }
