@@ -118,7 +118,7 @@ mainpc
     auto base = 1.0 * justLCG;
     auto fraction = [&](const char *n, int t) {
         std::cout << n << ' ' << t/1000 << ' ' << (t - base)/base << ' ' <<
-            count/t << " | ";
+            count/(t - base) << " | ";
     };
     fraction("LCG    ", justLCG);
     fraction("Lookups", lookups);

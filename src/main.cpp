@@ -1,7 +1,11 @@
 #include "ep/Poker_io.h"
 #include "ep/Poker.h"
 
-#define CATCH_CONFIG_MAIN
+#ifdef TESTS
+    #define CATCH_CONFIG_MAIN
+#else
+    #define CATCH_CONFIG_RUNNER
+#endif
 #include "catch.hpp"
 
 constexpr uint64_t royalFlush() {
@@ -111,5 +115,12 @@ TEST_CASE("Simple operations", "[basic]") {
         REQUIRE(ep::PAIR == pairHR.hand);
         REQUIRE((0 | r3) == pairHR.high);
         REQUIRE((rK | rQ | rJ) == pairHR.low);
+
+        auto KT874 = ep::SWARRank(hK | dT | c8 | c7 | c4 | d3 | s2);
+        ep::CSet kingHigh = { ep::convert(KT874), KT874 };
+        auto kingHighT874 = ep::handRank(kingHigh);
+        REQUIRE(ep::HIGH_CARDS == kingHighT874.hand);
+        REQUIRE((rK | rT | r8 | r7 | r4) == kingHighT874.high);
+        REQUIRE(0 == kingHighT874.low);
     }
 }
