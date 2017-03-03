@@ -141,9 +141,19 @@ template<int Size, typename T = uint64_t> struct SWAR {
     constexpr SWAR set(int index, int bit) {
         return SWAR(m_v | (T(1) << (index * Size + bit)));
     }
+
+    constexpr operator bool() { return m_v; }
 protected:
     T m_v;
 };
+
+constexpr auto transformToUnits =
+#ifdef DO_NOT_MAKE_UNITS
+false
+#else
+true
+#endif
+;
 
 template<int N, int Size, typename T>
 constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
@@ -156,11 +166,11 @@ constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     auto adjusted = v.value() | msbMask;
     auto rv = adjusted - subtraend;
     rv &= msbMask;
-    return SWAR<Size, T>(rv >> msbPos);
+    return SWAR<Size, T>(transformToUnits ? (rv >> msbPos) : rv);
 }
 
 static_assert(
-    0x10110001 == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),
+    (0x80880008 >> (transformToUnits ? 3 : 0)) == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),
     ""
 );
 

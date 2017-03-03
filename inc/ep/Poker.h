@@ -144,7 +144,7 @@ union HandRank {
         hand(h), high(high), low(low)
     {}
 
-    constexpr operator bool() { return code; }
+    operator bool() const { return code; }
 };
 
 inline unsigned reverseBits(unsigned input) { return input; }

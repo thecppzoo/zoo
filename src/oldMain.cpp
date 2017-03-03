@@ -31,18 +31,6 @@ void experiment(unsigned count, std::mt19937 &generator) {
 
 auto names = "AKQJT98765432";
 
-std::ostream &operator<<(std::ostream &out, ep::core::SWAR<4, uint64_t> s) {
-    auto suites = "chsd";
-    auto set = s.value();
-    while(set) {
-        auto bit = __builtin_ctzll(set);
-        auto mask = uint64_t(1) << bit;
-        out << names[bit / 4] << suites[bit % 4];
-        set ^= mask;
-    }
-    return out;
-}
-
 int maino(int argc, char** argv) {
     std::random_device device;
     std::mt19937 generator(device());
