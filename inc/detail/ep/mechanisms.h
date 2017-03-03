@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ep/Poker.h"
+#include "obsolete/Poker.h"
 #include "ep/Poker_io.h"
 #include "ep/Floyd.h"
 

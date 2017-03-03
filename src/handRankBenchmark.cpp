@@ -1,5 +1,5 @@
 #include "ep/timing/benchmark.h"
-#include "ep/Poker.h"
+#include "obsolete/Poker.h"
 #include "ep/Poker_io.h"
 #include "ep/Floyd.h"
 #include "ep/nextSubset.h"

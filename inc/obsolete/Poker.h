@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PokerTypes.h"
+#include "ep/PokerTypes.h"
 
 namespace ep {
 
