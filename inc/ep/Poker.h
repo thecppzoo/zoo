@@ -84,4 +84,27 @@ inline uint64_t flush(uint64_t arg) {
     return 0;
 }
 
+template<int N>
+constexpr RankCounts noaks(RankCounts rs) {
+    return rs.greaterEqual<N>();
+}
+
+#define RARE(v) if(__builtin_expect(bool(v), false))
+#define LIKELY_NOT(v) if(__builtin_expect(!bool(v), true))
+
+inline SWARRank straights_rankRepresentation(RankCounts counts) {
+    auto present = counts.counts();
+    auto acep = 
+        present.at(ep::abbreviations::rA) ?
+            uint64_t(0xF) << ep::abbreviations::rA :
+            uint64_t(0);
+    auto ranks = present.value();
+    auto sk = ranks << 4;
+    auto rak = ranks & sk;
+    auto rt = acep | (ranks << 16);
+    auto rqj = rak << 8;
+    auto rakqj = rak & rqj;
+    return SWARRank(rakqj & rt);
+}
+
 }

@@ -44,14 +44,6 @@ constexpr SuitCounts flushes(SuitCounts  ss) {
     return ss.greaterEqual<5>();
 }
 
-template<int N>
-constexpr RankCounts noaks(RankCounts rs) {
-    return rs.greaterEqual<N>();
-}
-
-#define RARE(v) if(__builtin_expect(bool(v), false))
-#define LIKELY_NOT(v) if(__builtin_expect(!bool(v), true))
-
 // \note Again the Egyptian multiplication algorithm,
 // including Ace-as-1 7 operations instead of the 10 in the naive method
 inline unsigned straights(unsigned ranks) {
