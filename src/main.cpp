@@ -1,5 +1,6 @@
 #include "ep/Poker_io.h"
 #include "obsolete/Poker.h"
+#include "ep/Poker.h"
 
 #ifdef TESTS
     #define CATCH_CONFIG_MAIN

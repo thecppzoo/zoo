@@ -21,7 +21,7 @@ struct ProgressiveGenerator {
 
 int isFOAK(uint64_t cards) {
     ep::SWARRank ranks(cards);
-    ep::RankCounts counts = ranks;
+    ep::RankCounts counts(ranks);
     auto foaks = ep::core::greaterEqualSWAR<4>(counts.counts());
     return foaks;
 }
@@ -55,7 +55,7 @@ uint64_t flush(uint64_t ranks) {
 /// \return true if the cards have a three of a kind and a pair
 int isTOAKplusPAIRv1(uint64_t cards) {
     ep::SWARRank ranks(cards);
-    ep::RankCounts counts = ranks;
+    ep::RankCounts counts(ranks);
     auto toaks = ep::core::greaterEqualSWAR<3>(counts.counts());
     if(!toaks) { return false; }
     auto toakIndex = toaks.top();
@@ -66,7 +66,7 @@ int isTOAKplusPAIRv1(uint64_t cards) {
 
 int colorBlindRank(uint64_t cards) {
     ep::SWARRank ranks(cards);
-    ep::RankCounts counts = ranks;
+    ep::RankCounts counts(ranks);
     auto toaks = ep::core::greaterEqualSWAR<3>(counts.counts());
     if(toaks) {
         auto foaks = ep::core::greaterEqualSWAR<4>(counts.counts());
@@ -106,7 +106,7 @@ inline unsigned toRanks(uint64_t ranks) {
 }
 
 int rankFlushG(uint64_t cards) {
-    auto s = straights(ep::SWARRank(cards));
+    auto s = straights(ep::RankCounts(ep::SWARRank(cards)));
     if(s) {
         return encode(ep::STRAIGHT_FLUSH, 0, 1 << s.top());
     }
@@ -118,13 +118,13 @@ int rankFlushG(uint64_t cards) {
 }
 
 int rankFlushCheat(uint64_t cards) {
-    if(straights(ep::SWARRank(cards))) { return ep::STRAIGHT_FLUSH; }
+    if(straights(ep::RankCounts(ep::SWARRank(cards)))) { return ep::STRAIGHT_FLUSH; }
     return ep::FLUSH;
 }
 
 int whole(uint64_t cards) {
     ep::SWARRank ranks(cards);
-    ep::RankCounts counts = ranks;
+    ep::RankCounts counts(ranks);
     auto toaks = ep::core::greaterEqualSWAR<3>(counts.counts());
     if(toaks) {
         auto foaks = ep::core::greaterEqualSWAR<4>(counts.counts());
@@ -184,10 +184,10 @@ int whole(uint64_t cards) {
 
 int wholeCheat(uint64_t cards) {
     ep::SWARRank ranks(cards);
-    ep::RankCounts counts = ranks;
-    auto toaks = ep::core::greaterEqualSWAR<3>(counts.counts());
+    ep::RankCounts counts(ranks);
+    auto toaks = counts.greaterEqual<3>();
     if(toaks) {
-        auto foaks = ep::core::greaterEqualSWAR<4>(counts.counts());
+        auto foaks = counts.greaterEqual<4>();
         if(foaks) {
             return ep::FOUR_OF_A_KIND;
         }
@@ -319,8 +319,7 @@ benchmarks
     indicators(v6, base);
   
     std::cout << ' ' << toakPlusPairs << ' ' << std::hex << sideEffect << ' ' <<
-        xorCheck << ' ' <<
-        (ep::core::transformToUnits ? "2Units" : "~Units") << std::endl;
+        xorCheck << std::endl;
     return 0;
 }
 

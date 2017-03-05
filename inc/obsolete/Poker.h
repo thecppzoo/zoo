@@ -1,47 +1,8 @@
 #pragma once
 
-#include "ep/PokerTypes.h"
+#include "ep/Poker.h"
 
 namespace ep {
-
-
-constexpr int64_t positiveIndex1Better(uint64_t index1, uint64_t index2) {
-    return index1 - index2;
-}
-
-template<int Size, typename T>
-struct Counted_impl {
-    Counted_impl() = default;
-    constexpr Counted_impl(core::SWAR<Size, T> bits):
-        m_counts(
-            core::popcount<core::metaLogCeiling(Size - 1) - 1>(bits.value())
-        )
-    {}
-
-    constexpr core::SWAR<Size, T> counts() { return m_counts; }
-
-    template<int N>
-    constexpr Counted_impl greaterEqual() {
-        return core::greaterEqualSWAR<N>(m_counts);
-    }
-    constexpr operator bool() const { return m_counts.value(); }
-
-    constexpr int best() {
-        return m_counts.top();
-    }
-
-    constexpr Counted_impl clearAt(int index) {
-        auto rv = Counted_impl();
-        rv.m_counts = m_counts.clear(index);
-        return rv;
-    }
-
-    protected:
-    core::SWAR<Size, T> m_counts;
-};
-
-using RankCounts = Counted_impl<RankSize, uint64_t>;
-using SuitCounts = Counted_impl<SuitSize, uint64_t>;
 
 struct CSet {
     SWARSuit m_bySuit;
@@ -59,8 +20,8 @@ struct CSet {
         return { m_bySuit ^ o.m_bySuit, m_byRank ^ m_byRank };
     }
 
-    constexpr SuitCounts suitCounts() { return {m_bySuit}; }
-    constexpr RankCounts rankCounts() { return m_byRank; }
+    constexpr SuitCounts suitCounts() { return SuitCounts(m_bySuit); }
+    constexpr RankCounts rankCounts() { return RankCounts(m_byRank); }
 
     constexpr static unsigned rankSet(uint64_t orig) {
         auto rv = orig;

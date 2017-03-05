@@ -42,7 +42,7 @@ int maino(int argc, char** argv) {
         };
     auto toakCheck = [](uint64_t cards) {
         ep::core::SWAR<4, uint64_t> nibbles(cards);
-        ep::RankCounts counts = nibbles;
+        ep::RankCounts counts(nibbles);
         auto toaks = counts.greaterEqual<3>();
         if(toaks) {
             static auto count = 5;

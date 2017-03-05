@@ -147,14 +147,6 @@ protected:
     T m_v;
 };
 
-constexpr auto transformToUnits =
-#ifdef DO_NOT_MAKE_UNITS
-false
-#else
-true
-#endif
-;
-
 template<int N, int Size, typename T>
 constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     static_assert(1 < Size, "Degenerated SWAR");
@@ -166,11 +158,11 @@ constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     auto adjusted = v.value() | msbMask;
     auto rv = adjusted - subtraend;
     rv &= msbMask;
-    return SWAR<Size, T>(transformToUnits ? (rv >> msbPos) : rv);
+    return SWAR<Size, T>(rv);
 }
 
 static_assert(
-    (0x80880008 >> (transformToUnits ? 3 : 0)) == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),
+    0x80880008 == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),
     ""
 );
 
