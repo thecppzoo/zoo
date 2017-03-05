@@ -16,6 +16,20 @@ constexpr uint64_t royalFlush() {
 
 int whole(uint64_t);
 
+TEST_CASE("Poker operations", "[basic]") {
+    SECTION("Flush") {
+        using namespace ep::abbreviations;
+        auto noFlush = sQ;
+        REQUIRE(0 == ep::flush(noFlush));
+
+        auto flushOfDiamonds = dK | dT | d7 | d6 | d2;
+        auto sevenCardFlush5x2 = noFlush | sA | flushOfDiamonds;
+        auto flush = ep::flush(sevenCardFlush5x2);
+        auto flushOfSpades = flushOfDiamonds >> 3;
+        REQUIRE(flush == flushOfSpades);
+    }
+}
+
 TEST_CASE("Simple operations", "[basic]") {
     ep::SWARRank royal(royalFlush());
     SECTION("Fundamental") {
