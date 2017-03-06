@@ -30,14 +30,16 @@ TEST_CASE("Poker operations", "[basic]") {
 
         auto heartsRoyalFlush = royalFlush();
         auto hrf = ep::SWARRank(heartsRoyalFlush);
-        auto present = ep::RankCounts(hrf);
+        auto hrcounted = ep::RankCounts(hrf);
+        auto present = hrcounted.greaterEqual<1>();
         auto straightsResult = ep::straights_rankRepresentation(present);
         REQUIRE(sA == straightsResult.value());
 
         auto straightTo5 = (heartsRoyalFlush ^ hT) | d2 | c3 | d4 | s5;
         auto sr5 = ep::SWARRank(straightTo5);
         auto p5 = ep::RankCounts(sr5);
-        auto straightTo5Result = ep::straights_rankRepresentation(p5);
+        auto p5Present = p5.greaterEqual<1>();
+        auto straightTo5Result = ep::straights_rankRepresentation(p5Present);
         REQUIRE(s5 == straightTo5Result.value());
     }
 }

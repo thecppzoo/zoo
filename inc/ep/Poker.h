@@ -25,22 +25,21 @@ struct Counted_impl {
     {}
     constexpr Counted_impl(NoConversion, core::SWAR<Size, T> bits):
         m_counts(bits) {}
-    
+
+    constexpr Counted_impl clearAt(int index) {
+        return Counted_impl(doNotConvert, m_counts.clear(index));
+    }
 
     constexpr core::SWAR<Size, T> counts() { return m_counts; }
 
     template<int N>
-    constexpr Counted_impl greaterEqual() {
-        return Counted_impl(doNotConvert, core::greaterEqualSWAR<N>(m_counts));
+    constexpr core::BooleanSWAR<Size, T> greaterEqual() {
+        return core::greaterEqualSWAR<N>(m_counts);
     }
 
     constexpr operator bool() const { return m_counts.value(); }
 
     constexpr int best() { return m_counts.top(); }
-
-    constexpr Counted_impl clearAt(int index) {
-        return Counted_impl(doNotConvert, m_counts.clear(index));
-    }
 
     protected:
     core::SWAR<Size, T> m_counts;
@@ -48,6 +47,7 @@ struct Counted_impl {
 
 using RankCounts = Counted_impl<RankSize, uint64_t>;
 using SuitCounts = Counted_impl<SuitSize, uint64_t>;
+using RanksPresent = core::BooleanSWAR<RankSize, uint64_t>;
 
 struct CardSet {
     SWARRank m_ranks;
@@ -65,8 +65,10 @@ struct CardSet {
     static unsigned ranks(RankCounts rc) {
         constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(8));
         auto present = rc.greaterEqual<1>();
-        return __builtin_ia32_pext_di(present.counts().value(), selector);
+        return __builtin_ia32_pext_di(present.value(), selector);
     }
+
+    constexpr uint64_t cards() { return m_ranks.value(); }
 };
 
 inline CardSet operator|(CardSet l, CardSet r) {
@@ -84,16 +86,10 @@ inline uint64_t flush(uint64_t arg) {
     return 0;
 }
 
-template<int N>
-constexpr RankCounts noaks(RankCounts rs) {
-    return rs.greaterEqual<N>();
-}
-
 #define RARE(v) if(__builtin_expect(bool(v), false))
 #define LIKELY_NOT(v) if(__builtin_expect(!bool(v), true))
 
-inline SWARRank straights_rankRepresentation(RankCounts counts) {
-    auto present = counts.counts();
+inline SWARRank straights_rankRepresentation(RanksPresent present) {
     auto acep = 
         present.at(ep::abbreviations::rA) ?
             uint64_t(0xF) << ep::abbreviations::rA :
@@ -105,6 +101,102 @@ inline SWARRank straights_rankRepresentation(RankCounts counts) {
     auto rqj = rak << 8;
     auto rakqj = rak & rqj;
     return SWARRank(rakqj & rt);
+}
+
+enum BestHand {
+    HIGH_CARDS = 0, PAIR, TWO_PAIRS, THREE_OF_A_KIND, STRAIGHT, FLUSH,
+    FULL_HOUSE, FOUR_OF_A_KIND, STRAIGHT_FLUSH
+};
+
+union HandRank {
+    uint32_t code;
+    struct {
+        unsigned
+            low: 14,
+            high: 14,
+            hand: 4;
+    };
+
+    HandRank(): code(0) {}
+    HandRank(BestHand h, int high, int low):
+        hand(h), high(high), low(low)
+    {}
+
+    operator bool() const { return code; }
+};
+
+inline unsigned toRanks(uint64_t ranks) {
+    constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(1));
+    return __builtin_ia32_pext_di(ranks, selector);
+}
+inline HandRank handRank(CardSet hand) {
+    RankCounts rankCounts{SWARRank(hand.cards())};
+    auto toaks = rankCounts.greaterEqual<3>();
+    HandRank rv;
+    RARE(toaks) {
+        auto foaks = rankCounts.greaterEqual<4>();
+        RARE(foaks) {
+            static_assert(TotalHand < 8, "There can be four-of-a-kind and straight-flush");
+            auto foak = foaks.top();
+            auto without = rankCounts.clearAt(foak);
+            return { FOUR_OF_A_KIND, 1 << foak, 1 << without.best() };
+        }
+        auto toak = toaks.top();
+        auto without = rankCounts.clearAt(toak);
+        auto pairs = without.greaterEqual<2>();
+        RARE(pairs) {
+            static_assert(TotalHand < 8, "There can be full-house and straight-flush");
+            auto pair = pairs.top();
+            return { FULL_HOUSE, (1 << toak), (1 << pair) };
+        }
+        auto high = 1 << toak;
+        auto highest = without.best();
+        auto middleBottom = without.clearAt(highest);
+        auto middle = middleBottom.best();
+        auto bottom = middleBottom.clearAt(middle);
+        auto lowest = bottom.best();
+        auto low = (1 << highest) | (1 << middle) | (1 << lowest);
+        rv = HandRank(THREE_OF_A_KIND, high, low);
+    }
+    static_assert(TotalHand < 2*5, "No two flushes");
+    auto flushCards = flush(hand.cards());
+    RARE(flushCards) {
+        auto tmp = RanksPresent(flushCards);
+        auto straightFlush = straights_rankRepresentation(tmp);
+        RARE(straightFlush) {
+            return { STRAIGHT_FLUSH, 1 << straightFlush.top(), 0 };
+        }
+        auto cards = straightFlush.value();
+        for(auto count = __builtin_popcountll(cards); 5 < count--; ) {
+            cards &= (cards - 1); // turns off lsb
+        }
+        auto ranks = toRanks(cards);
+        return { FLUSH, 0, int(ranks) };
+    }
+    auto ranks = rankCounts.greaterEqual<1>();
+    auto str = straights_rankRepresentation(ranks);
+    RARE(str) { return { STRAIGHT, 0, 1 << str.top() }; }
+    RARE(rv) { return rv; }
+    auto pairs = rankCounts.greaterEqual<2>();
+    if(pairs) {
+        auto top = pairs.top();
+        auto bottomPairs = ranks.clear(top);
+        auto without = rankCounts.clearAt(top);
+        if(bottomPairs) {
+            auto bottom = bottomPairs.top();
+            auto high = (1 << top) | (1 << bottom);
+            auto without2 = without.clearAt(bottom);
+            return { TWO_PAIRS, high, 1 << without2.best() };
+        }
+        // assert(5 == __builtin...
+        
+        //return { PAIR, high, next1 | next2 | next3 };
+    }
+    auto valueRanks = ranks.value();
+    for(auto count = TotalHand - 5; count--; ) {
+        valueRanks &= valueRanks - 1;
+    }
+    return { HIGH_CARDS, 0, int(valueRanks) };
 }
 
 }

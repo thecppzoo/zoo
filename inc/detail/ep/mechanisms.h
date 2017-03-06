@@ -6,6 +6,9 @@
 
 namespace ep { namespace naive {
 
+template<int N>
+RankCounts noaks(RankCounts rc) { return RankCounts(RankCounts::doNotConvert, rc.greaterEqual<N>()); }
+
 inline HandRank handRank(CSet hand) {
     auto rankCounts = hand.rankCounts();
     auto suitCounts = hand.suitCounts();
@@ -30,7 +33,7 @@ inline HandRank handRank(CSet hand) {
     auto flushes = suitCounts.greaterEqual<5>();
     RARE(flushes) {
         static_assert(TotalHand < 2*5, "No two flushes");
-        auto suit = flushes.best();
+        auto suit = flushes.top();
         auto royal = hand.m_bySuit.at(suit);
         auto isIt = straights(royal);
         RARE(isIt) {
@@ -43,8 +46,8 @@ inline HandRank handRank(CSet hand) {
     RARE(rv) { return rv; }
     auto pairs = rankCounts.greaterEqual<2>();
     if(pairs) {
-        auto top = pairs.best();
-        auto without = pairs.clearAt(top);
+        auto top = pairs.top();
+        auto without = pairs.clear(top);
         if(without) {
             return { TWO_PAIRS, 0, 0 };
         }

@@ -142,13 +142,23 @@ template<int Size, typename T = uint64_t> struct SWAR {
         return SWAR(m_v | (T(1) << (index * Size + bit)));
     }
 
-    constexpr operator bool() { return m_v; }
+    constexpr operator bool() const { return m_v; }
 protected:
     T m_v;
 };
 
+template<int Size, typename T>
+struct BooleanSWAR: SWAR<Size, T> {
+    constexpr BooleanSWAR(T v): SWAR<Size, T>(v) {}
+
+    constexpr BooleanSWAR clear(int bit) { return this->m_v ^ (T(1) << bit); }
+    constexpr int best() { return this->top(); }
+
+    constexpr operator bool() const { return *this; }
+};
+
 template<int N, int Size, typename T>
-constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
+constexpr BooleanSWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     static_assert(1 < Size, "Degenerated SWAR");
     static_assert(metaLogCeiling(N) < Size, "N is too big for this technique");
     constexpr auto msbPos  = Size - 1;
@@ -158,7 +168,7 @@ constexpr SWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     auto adjusted = v.value() | msbMask;
     auto rv = adjusted - subtraend;
     rv &= msbMask;
-    return SWAR<Size, T>(rv);
+    return rv;
 }
 
 static_assert(

@@ -40,7 +40,7 @@ struct CSet {
     }
 };
 
-constexpr SuitCounts flushes(SuitCounts  ss) {
+constexpr core::BooleanSWAR<16, uint64_t> flushes(SuitCounts  ss) {
     return ss.greaterEqual<5>();
 }
 
@@ -78,50 +78,26 @@ inline unsigned straights(unsigned ranks) {
     return rakqj & rt;
 }
 
-enum BestHand {
-    HIGH_CARDS = 0, PAIR, TWO_PAIRS, THREE_OF_A_KIND, STRAIGHT, FLUSH,
-    FULL_HOUSE, FOUR_OF_A_KIND, STRAIGHT_FLUSH
-};
-
-union HandRank {
-    uint32_t code;
-    struct {
-        unsigned
-            low: 14,
-            high: 14,
-            hand: 4;
-    };
-
-    HandRank(): code(0) {}
-    HandRank(BestHand h, int high, int low):
-        hand(h), high(high), low(low)
-    {}
-
-    operator bool() const { return code; }
-};
-
-inline unsigned reverseBits(unsigned input) { return input; }
-
 inline HandRank handRank(CSet hand) {
     auto rankCounts = hand.rankCounts();
     auto suitCounts = hand.suitCounts();
     auto ranks = hand.rankSet();
-    auto toaks = noaks<3>(rankCounts);
+    auto toaks = rankCounts.greaterEqual<3>();
     HandRank rv;
     RARE(toaks) {
-        auto foaks = noaks<4>(rankCounts);
+        auto foaks = rankCounts.greaterEqual<4>();
         RARE(foaks) {
             static_assert(TotalHand < 8, "There can be four-of-a-kind and straight-flush");
-            auto foak = foaks.best();
+            auto foak = foaks.top();
             auto without = rankCounts.clearAt(foak);
             return { FOUR_OF_A_KIND, 1 << foak, 1 << without.best() };
         }
-        auto toak = toaks.best();
+        auto toak = toaks.top();
         auto without = rankCounts.clearAt(toak);
-        auto pairs = noaks<2>(without);
+        auto pairs = without.greaterEqual<2>();
         RARE(pairs) {
             static_assert(TotalHand < 8, "There can be full-house and straight-flush");
-            auto pair = pairs.best();
+            auto pair = pairs.top();
             return { FULL_HOUSE, (1 << toak), (1 << pair) };
         }
         auto high = 1 << toak;
@@ -135,7 +111,7 @@ inline HandRank handRank(CSet hand) {
     auto flushes = suitCounts.greaterEqual<5>();
     RARE(flushes) {
         static_assert(TotalHand < 2*5, "No two flushes");
-        auto suit = flushes.best();
+        auto suit = flushes.top();
         auto royal = hand.m_bySuit.at(suit);
         auto isIt = straights(royal);
         RARE(isIt) {
@@ -151,10 +127,10 @@ inline HandRank handRank(CSet hand) {
     RARE(rv) { return rv; }
     auto pairs = rankCounts.greaterEqual<2>();
     if(pairs) {
-        auto top = pairs.best();
-        auto without = pairs.clearAt(top);
+        auto top = pairs.top();
+        auto without = pairs.clear(top);
         if(without) {
-            auto bottom = without.best();
+            auto bottom = without.top();
             auto high = (1 << top) | (1 << bottom);
             ranks ^= high;
             return { TWO_PAIRS, high, 1 << core::msb(ranks) };

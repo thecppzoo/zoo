@@ -4,6 +4,9 @@
 
 namespace ep {
 
+template<int N>
+RankCounts noaks(RankCounts rc) { return RankCounts(RankCounts::doNotConvert, rc.greaterEqual<N>()); }
+
 inline int bestFlush(unsigned p1, unsigned p2) {
     return positiveIndex1Better(p1, p2);
 }
@@ -17,8 +20,8 @@ inline int bestKickers(
 ) {
     return
         positiveIndex1Better(
-            p1s.greaterEqual<1>().counts().value(),
-            p2s.greaterEqual<1>().counts().value()
+            p1s.greaterEqual<1>().value(),
+            p2s.greaterEqual<1>().value()
         );
 }
 
@@ -107,7 +110,7 @@ inline unsigned straightFrontCheck(unsigned rankSet) {
     
 inline ComparisonResult winnerPotentialFullHouseGivenThreeOfAKind(
     RankCounts p1s, RankCounts p2s,
-    RankCounts p1toaks, RankCounts p2toaks
+    RanksPresent p1toaks, RanksPresent p2toaks
 ) {
     auto p1BestThreeOfAKindIndex = p1toaks.best();
     auto p1WithoutBestThreeOfAKind = p1s.clearAt(p1BestThreeOfAKindIndex);
@@ -157,8 +160,8 @@ inline ComparisonResult winnerPotentialFullHouseOrFourOfAKind(
     auto p2ThreeOfAKinds = p2s.greaterEqual<3>();
     RARE(p1ThreeOfAKinds) { // p1 has a three of a kind
         RARE(p2ThreeOfAKinds) { // p2 also has a three of a kind
-            auto p1FourOfAKinds = p1s.greaterEqual<4>();
-            auto p2FourOfAKinds = p2s.greaterEqual<4>();
+            auto p1FourOfAKinds = noaks<4>(p1s);
+            auto p2FourOfAKinds = noaks<4>(p2s);
             RARE(p1FourOfAKinds) {
                 RARE(p2FourOfAKinds) {
                     return {
@@ -171,7 +174,7 @@ inline ComparisonResult winnerPotentialFullHouseOrFourOfAKind(
             // No four of a kind
             return
                 winnerPotentialFullHouseGivenThreeOfAKind(
-                    p1s, p1ThreeOfAKinds, p2s, p2ThreeOfAKinds
+                    p1s, p2s, p1ThreeOfAKinds, p2ThreeOfAKinds
                 );
         }
         // p2 lacks three of a kind, can not be full-house nor four-of-a-kind
@@ -369,11 +372,11 @@ inline int winner(CSet community, CSet p1, CSet p2) {
                 RARE(p2foaks) {
                     return bestFourOfAKind(p1ranks, p2ranks, p1foaks, p2foaks);
                 }
-                RARE(straightFlush(p2, p2Flushes)) { return -1; }
+                //RARE(straightFlush(p2, p2Flushes)) { return -1; }
                 return 1;
             }
             RARE(p2foaks) {
-                RARE(straightFlush(p1, p2Flushes)) { return 1; }
+                //RARE(straightFlush(p1, p2Flushes)) { return 1; }
                 return -1;
             }
             // no four of a kind
@@ -382,7 +385,7 @@ inline int winner(CSet community, CSet p1, CSet p2) {
                 static_assert(TotalHand < 8, "There can be full house and straight flush");
                 auto p2fh = isFullHouse(p2ranks);
                 RARE(p2fh.isFullHouse) { return bestFullHouse(p1fh, p2fh); }
-                RARE(straightFlush(p2, p2Flushes)) { return -1; }
+                //RARE(straightFlush(p2, p2Flushes)) { return -1; }
                 return 1;
             }
             // no four of a kind, no full house either hand

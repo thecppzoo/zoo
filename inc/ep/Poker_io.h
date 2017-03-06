@@ -8,7 +8,7 @@ namespace ep { namespace core {
 
 inline std::ostream &operator<<(std::ostream &out, SWARRank ranks) {
     static auto g_rankLetters = "23456789TJQKA0#%";
-    static auto g_suitLetters = "shcd";
+    static auto g_suitLetters = "shdc";
     if(!ranks.value()) { return out << '-'; }
     for(;;) {
         auto rank = ranks.top();

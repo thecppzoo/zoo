@@ -85,7 +85,7 @@ int colorBlindRank(uint64_t cards) {
     if(s) { return ep::STRAIGHT; }
     auto pairs = counts.greaterEqual<2>();
     if(pairs) {
-        auto bestPair = pairs.best();
+        auto bestPair = pairs.top();
         auto cleared = counts.clearAt(bestPair);
         auto secondPair = cleared.greaterEqual<2>();
         if(secondPair) { return ep::TWO_PAIRS; }
@@ -100,11 +100,6 @@ inline int encode(int hand, int h, int l) {
 
 //#include <x86intrin.h>
 
-inline unsigned toRanks(uint64_t ranks) {
-    constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(1));
-    return __builtin_ia32_pext_di(ranks, selector);
-}
-
 int rankFlushG(uint64_t cards) {
     auto s = straights(ep::RankCounts(ep::SWARRank(cards)));
     if(s) {
@@ -113,7 +108,7 @@ int rankFlushG(uint64_t cards) {
     for(auto count = __builtin_popcountll(cards); __builtin_expect(5 < count--, 0); ) {
         cards &= cards - 1;
     }
-    auto high = toRanks(cards);
+    auto high = ep::toRanks(cards);
     return encode(ep::FLUSH, 0, high);
 }
 
@@ -138,7 +133,7 @@ int whole(uint64_t cards) {
         auto cleared = counts.clearAt(bestToak);
         auto pairs = cleared.greaterEqual<2>();
         if(pairs) {
-            return encode(ep::FULL_HOUSE, 1 << bestToak, 1 << pairs.best());
+            return encode(ep::FULL_HOUSE, 1 << bestToak, 1 << pairs.top());
         }
 
         auto flushCards = flush(cards);
@@ -179,7 +174,7 @@ int whole(uint64_t cards) {
     }
     cards &= cards - 1;
     cards &= cards - 1;
-    return encode(ep::HIGH_CARDS, 0, toRanks(cards));
+    return encode(ep::HIGH_CARDS, 0, ep::toRanks(cards));
 }
 
 int wholeCheat(uint64_t cards) {
