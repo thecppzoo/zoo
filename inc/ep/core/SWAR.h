@@ -99,15 +99,13 @@ template<int Level>
 constexpr uint64_t popcount(uint64_t a) {
     return detail::Selector_impl<2 < Level>::template execute<Level>(a);
 }
-//template<>
-//constexpr uint64_t popcount<3>(uint64_t a) {
-    
 
 static_assert(0x210 == popcount<0>(0x320), "");
 static_assert(0x4321 == popcount<1>(0xF754), "");
 static_assert(0x50004 == popcount<3>(0x3E001122), "");
 
-template<typename T> constexpr typename std::make_signed<T>::type msb(T v) {
+
+template<typename T> constexpr typename std::make_unsigned<T>::type msb(T v) {
     return 8*sizeof(T) - 1 - __builtin_clzll(v);
 }
 
@@ -151,10 +149,12 @@ template<int Size, typename T>
 struct BooleanSWAR: SWAR<Size, T> {
     constexpr BooleanSWAR(T v): SWAR<Size, T>(v) {}
 
-    constexpr BooleanSWAR clear(int bit) { return this->m_v ^ (T(1) << bit); }
+    constexpr BooleanSWAR clear(int bit) {
+        constexpr auto Bit = T(1) << (Size - 1);
+        return this->m_v ^ (Bit << (Size * bit)); }
     constexpr int best() { return this->top(); }
 
-    constexpr operator bool() const { return *this; }
+    constexpr operator bool() const { return this->m_v; }
 };
 
 template<int N, int Size, typename T>

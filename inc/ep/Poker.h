@@ -57,16 +57,16 @@ struct CardSet {
 
     constexpr RankCounts counts() { return RankCounts(m_ranks); }
 
-    static unsigned ranks(uint64_t arg) {
+    static unsigned ranks(uint64_t arg);/* {
         constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(1));
         return __builtin_ia32_pext_di(arg, selector);
-    }
+    }*/
 
-    static unsigned ranks(RankCounts rc) {
+    static unsigned ranks(RankCounts rc);/* {
         constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(8));
         auto present = rc.greaterEqual<1>();
         return __builtin_ia32_pext_di(present.value(), selector);
-    }
+    }*/
 
     constexpr uint64_t cards() { return m_ranks.value(); }
 };
@@ -129,6 +129,12 @@ inline unsigned toRanks(uint64_t ranks) {
     constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(1));
     return __builtin_ia32_pext_di(ranks, selector);
 }
+
+inline unsigned toRanks(RanksPresent rp) {
+    constexpr auto selector = ep::core::makeBitmask<4>(uint64_t(8));
+    return __builtin_ia32_pext_di(rp.value(), selector);
+}
+
 inline HandRank handRank(CardSet hand) {
     RankCounts rankCounts{SWARRank(hand.cards())};
     auto toaks = rankCounts.greaterEqual<3>();
@@ -164,7 +170,7 @@ inline HandRank handRank(CardSet hand) {
         auto tmp = RanksPresent(flushCards);
         auto straightFlush = straights_rankRepresentation(tmp);
         RARE(straightFlush) {
-            return { STRAIGHT_FLUSH, 1 << straightFlush.top(), 0 };
+            return { STRAIGHT_FLUSH, 0, 1 << straightFlush.top() };
         }
         auto cards = straightFlush.value();
         for(auto count = __builtin_popcountll(cards); 5 < count--; ) {
@@ -180,19 +186,24 @@ inline HandRank handRank(CardSet hand) {
     auto pairs = rankCounts.greaterEqual<2>();
     if(pairs) {
         auto top = pairs.top();
+        auto high = (1 << top);
         auto bottomPairs = ranks.clear(top);
         auto without = rankCounts.clearAt(top);
         if(bottomPairs) {
             auto bottom = bottomPairs.top();
-            auto high = (1 << top) | (1 << bottom);
             auto without2 = without.clearAt(bottom);
-            return { TWO_PAIRS, high, 1 << without2.best() };
+            return { TWO_PAIRS, high | (1 << bottom), 1 << without2.best() };
         }
-        // assert(5 == __builtin...
-        
-        //return { PAIR, high, next1 | next2 | next3 };
+        auto valueRanks = ranks.value();
+        // Objective: leave in valueRanks three kickers
+        // Given: TotalHand - 2 ranks
+        // TotalHand - 1 - 1 ranks - count = 3 <=> count = TotalHand - 5;
+        for(auto count = TotalHand - 5; count--; ) {
+            valueRanks &= valueRanks - 1;
+        }
+        return { PAIR, high, int(valueRanks) };
     }
-    auto valueRanks = ranks.value();
+    auto valueRanks = toRanks(ranks);
     for(auto count = TotalHand - 5; count--; ) {
         valueRanks &= valueRanks - 1;
     }
