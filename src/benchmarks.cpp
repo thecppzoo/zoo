@@ -296,7 +296,7 @@ benchmarks
     operation = [](uint64_t c) -> int {
         ep::SWARRank ranks(c); ep::SWARSuit ss = ep::convert(ranks);
         ep::CSet cs = { ss, ranks };
-        return ep::handRank(cs);
+        return ep::handRank(cs).code;
     };
     auto v5 = driver(gen, count, v1fun);
     std::cout << " |h ";

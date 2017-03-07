@@ -124,7 +124,7 @@ inline HandRank handRank(CSet hand) {
     }
     auto str = straights(ranks);
     RARE(str) { return { STRAIGHT, 1 << core::msb(str), 0 }; }
-    RARE(rv) { return rv; }
+    RARE(rv.isSet()) { return rv; }
     auto pairs = rankCounts.greaterEqual<2>();
     if(pairs) {
         auto top = pairs.top();

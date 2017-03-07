@@ -117,12 +117,16 @@ union HandRank {
             hand: 4;
     };
 
-    HandRank(): code(0) {}
+    constexpr HandRank(): code(0) {}
+
     HandRank(BestHand h, int high, int low):
         hand(h), high(high), low(low)
     {}
 
-    operator bool() const { return code; }
+    constexpr bool isSet() { return 0 != code; }
+
+    constexpr bool operator==(HandRank hr) {
+        return code == hr.code; }
 };
 
 inline unsigned toRanks(uint64_t ranks) {
@@ -156,12 +160,10 @@ inline HandRank handRank(CardSet hand) {
             return { FULL_HOUSE, (1 << toak), (1 << pair) };
         }
         auto high = 1 << toak;
-        auto highest = without.best();
-        auto middleBottom = without.clearAt(highest);
-        auto middle = middleBottom.best();
-        auto bottom = middleBottom.clearAt(middle);
-        auto lowest = bottom.best();
-        auto low = (1 << highest) | (1 << middle) | (1 << lowest);
+        auto kicker1 = without.best();
+        auto without2 = without.clearAt(kicker1);
+        auto kicker2 = without2.best();
+        auto low = (1 << kicker1) | (1 << kicker2);
         rv = HandRank(THREE_OF_A_KIND, high, low);
     }
     static_assert(TotalHand < 2*5, "No two flushes");
@@ -172,7 +174,7 @@ inline HandRank handRank(CardSet hand) {
         RARE(straightFlush) {
             return { STRAIGHT_FLUSH, 0, 1 << straightFlush.top() };
         }
-        auto cards = straightFlush.value();
+        auto cards = flushCards;
         for(auto count = __builtin_popcountll(cards); 5 < count--; ) {
             cards &= (cards - 1); // turns off lsb
         }
@@ -182,19 +184,19 @@ inline HandRank handRank(CardSet hand) {
     auto ranks = rankCounts.greaterEqual<1>();
     auto str = straights_rankRepresentation(ranks);
     RARE(str) { return { STRAIGHT, 0, 1 << str.top() }; }
-    RARE(rv) { return rv; }
+    RARE(rv.isSet()) { return rv; }
     auto pairs = rankCounts.greaterEqual<2>();
     if(pairs) {
         auto top = pairs.top();
         auto high = (1 << top);
-        auto bottomPairs = ranks.clear(top);
-        auto without = rankCounts.clearAt(top);
+        auto bottomPairs = pairs.clear(top);
+        auto without = ranks.clear(top);
         if(bottomPairs) {
             auto bottom = bottomPairs.top();
-            auto without2 = without.clearAt(bottom);
-            return { TWO_PAIRS, high | (1 << bottom), 1 << without2.best() };
+            auto without2 = without.clear(bottom);
+            return { TWO_PAIRS, high | (1 << bottom), 1 << without2.top() };
         }
-        auto valueRanks = ranks.value();
+        auto valueRanks = toRanks(without);
         // Objective: leave in valueRanks three kickers
         // Given: TotalHand - 2 ranks
         // TotalHand - 1 - 1 ranks - count = 3 <=> count = TotalHand - 5;

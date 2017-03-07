@@ -16,24 +16,14 @@ constexpr uint64_t royalFlush() {
 
 int whole(uint64_t);
 
-ep::HandRank fh(uint64_t c) {
-    using namespace ep;
-    SWARRank sr(c);
-    RankCounts rc(sr);
-    auto toaks = rc.greaterEqual<3>();
-    if(toaks) {
-        auto best = toaks.top();
-        auto without = rc.clearAt(best);
-        auto pairs = without.greaterEqual<2>();
-        if(pairs) {
-            return { FULL_HOUSE, 1 << best, 1 << pairs.top() };
-        }
-    }
-    return { HIGH_CARDS, 0, 0 };
-}
-
 TEST_CASE("Poker operations", "[basic]") {
     using namespace ep::abbreviations;
+    SECTION("HandRank equality") {
+        ep::HandRank hr1(ep::HIGH_CARDS, 1, 0);
+        ep::HandRank hr2(ep::HIGH_CARDS, 2, 0);
+        auto equal = hr1 == hr2;
+        REQUIRE(!equal);
+    }
     SECTION("Flush") {
         auto noFlush = sQ;
         REQUIRE(0 == ep::flush(noFlush));
@@ -115,7 +105,7 @@ TEST_CASE("Hands", "[basic]") {
     }
 
     SECTION("Three of a kind") {
-        auto threysOverAceKing = (royalFlush() ^ hT) | h3 | d3 | c3;
+        auto threysOverAceKing = (royalFlush() ^ hT) | s3 | d3 | c3;
         auto r = ep::handRank(threysOverAceKing);
         REQUIRE(ep::HandRank(ep::THREE_OF_A_KIND, 0 | r3, rA | rK) == r);
     }
@@ -129,7 +119,8 @@ TEST_CASE("Hands", "[basic]") {
     SECTION("Pairs") {
         auto hooks = (royalFlush() ^ hA) | cJ | s2 | s3;
         auto r = ep::handRank(hooks);
-        REQUIRE(ep::HandRank(ep::PAIR, 0 | rJ, rK | rQ | rT) == r);
+        ep::HandRank comparator(ep::PAIR, 0 | rJ, rK | rQ | rT);
+        REQUIRE(comparator == r);
     }
 
     SECTION("High Cards") {
