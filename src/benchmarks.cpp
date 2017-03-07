@@ -273,45 +273,50 @@ benchmarks
     auto base = driver(gen, count, empty);
     indicators(base, base);
     std::cout.flush();
-    auto v1 = driver(gen, count, v1fun);
-    std::cout << " |1 ";
-    indicators(v1, base);
-    std::cout.flush();
-    operation = [](uint64_t c) { return colorBlindRank(c); };
-    auto v2 = driver(gen, count, v1fun);
-    std::cout << " |cb ";
-    indicators(v2, base);
-    std::cout.flush();
-    operation = [](uint64_t c) -> int { return flush(c); };
-    auto v3 = driver(gen, count, v1fun);
-    std::cout << " |f ";
-    indicators(v3, base);
-    std::cout.flush();
-    operation = [](uint64_t c) -> int { return whole(c); };
-    auto v4 = driver(gen, count, v1fun);
-    std::cout << " |w ";
-    indicators(v4, base);
-    std::cout.flush();
+
+    if(1 == argc) {
+        auto v1 = driver(gen, count, v1fun);
+        std::cout << " |1 ";
+        indicators(v1, base);
+        std::cout.flush();
+        operation = [](uint64_t c) { return colorBlindRank(c); };
+        auto v2 = driver(gen, count, v1fun);
+        std::cout << " |cb ";
+        indicators(v2, base);
+        std::cout.flush();
+        operation = [](uint64_t c) -> int { return flush(c); };
+        auto v3 = driver(gen, count, v1fun);
+        std::cout << " |f ";
+        indicators(v3, base);
+        std::cout.flush();
+        operation = [](uint64_t c) -> int { return whole(c); };
+        auto v4 = driver(gen, count, v1fun);
+        std::cout << " |w ";
+        indicators(v4, base);
+        std::cout.flush();
+    }
 
     operation = [](uint64_t c) -> int {
-        ep::SWARRank ranks(c); ep::SWARSuit ss = ep::convert(ranks);
-        ep::CSet cs = { ss, ranks };
-        return ep::handRank(cs).code;
+        //ep::SWARRank ranks(c); ep::SWARSuit ss = ep::convert(ranks);
+        //ep::CSet cs = { ss, ranks };
+        return ep::handRank(c).code;
     };
     auto v5 = driver(gen, count, v1fun);
     std::cout << " |h ";
     indicators(v5, base);
     std::cout.flush();
 
-    operation = [](uint64_t c) -> int {
-        /*ep::SWARRank ranks(c); ep::SWARSuit ss = ep::convert(ranks);
-        ep::CSet cs = { ss, ranks };
-        return ep::naive::handRank(cs);*/
-        return wholeCheat(c);
-    };
-    auto v6 = driver(gen, count, v1fun);
-    std::cout << " |c ";
-    indicators(v6, base);
+    if(1 == argc) {
+        operation = [](uint64_t c) -> int {
+            /*ep::SWARRank ranks(c); ep::SWARSuit ss = ep::convert(ranks);
+            ep::CSet cs = { ss, ranks };
+            return ep::naive::handRank(cs);*/
+            return wholeCheat(c);
+        };
+        auto v6 = driver(gen, count, v1fun);
+        std::cout << " |c ";
+        indicators(v6, base);
+    }
   
     std::cout << ' ' << toakPlusPairs << ' ' << std::hex << sideEffect << ' ' <<
         xorCheck << std::endl;
