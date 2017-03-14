@@ -1,5 +1,6 @@
 #include "detail/ep/mechanisms.h"
 #include "ep/nextSubset.h"
+#include "ep/Compare.h"
 #include "ep/timing/benchmark.h"
 
 #include <iostream>

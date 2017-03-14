@@ -109,7 +109,7 @@ enum BestHand {
 };
 
 union HandRank {
-    uint32_t code;
+    int32_t code;
     struct {
         unsigned
             low: 14,
@@ -139,7 +139,18 @@ inline unsigned toRanks(RanksPresent rp) {
     return __builtin_ia32_pext_di(rp.value(), selector);
 }
 
-inline HandRank handRank(CardSet hand) {
+inline uint64_t flush(void *, uint64_t cards) { return flush(cards); }
+
+namespace {
+    struct Colored { int shift; };
+    struct ColorBlind {};
+};
+
+inline uint64_t flush(Colored *c, uint64_t cards);
+inline uint64_t flush(ColorBlind *c, uint64_t cards);
+
+template<typename T>
+inline HandRank handRank(T *p, CardSet hand) {
     RankCounts rankCounts{SWARRank(hand.cards())};
     auto toaks = rankCounts.greaterEqual<3>();
     HandRank rv;
@@ -167,7 +178,7 @@ inline HandRank handRank(CardSet hand) {
         rv = HandRank(THREE_OF_A_KIND, high, low);
     }
     static_assert(TotalHand < 2*5, "No two flushes");
-    auto flushCards = flush(hand.cards());
+    auto flushCards = flush(p, hand.cards());
     RARE(flushCards) {
         auto tmp = RanksPresent(flushCards);
         auto straightFlush = straights_rankRepresentation(tmp);
@@ -210,6 +221,14 @@ inline HandRank handRank(CardSet hand) {
         valueRanks &= valueRanks - 1;
     }
     return { HIGH_CARDS, 0, int(valueRanks) };
+}
+
+inline HandRank handRank(CardSet hand) { return handRank<void>(nullptr, hand); }
+
+inline int compare(CardSet community, CardSet p1, CardSet p2) {
+    auto rank1 = handRank(community | p1);
+    auto rank2 = handRank(community | p2);
+    return rank1.code - rank2.code;
 }
 
 }

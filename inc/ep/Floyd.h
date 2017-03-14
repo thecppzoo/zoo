@@ -1,6 +1,7 @@
 #pragma once
 
-#include <stdint.h>
+#include "ep/core/deposit.h"
+
 #include <random>
 
 namespace ep {
@@ -22,16 +23,10 @@ inline uint64_t floydSample(Rng &&g) {
     return rv;
 }
 
-inline uint64_t deposit(uint64_t preselected, uint64_t extra) {
-    auto depositSelector = ~preselected;
-    auto deposited = __builtin_ia32_pdep_di(extra, depositSelector);
-    return preselected | deposited;
-}
-
 template<int N, int K, typename Rng>
 inline uint64_t floydSample(Rng &&g, uint64_t preselected) {
     auto normal = floydSample<N, K>(std::forward<Rng>(g));
-    return deposit(preselected, normal);
+    return core::deposit(preselected, normal);
 }
 
 }
