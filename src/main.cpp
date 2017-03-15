@@ -23,6 +23,29 @@ TEST_CASE("Classification generation", "[bit]") {
         REQUIRE((sA | sK) == sp.next());
         REQUIRE(!sp);
     }
+    SECTION("PocketPair") {
+        using namespace ep;
+        using namespace abbreviations;
+        PocketPair pp;
+        REQUIRE((s2 | h2) == pp.next());
+        REQUIRE((s3 | h3) == pp.next());
+        pp.m_current = sA;
+        REQUIRE(bool(pp));
+        pp.next();
+        REQUIRE(!pp);
+    }
+    SECTION("SuitedPocket") {
+        using namespace ep;
+        using namespace abbreviations;
+        UnsuitedPocket sp;
+        REQUIRE((s3 | h2) == sp.next());
+        REQUIRE(bool(sp));
+        REQUIRE((s4 | h2) == sp.next());
+        REQUIRE((s4 | h3) == sp.next());
+        sp.m_current = 3 << 11;
+        REQUIRE((sA | hK) == sp.next());
+        REQUIRE(!sp);
+    }
 }
 
 constexpr uint64_t royalFlush() {
