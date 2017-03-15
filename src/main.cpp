@@ -1,6 +1,7 @@
 #include "ep/Poker_io.h"
 #include "ep/Poker.h"
 #include "ep/Floyd.h"
+#include "ep/Cases.h"
 
 #ifdef TESTS
     #define CATCH_CONFIG_MAIN
@@ -8,6 +9,21 @@
     #define CATCH_CONFIG_RUNNER
 #endif
 #include "catch.hpp"
+
+TEST_CASE("Classification generation", "[bit]") {
+    SECTION("SuitedPocket") {
+        using namespace ep;
+        using namespace abbreviations;
+        SuitedPocket sp;
+        REQUIRE(0x11 == sp.next());
+        REQUIRE(bool(sp));
+        REQUIRE(0x101 == sp.next());
+        REQUIRE(0x110 == sp.next());
+        sp.m_current = 3 << 11;
+        REQUIRE((sA | sK) == sp.next());
+        REQUIRE(!sp);
+    }
+}
 
 constexpr uint64_t royalFlush() {
     using namespace ep::abbreviations;
@@ -23,7 +39,8 @@ TEST_CASE("Bit operations", "[bit]") {
     auto alreadySet = 0xC63; // 1 1 0 0 .0 1 1 0 .0 0 1 1
     auto interleave = 0x2A; //  1a0b.1c0d1e0f
     auto expected = 0xEEB; //   1 1 1a0b.1c1 1 0d.1e0f1 1
-    auto byEp = ep::deposit(alreadySet, interleave);
+    auto byEp = ep::core::deposit(alreadySet, interleave);
+    byEp |= alreadySet;
     REQUIRE(expected == byEp);
 }
 
