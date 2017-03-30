@@ -12,6 +12,7 @@ struct SuitedPocket {
     using U = uint64_t;
 
     constexpr static auto equivalents = NSuits;
+    constexpr static auto count = Choose<NRanks, 2>::value;
     // Exclude everything not spades
     constexpr static auto preselected = core::makeBitmask<RankSize, uint64_t>(0xE);
     // 2 and 3 of spades
@@ -32,6 +33,7 @@ struct SuitedPocket {
 
 struct PocketPair {
     constexpr static auto equivalents = Choose<NSuits, 2>::value;
+    constexpr static auto count = NRanks;
 
     constexpr static auto preselected = core::makeBitmask<RankSize, uint64_t>(0xE);
     constexpr static uint64_t starting = 1;
@@ -54,6 +56,7 @@ struct PocketPair {
 
 struct UnsuitedPocket {
     constexpr static auto equivalents = Choose<NSuits, 2>::value;
+    constexpr static auto count = Choose<NRanks, 2>::value;
     constexpr static auto preselected = core::makeBitmask<RankSize, uint64_t>(0xE);
     // 2 and 3 of spades
     constexpr static uint64_t starting = 3;
@@ -74,4 +77,14 @@ struct UnsuitedPocket {
     }
 };
 
+template<typename Pocket>
+struct Communities;
+
+template<>
+struct Communities<UnsuitedPocket> {
+    using predecessor = UnsuitedPocket;
+};
+
+// Unsuited pocket continuations:
+// 
 }

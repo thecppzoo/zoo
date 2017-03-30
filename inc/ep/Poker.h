@@ -149,8 +149,17 @@ namespace {
 inline uint64_t flush(Colored *c, uint64_t cards);
 inline uint64_t flush(ColorBlind *c, uint64_t cards);
 
+/// \note benchmarks seem to indicate this is a 0.5% time pessimization!
+template<typename T>
+inline bool mayStraight(T *p, CardSet hand) {
+    static_assert(13 == NRanks, "");
+    constexpr auto fivesOrTens = uint64_t(0xF0000F000);
+    return hand.cards() & fivesOrTens;
+}
+
 template<typename T>
 inline HandRank handRank(T *p, CardSet hand) {
+    auto mayS = mayStraight(p, hand);
     RankCounts rankCounts{SWARRank(hand.cards())};
     auto toaks = rankCounts.greaterEqual<3>();
     HandRank rv;
@@ -181,7 +190,10 @@ inline HandRank handRank(T *p, CardSet hand) {
     auto flushCards = flush(p, hand.cards());
     RARE(flushCards) {
         auto tmp = RanksPresent(flushCards);
-        auto straightFlush = straights_rankRepresentation(tmp);
+        auto straightFlush =
+            mayS ?
+                straights_rankRepresentation(tmp) :
+                SWARRank(0);
         RARE(straightFlush) {
             return { STRAIGHT_FLUSH, 0, 1 << straightFlush.top() };
         }
@@ -193,7 +205,10 @@ inline HandRank handRank(T *p, CardSet hand) {
         return { FLUSH, 0, int(ranks) };
     }
     auto ranks = rankCounts.greaterEqual<1>();
-    auto str = straights_rankRepresentation(ranks);
+    auto str =
+        mayS ?
+            straights_rankRepresentation(ranks) :
+            SWARRank(0);
     RARE(str) { return { STRAIGHT, 0, 1 << str.top() }; }
     RARE(rv.isSet()) { return rv; }
     auto pairs = rankCounts.greaterEqual<2>();
