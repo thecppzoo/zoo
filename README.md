@@ -8,6 +8,12 @@ Currently, we have the hand evaluator framework, that achieves in normally avail
 
 Currently, the code is a header-only framework with some use cases programmed in C++ 14.
 
+This code beats other poker engines, including the popular open source framework "PokerStove" both on ease of use and performance due to the application of Generic Programming.
+
+Generic Programming allows hoisting what otherwise would be run-time computation to compilation time, this is illustrated in the non-trivial `static_assert` in the code itself.
+
+The documentation for the advanced programming techniques, including the Floyd sampling algorithm, the SWAR techniques is being written.
+
 ## How to build it
 
 ### Prerequisites:
@@ -18,7 +24,7 @@ Currently, the code is a header-only framework with some use cases programmed in
 4. Test cases require the ["Catch" testing framework](https://github.com/philsquared/Catch).
 5. Currently the code does not require a Unix/POSIX operating system (this code should be compilable in Windows64 through either gcc or clang), however, **we reserve the option to make the code incompatible with any operating system**.
 
-There are several test programs available:
+### There are several test programs available:
 
 #### Unit tests at [src/main.cpp](https://github.com/thecppzoo/pokerbotic/blob/master/src/main.cpp)
 
@@ -54,5 +60,5 @@ Currently, multithreaded partitioning of evaluations is being implemented.
 
 ## Documentation/User manual
 
-Not yet written.  Most of the code available under the folder "ep/" is fully operational.
+Not yet written.  Most of the code available under the folder `ep/` is fully operational.
 
