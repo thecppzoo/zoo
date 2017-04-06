@@ -51,3 +51,8 @@ When implementing the deck representation we found that higher-rank is higher-bi
 
 There is an important free standing template function, [`greaterEqualSWAR`](https://github.com/thecppzoo/pokerbotic/blob/master/inc/ep/core/SWAR.h#L161), that given a SWAR and an integer template parameter N will return a boolean SWAR with the data elements whose values are greater than or equal to the given N.
 
+## Comparisons to other choices
+
+Poker Stove uses table lookups for almost all of its combinatorial logic.  We are very surprised that the logic approach we followed leads to the same performance with the benchmark granularity we've tested, because they are very different.
+
+We still strongly prefer the logic-based approach, because it is branch-less code with no dependencies on the input data, in terms of performance it will behave the same way all the time.  However, the table-lookup based approach looks better in benchmark code than in real life, because it requires the caches to have the tables in-memory; while it is complicated to generate realistic benchmarks in which on purpose the table-lookup mechanism is starved of memory for the tables, this may happen in real life.  Especially with random data that leads to less predictable memory access patterns, and in hyperthreading in which several threads compete for the caches within the same core.
