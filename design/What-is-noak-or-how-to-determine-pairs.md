@@ -1,6 +1,6 @@
 # What the hell does "noak" mean in Pokerbotic? or how did you implement detection of pairs, three of a kind, four of a kind?
 
-"Noak" in Pokerbotic code means N-Of-A-Kind, where N is 2, 3, or 4.
+"Noak" in Pokerbotic code means N-Of-A-Kind, where N is 1, 2, 3, or 4.
 
 In Pokerbotic, more than a full third of the execution time of classification of hands is spent in determining whether the hand is a four-of-a-kind, a full-house, three-of-a-kind, a pair, or just a high-card.  The other roughly two thirds are spent at about a similar execution time cost by the detection of straights and detection of flushes.
 
@@ -50,6 +50,8 @@ Unfortunately, the counting of leading zeroes must be converted to a bit index b
 When implementing the deck representation we found that higher-rank is higher-bit-index overperforms the representation of higher-rank-is-lower-bit-index, because even if all of the rank comparison operations are interested in the highest rank and in SWAR registers they are less performing as higher-rank-more-significant-bit, straights, flushes, and sets of cards in general can be compared much, much faster if the highest rank is at the most significant bits using plain unsigned integer comparisons.
 
 There is an important free standing template function, [`greaterEqualSWAR`](https://github.com/thecppzoo/pokerbotic/blob/master/inc/ep/core/SWAR.h#L161), that given a SWAR and an integer template parameter N will return a boolean SWAR with the data elements whose values are greater than or equal to the given N.
+
+The key insight in this function is to leverage substraction.  For example, assume an element size of four bits and a comparison against three (as if detecting three of a kind).  We can set the most significant bit, giving a value of 8, and add the comparison constant, in this case 3, resulting in 11.  We can build a SWAR in which each element is 11, and subtract the comparand.  In the result from this subtraction, all the elements that have the bit for 8 set were greater equal to 4.
 
 ## Comparisons to other choices
 
