@@ -9,24 +9,24 @@ namespace detail {
 
 template<int Size, int Alignment>
 struct alignas(Alignment) AlignedStorage {
-	char space[Size];
+    char space[Size];
 };
 
 }
 
 template<int Size, int Alignment = alignof(void *)>
 struct AnyContainer {
-	template<typename T>
-	static constexpr bool value_semantics() {
-		return alignof(T) <= Alignment && sizeof(T) <= Size;
-	}
+    template<typename T>
+    static constexpr bool value_semantics() {
+        return alignof(T) <= Alignment && sizeof(T) <= Size;
+    }
 
-	template<
-		typename T,
-		typename Decayed = std::decay_t<T>,
-		std::enable_if_t<std::is_copy_constructible<Decayed>::value, int> = 0
-	>
-	AnyContainer(T &&initializer);
+    template<
+        typename T,
+        typename Decayed = std::decay_t<T>,
+        std::enable_if_t<std::is_copy_constructible<Decayed>::value, int> = 0
+    >
+    AnyContainer(T &&initializer);
 
     ~AnyContainer() { m_typeSwitch.destroy(m_space); }
 
@@ -34,8 +34,6 @@ protected:
     using Storage = detail::AlignedStorage<Size, Alignment>;
 
     struct TypeSwitch {
-        virtual void copy(Storage &to, Storage &from) {}
-        virtual void move(Storage &to, Storage &&from) {}
         virtual void destroy(Storage &what) {}
     };
 
