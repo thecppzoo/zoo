@@ -12,20 +12,30 @@ struct IAnyContainer {
     char m_space[Size];
 };
 
-template<int Size, int Alignment>
-struct ValueContainer: IAnyContainer<Size, Alignment> {};
+template<int Size, int Alignment, typename ValueType>
+struct ValueContainer: IAnyContainer<Size, Alignment> {
+    ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
 
-template<int Size, int Alignment>
-struct ReferentialContainer: IAnyContainer<Size, Alignment> {};
-
-template<int Size, int Alignment, bool Value>
-struct PolymorphicImplementationDecider {
-    using type = ReferentialContainer<Size, Alignment>;
+    void destroy() override { thy()->~ValueType(); }
 };
 
-template<int Size, int Alignment>
-struct PolymorphicImplementationDecider<Size, Alignment, true> {
-    using type = ValueContainer<Size, Alignment>;
+template<int Size, int Alignment, typename ValueType>
+struct ReferentialContainer: IAnyContainer<Size, Alignment> {
+    ValueType **pThy() { return reinterpret_cast<ValueType **>(this->m_space); }
+
+    ValueType *thy() { return *pThy(); }
+
+    void destroy() override { thy()->~ValueType(); }
+};
+
+template<int Size, int Alignment, typename ValueType, bool Value>
+struct PolymorphicImplementationDecider {
+    using type = ReferentialContainer<Size, Alignment, ValueType>;
+};
+
+template<int Size, int Alignment, typename ValueType>
+struct PolymorphicImplementationDecider<Size, Alignment, ValueType, true> {
+    using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
 struct PolymorphicTypeSwitch {
@@ -42,7 +52,10 @@ struct PolymorphicTypeSwitch {
     template<int Size, int Alignment, typename ValueType>
     using Implementation =
         typename PolymorphicImplementationDecider<
-            Size, Alignment, useValueSemantics<Size, Alignment, ValueType>()
+            Size,
+            Alignment,
+            ValueType,
+            useValueSemantics<Size, Alignment, ValueType>()
         >::type;
 };
 
@@ -61,6 +74,9 @@ struct AnyContainer {
     }
 
     AnyContainer(AnyContainer &&moveable);
+
+    template<typename Initializer>
+    AnyContainer(Initializer &&initializer);
 
     ~AnyContainer() { container()->destroy(); }
 
