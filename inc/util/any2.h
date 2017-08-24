@@ -16,6 +16,11 @@ template<int Size, int Alignment, typename ValueType>
 struct ValueContainer: IAnyContainer<Size, Alignment> {
     ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
 
+    template<typename Value>
+    ValueContainer(Value &&value) {
+        new(this->m_space) ValueType{std::forward<Value>(value)};
+    }
+
     void destroy() override { thy()->~ValueType(); }
 };
 
@@ -24,6 +29,11 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
     ValueType **pThy() { return reinterpret_cast<ValueType **>(this->m_space); }
 
     ValueType *thy() { return *pThy(); }
+
+    template<typename Value>
+    ReferentialContainer(Value &&value) {
+        *pThy() = new ValueType{std::forward<Value>(value)};
+    }
 
     void destroy() override { thy()->~ValueType(); }
 };
@@ -59,7 +69,7 @@ struct PolymorphicTypeSwitch {
         >::type;
 };
 
-template<int Size, int Alignment, typename TypeSwitch>
+template<int Size, int Alignment, typename TypeSwitch = PolymorphicTypeSwitch>
 struct AnyContainer {
     using Container = typename TypeSwitch::template empty<Size, Alignment>;
 
@@ -84,6 +94,15 @@ struct AnyContainer {
         return reinterpret_cast<Container *>(const_cast<char *>(m_space));
     }
 };
+
+template<int Size, int Alignment, typename TypeSwitch>
+template<typename Initializer>
+AnyContainer<Size, Alignment, TypeSwitch>::AnyContainer(Initializer &&i) {
+    using Decayed = std::decay_t<Initializer>;
+    using Implementation =
+        typename TypeSwitch::template Implementation<Size, Alignment, Decayed>;
+    new(m_space) Implementation(std::forward<Initializer>(i));
+}
 
 using Any = AnyContainer<8, 8, PolymorphicTypeSwitch>;
 
