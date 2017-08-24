@@ -1,6 +1,7 @@
 #pragma once
 
-#include <type_traits>
+#include "meta/NotBasedOf.h"
+
 #include <new>
 
 namespace zoo {
@@ -11,6 +12,11 @@ template<int Size, int Alignment>
 struct alignas(Alignment) AlignedStorage {
     char space[Size];
 };
+
+template<typename Decayed, typename Container>
+constexpr bool isValidInitializer() {
+    return std::is_copy_constructible<Decayed>::value;
+}
 
 }
 
@@ -24,11 +30,15 @@ struct AnyContainer {
     template<
         typename T,
         typename Decayed = std::decay_t<T>,
-        std::enable_if_t<std::is_copy_constructible<Decayed>::value, int> = 0
+        std::enable_if_t<
+                std::is_copy_constructible<Decayed>::value &&
+                meta::NotBasedOf<Decayed, AnyContainer>(),
+            int
+        > = 0
     >
     AnyContainer(T &&initializer);
 
-    ~AnyContainer() { m_typeSwitch.destroy(m_space); }
+    ~AnyContainer() { typeSwitch()->destroy(m_space); }
 
 protected:
     using Storage = detail::AlignedStorage<Size, Alignment>;
@@ -58,13 +68,20 @@ protected:
     template<typename T>
     struct Referential: TypeSwitch {
         void destroy(Storage &what) override {
-            auto pointer = reinterpret_cast<T *>(what.space);
-            delete pointer;
+            auto pointer = reinterpret_cast<T **>(what.space);
+            delete *pointer;
         }
     };
 
     Storage m_space;
-    TypeSwitch m_typeSwitch;
+    detail::AlignedStorage<sizeof(TypeSwitch *), alignof(TypeSwitch *)>
+        m_typeSwitchSpace;
+
+    TypeSwitch *typeSwitch() const {
+        auto asTypeSwitch =
+            reinterpret_cast<const TypeSwitch *>(m_typeSwitchSpace.space);
+        return const_cast<TypeSwitch *>(asTypeSwitch);
+    }
 };
 
 using Any = AnyContainer<8>;
@@ -73,16 +90,20 @@ template<int Size, int Alignment>
 template<
     typename T,
     typename Decayed,
-    std::enable_if_t<std::is_copy_constructible<Decayed>::value, int>
+    std::enable_if_t<
+            std::is_copy_constructible<Decayed>::value &&
+            meta::NotBasedOf<Decayed, AnyContainer<Size, Alignment>>(),
+        int
+    >
 >
 AnyContainer<Size, Alignment>::AnyContainer(T &&initializer) {
     if(alignof(Decayed) <= Alignment && sizeof(Decayed) <= Size) {
         new(m_space.space) Decayed{std::forward<T>(initializer)};
-        new(&m_typeSwitch) Value<Decayed>{};
+        new(typeSwitch()) Value<Decayed>{};
     } else {
         reinterpret_cast<Decayed *&>(m_space.space) =
             new Decayed{std::forward<T>(initializer)};
-        new(&m_typeSwitch) Referential<Decayed>{};
+        new(typeSwitch()) Referential<Decayed>{};
     }
 };
 

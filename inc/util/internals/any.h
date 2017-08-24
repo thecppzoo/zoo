@@ -6,7 +6,7 @@ namespace zoo { namespace internals {
 
 struct AnyExtensions: Any {
     static const zoo::Any::TypeSwitch *ts(const zoo::Any &a) {
-        return &static_cast<const AnyExtensions *>(&a)->m_typeSwitch;
+        return static_cast<const AnyExtensions *>(&a)->typeSwitch();
     }
 
     template<typename T>
