@@ -109,7 +109,13 @@ struct AnyContainer {
         source->move(container());
     }
 
-    template<typename Initializer>
+    template<
+        typename Initializer,
+        std::enable_if_t<
+            meta::NotBasedOf<Initializer, AnyContainer>(),
+            int
+        > = 0
+    >
     AnyContainer(Initializer &&initializer);
 
     ~AnyContainer() { container()->destroy(); }
@@ -120,9 +126,18 @@ struct AnyContainer {
 };
 
 template<int Size, int Alignment, typename TypeSwitch>
-template<typename Initializer>
+template<
+    typename Initializer,
+    std::enable_if_t<
+        meta::NotBasedOf<
+            Initializer, AnyContainer<Size, Alignment, TypeSwitch>
+        >(),
+        int
+    >
+>
 AnyContainer<Size, Alignment, TypeSwitch>::AnyContainer(Initializer &&i) {
     using Decayed = std::decay_t<Initializer>;
+    static_assert(std::is_copy_constructible<Decayed>::value, "");
     using Implementation =
         typename TypeSwitch::template Implementation<Size, Alignment, Decayed>;
     new(m_space) Implementation(std::forward<Initializer>(i));

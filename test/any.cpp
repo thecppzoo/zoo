@@ -49,6 +49,7 @@ TEST_CASE("Any", "[contract]") {
         debug();
         zoo::Any b{a};
         debug();
-        REQUIRE(zoo::internals::AnyExtensions::isReferential<zoo::Any>(b));
+        REQUIRE(!zoo::internals::AnyExtensions::isReferential<zoo::Any>(b));
+        REQUIRE(zoo::internals::AnyExtensions::isAValue<int>(b));
     }
 }
