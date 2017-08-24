@@ -7,6 +7,8 @@ namespace zoo {
 template<int Size, int Alignment>
 struct IAnyContainer {
     virtual void destroy() {}
+    virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
+    virtual void move(IAnyContainer *to) { new(to) IAnyContainer; }
 
     alignas(Alignment)
     char m_space[Size];
@@ -14,6 +16,8 @@ struct IAnyContainer {
 
 template<int Size, int Alignment, typename ValueType>
 struct ValueContainer: IAnyContainer<Size, Alignment> {
+    using IAC = IAnyContainer<Size, Alignment>;
+
     ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
 
     template<typename Value>
@@ -22,11 +26,19 @@ struct ValueContainer: IAnyContainer<Size, Alignment> {
     }
 
     void destroy() override { thy()->~ValueType(); }
+
+    void copy(IAC *to) override { new(to) ValueContainer{*thy()}; }
+
+    void move(IAC *to) override { new(to) ValueContainer{std::move(*thy())}; }
 };
 
 template<int Size, int Alignment, typename ValueType>
 struct ReferentialContainer: IAnyContainer<Size, Alignment> {
-    ValueType **pThy() { return reinterpret_cast<ValueType **>(this->m_space); }
+    using IAC = IAnyContainer<Size, Alignment>;
+
+    ValueType **pThy() {
+        return reinterpret_cast<ValueType **>(this->m_space);
+    }
 
     ValueType *thy() { return *pThy(); }
 
@@ -35,7 +47,16 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
         *pThy() = new ValueType{std::forward<Value>(value)};
     }
 
+    ReferentialContainer(ValueType *ptr) { *pThy() = ptr; }
+
     void destroy() override { thy()->~ValueType(); }
+
+    void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
+
+    void move(IAC *to) override {
+        new(to) ReferentialContainer{thy()};
+        *pThy() = nullptr;
+    }
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>
@@ -80,10 +101,13 @@ struct AnyContainer {
 
     AnyContainer(const AnyContainer &model) {
         auto source = model.container();
-        source->copy(this);
+        source->copy(container());
     }
 
-    AnyContainer(AnyContainer &&moveable);
+    AnyContainer(AnyContainer &&moveable) {
+        auto source = moveable.container();
+        source->move(container());
+    }
 
     template<typename Initializer>
     AnyContainer(Initializer &&initializer);

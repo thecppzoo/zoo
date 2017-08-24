@@ -16,7 +16,10 @@ struct Destructor {
 };
 
 struct alignas(16) D2: Destructor { using Destructor::Destructor; };
+
 struct Big { double a, b; };
+
+void debug() {};
 
 TEST_CASE("Any", "[contract]") {
     SECTION("Value Destruction") {
@@ -40,5 +43,12 @@ TEST_CASE("Any", "[contract]") {
     SECTION("Referential Semantics - Size") {
         zoo::Any v{Big{}};
         REQUIRE(zoo::internals::AnyExtensions::isReferential<Big>(v));
+    }
+    SECTION("Copy constructor") {
+        zoo::Any a{5};
+        debug();
+        zoo::Any b{a};
+        debug();
+        REQUIRE(zoo::internals::AnyExtensions::isReferential<zoo::Any>(b));
     }
 }
