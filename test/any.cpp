@@ -45,7 +45,7 @@ TEST_CASE("Any", "[contract]") {
         REQUIRE(zoo::internals::AnyExtensions::isReferential<Big>(v));
     }
     SECTION("Copy constructor") {
-        zoo::Any a{5};
+        zoo::internals::AnyExtensions a{5};
         debug();
         zoo::Any b{a};
         debug();

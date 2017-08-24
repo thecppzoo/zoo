@@ -5,6 +5,8 @@
 namespace zoo { namespace internals {
 
 struct AnyExtensions: Any {
+    using Any::Any;
+
     static const zoo::Any::Container *ts(const zoo::Any &a) {
         return static_cast<const AnyExtensions *>(&a)->container();
     }
