@@ -177,6 +177,15 @@ TEST_CASE("Any", "[contract]") {
         auto valuePointerAtEmpty = zoo::any_cast<int>(&empty);
         REQUIRE(5 == *valuePointerAtEmpty);
     }
+    SECTION("any_cast") {
+        REQUIRE_THROWS_AS(zoo::any_cast<int>(empty), std::bad_cast &);
+        REQUIRE(nullptr == zoo::any_cast<int>(&empty));
+        const zoo::Any *constAny = nullptr;
+        REQUIRE(nullptr == zoo::any_cast<int>(constAny));
+        constAny = &empty;
+        empty = 7;
+        REQUIRE(nullptr != zoo::any_cast<int>(constAny));
+    }
     #ifdef MODERN_COMPILER
     SECTION("inplace") {
         zoo::Any bfi{std::in_place_type<BuildsFromInt>, 5};

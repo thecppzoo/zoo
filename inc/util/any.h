@@ -10,6 +10,9 @@
 
 namespace zoo {
 
+template<typename T>
+using uncvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
 template<int Size, int Alignment>
 struct IAnyContainer {
     virtual void destroy() {}
@@ -284,8 +287,48 @@ using CanonicalTypeSwitch =
 
 using Any = AnyContainer<CanonicalTypeSwitch>;
 
-template<typename T>
-inline T *any_cast(Any *ptr) { return anyContainerCast<T>(ptr); }
+struct bad_any_cast: std::bad_cast {
+    const char *what() const noexcept override {
+        return "Incorrect Any casting";
+    }
+};
+
+template<class ValueType>
+ValueType any_cast(const Any &operand) {
+    using U = uncvr_t<ValueType>;
+    static_assert(std::is_constructible<ValueType, const U &>::value, "");
+    if(typeid(U) != operand.type()) { throw bad_any_cast{}; }
+    return *anyContainerCast<U>(&operand);
+}
+
+template<class ValueType>
+ValueType any_cast(Any &operand) {
+    using U = uncvr_t<ValueType>;
+    static_assert(std::is_constructible<ValueType, U &>::value, "");
+    if(typeid(U) != operand.type()) { throw bad_any_cast{}; }
+    return *anyContainerCast<U>(&operand);
+}
+
+template<class ValueType>
+ValueType any_cast(Any &&operand) {
+    using U = uncvr_t<ValueType>;
+    static_assert(std::is_constructible<ValueType, U>::value, "");
+    if(typeid(U) != operand.type()) { throw bad_any_cast{}; }
+    return std::move(*anyContainerCast<U>(&operand));
+}
+
+template<class ValueType>
+ValueType *any_cast(Any *operand) {
+    if(!operand) { return nullptr; }
+    using U = uncvr_t<ValueType>;
+    if(typeid(U) != operand->type()) { return nullptr; }
+    return anyContainerCast<U>(operand);
+}
+
+template<typename ValueType>
+const ValueType *any_cast(const Any *ptr) {
+    return any_cast<ValueType>(const_cast<Any *>(ptr));
+}
 
 inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
