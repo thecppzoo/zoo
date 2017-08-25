@@ -8,15 +8,21 @@ template<int Size, int Alignment>
 struct IAnyContainer {
     virtual void destroy() {}
     virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
-    virtual void move(IAnyContainer *to) { new(to) IAnyContainer; }
-    virtual void *value() { return nullptr; }
+    virtual void move(IAnyContainer *to) noexcept { new(to) IAnyContainer; }
+    virtual void *value() noexcept { return nullptr; }
+    virtual bool empty() const noexcept { return true; }
 
     alignas(Alignment)
     char m_space[Size];
 };
 
+template<int Size, int Alignment>
+struct BaseContainer: IAnyContainer<Size, Alignment> {
+    bool empty() const noexcept { return false; }
+};
+
 template<int Size, int Alignment, typename ValueType>
-struct ValueContainer: IAnyContainer<Size, Alignment> {
+struct ValueContainer: BaseContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
 
     ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
@@ -30,9 +36,11 @@ struct ValueContainer: IAnyContainer<Size, Alignment> {
 
     void copy(IAC *to) override { new(to) ValueContainer{*thy()}; }
 
-    void move(IAC *to) override { new(to) ValueContainer{std::move(*thy())}; }
+    void move(IAC *to) noexcept override {
+        new(to) ValueContainer{std::move(*thy())};
+    }
 
-    void *value() override { return thy(); }
+    void *value() noexcept override { return thy(); }
 };
 
 template<int Size, int Alignment, typename ValueType>
@@ -56,12 +64,12 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
 
     void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
 
-    void move(IAC *to) override {
+    void move(IAC *to) noexcept override {
         new(to) ReferentialContainer{thy()};
         *pThy() = nullptr;
     }
 
-    void *value() override { return thy(); }
+    void *value() noexcept override { return thy(); }
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>
@@ -152,15 +160,26 @@ struct AnyContainer {
         return *this;
     }
 
+    void clear() noexcept {
+        container()->destroy();
+        new(this) AnyContainer;
+    }
+
+    void swap(AnyContainer &other) noexcept {
+        AnyContainer auxiliar{std::move(other)};
+        other = std::move(*this);
+        *this = std::move(auxiliar);
+    }
+ 
+    bool empty() const noexcept { return container()->empty(); }
+
     Container *container() const {
         return reinterpret_cast<Container *>(const_cast<char *>(m_space));
     }
 };
 
-using Any = AnyContainer<8, 8, PolymorphicTypeSwitch>;
-
-template<typename T>
-inline T *any_cast(Any *ptr) {
+template<typename T, int Size, int Alignment, typename TypeSwitch>
+inline T *anyContainerCast(AnyContainer<Size, Alignment, TypeSwitch> *ptr) {
     return reinterpret_cast<T *>(ptr->container()->value());
 }
 
@@ -181,5 +200,10 @@ AnyContainer<Size, Alignment, TypeSwitch>::AnyContainer(Initializer &&i) {
         typename TypeSwitch::template Implementation<Size, Alignment, Decayed>;
     new(m_space) Implementation(std::forward<Initializer>(i));
 }
+
+using Any = AnyContainer<sizeof(void *), alignof(void *), PolymorphicTypeSwitch>;
+
+template<typename T>
+inline T *any_cast(Any *ptr) { return anyContainerCast<T>(ptr); }
 
 }

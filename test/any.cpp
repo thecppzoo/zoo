@@ -129,4 +129,10 @@ TEST_CASE("Any", "[contract]") {
         auto p = any_cast<Moves>(&anotherTrampled);
         REQUIRE(Moves::MOVING == p->kind);
     }
+    SECTION("empty") {
+        zoo::Any a;
+        REQUIRE(a.empty());
+        a = 5;
+        REQUIRE(!a.empty());
+    }
 }
