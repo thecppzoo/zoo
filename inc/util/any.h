@@ -1,4 +1,4 @@
-#include "meta/NotBasedOf.h"
+#include "meta/NotBasedOn.h"
 
 #include <new>
 
@@ -125,7 +125,7 @@ struct AnyContainer {
     template<
         typename Initializer,
         std::enable_if_t<
-            meta::NotBasedOf<Initializer, AnyContainer>(),
+            meta::NotBasedOn<Initializer, AnyContainer>(),
             int
         > = 0
     >
@@ -150,7 +150,7 @@ struct AnyContainer {
     template<
         typename Argument,
         std::enable_if_t<
-            meta::NotBasedOf<Argument, AnyContainer>(),
+            meta::NotBasedOn<Argument, AnyContainer>(),
             int
         > = 0
     >
@@ -187,7 +187,7 @@ template<int Size, int Alignment, typename TypeSwitch>
 template<
     typename Initializer,
     std::enable_if_t<
-        meta::NotBasedOf<
+        meta::NotBasedOn<
             Initializer, AnyContainer<Size, Alignment, TypeSwitch>
         >(),
         int
