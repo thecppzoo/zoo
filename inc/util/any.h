@@ -9,6 +9,7 @@ struct IAnyContainer {
     virtual void destroy() {}
     virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
     virtual void move(IAnyContainer *to) { new(to) IAnyContainer; }
+    virtual void *value() { return nullptr; }
 
     alignas(Alignment)
     char m_space[Size];
@@ -30,6 +31,8 @@ struct ValueContainer: IAnyContainer<Size, Alignment> {
     void copy(IAC *to) override { new(to) ValueContainer{*thy()}; }
 
     void move(IAC *to) override { new(to) ValueContainer{std::move(*thy())}; }
+
+    void *value() override { return thy(); }
 };
 
 template<int Size, int Alignment, typename ValueType>
@@ -57,6 +60,8 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
         new(to) ReferentialContainer{thy()};
         *pThy() = nullptr;
     }
+
+    void *value() override { return thy(); }
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>
@@ -97,14 +102,14 @@ struct AnyContainer {
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
 
-    AnyContainer() { new(m_space) Container; }
+    AnyContainer() noexcept { new(m_space) Container; }
 
     AnyContainer(const AnyContainer &model) {
         auto source = model.container();
         source->copy(container());
     }
 
-    AnyContainer(AnyContainer &&moveable) {
+    AnyContainer(AnyContainer &&moveable) noexcept {
         auto source = moveable.container();
         source->move(container());
     }
@@ -120,10 +125,25 @@ struct AnyContainer {
 
     ~AnyContainer() { container()->destroy(); }
 
+    AnyContainer &operator=(const AnyContainer &model) {
+        return *this = AnyContainer{model};
+    }
+
+    AnyContainer &operator=(AnyContainer &&moveable) {
+        auto myself = container();
+        myself->destroy();
+        moveable.container()->move(myself);
+    }
+
     Container *container() const {
         return reinterpret_cast<Container *>(const_cast<char *>(m_space));
     }
 };
+
+template<typename T, int Size, int Alignment, typename TypeSwitch>
+inline T *any_cast(AnyContainer<Size, Alignment, TypeSwitch> *ptr) {
+    return reinterpret_cast<T *>(ptr->container()->value());
+}
 
 template<int Size, int Alignment, typename TypeSwitch>
 template<
