@@ -44,6 +44,10 @@ struct Moves {
     }
 };
 
+struct BuildsFromInt {
+    BuildsFromInt(int) {};
+};
+
 void debug() {};
 
 TEST_CASE("Any", "[contract]") {
@@ -158,4 +162,10 @@ TEST_CASE("Any", "[contract]") {
         auto valuePointerAtEmpty = zoo::any_cast<int>(&empty);
         REQUIRE(5 == *valuePointerAtEmpty);
     }
+    #ifdef MODERN_COMPILER
+    SECTION("inplace") {
+        zoo::Any bfi{std::in_place_type<BuildsFromInt>, 5};
+        REQUIRE(typeid(BuildsFromInt) == bfi.type());
+    }
+    #endif
 }

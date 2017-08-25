@@ -164,13 +164,15 @@ struct AnyContainer {
         typename Decayed = std::decay_t<ValueType>,
         std::enable_if_t<
             std::is_copy_constructible<Decayed>::value &&
-                std::is_constructible<Decayed, Initializers...>::value
+                std::is_constructible<Decayed, Initializers...>::value,
             int
         > = 0
     >
     inline
     AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
         using Implementation =
+            typename
+                TypeSwitch::template Implementation<Size, Alignment, Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
     }
     #endif
