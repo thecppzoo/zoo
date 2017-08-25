@@ -1,6 +1,11 @@
 #include "meta/NotBasedOn.h"
 
+#ifdef MODERN_COMPILER
+#include "meta/InplaceType.h"
+#endif
+
 #include <new>
+#include <initializer_list>
 #include <typeinfo>
 
 namespace zoo {
@@ -11,7 +16,7 @@ struct IAnyContainer {
     virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
     virtual void move(IAnyContainer *to) noexcept { new(to) IAnyContainer; }
     virtual void *value() noexcept { return nullptr; }
-    virtual bool empty() const noexcept { return true; }
+    virtual bool nonEmpty() const noexcept { return false; }
     virtual const std::type_info &type() const noexcept { return typeid(void); }
 
     alignas(Alignment)
@@ -20,7 +25,7 @@ struct IAnyContainer {
 
 template<int Size, int Alignment>
 struct BaseContainer: IAnyContainer<Size, Alignment> {
-    bool empty() const noexcept { return false; }
+    bool nonEmpty() const noexcept { return true; }
 };
 
 template<int Size, int Alignment, typename ValueType>
@@ -134,12 +139,41 @@ struct AnyContainer {
 
     template<
         typename Initializer,
+        typename Decayed = std::decay_t<Initializer>,
         std::enable_if_t<
-            meta::NotBasedOn<Initializer, AnyContainer>(),
+            meta::NotBasedOn<Initializer, AnyContainer>() &&
+                std::is_copy_constructible<Decayed>::value
+                #ifdef MODERN_COMPILER
+                && !meta::InplaceType<Initializer>::value
+                #endif
+            ,
             int
         > = 0
     >
-    AnyContainer(Initializer &&initializer);
+    AnyContainer(Initializer &&initializer) {
+        using Implementation =
+            typename
+                TypeSwitch::template Implementation<Size, Alignment, Decayed>;
+        new(m_space) Implementation(std::forward<Initializer>(initializer));
+    }
+
+    #ifdef MODERN_COMPILER
+    template<
+        typename ValueType,
+        typename... Initializers,
+        typename Decayed = std::decay_t<ValueType>,
+        std::enable_if_t<
+            std::is_copy_constructible<Decayed>::value &&
+                std::is_constructible<Decayed, Initializers...>::value
+            int
+        > = 0
+    >
+    inline
+    AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
+        using Implementation =
+        new(m_space) Implementation(std::forward<Initializers>(izers)...);
+    }
+    #endif
 
     ~AnyContainer() { container()->destroy(); }
 
@@ -170,7 +204,14 @@ struct AnyContainer {
         return *this;
     }
 
-    void clear() noexcept {
+    template<typename ValueType, typename... Arguments>
+    std::decay_t<ValueType> &emplace(Arguments  &&...);
+
+    template<typename ValueType, typename U, typename... Arguments>
+    std::decay_t<ValueType> &
+    emplace(std::initializer_list<U>, Arguments &&...);
+
+    void reset() noexcept {
         container()->destroy();
         new(this) AnyContainer;
     }
@@ -180,8 +221,8 @@ struct AnyContainer {
         other = std::move(*this);
         *this = std::move(auxiliar);
     }
- 
-    bool empty() const noexcept { return container()->empty(); }
+
+    bool has_value() const noexcept { return container()->nonEmpty(); }
 
     const std::type_info &type() const noexcept {
         return container()->type();
@@ -196,29 +237,11 @@ template<int Size, int Alignment, typename TypeSwitch>
 inline void anyContainerSwap(
     AnyContainer<Size, Alignment, TypeSwitch> &a1,
     AnyContainer<Size, Alignment, TypeSwitch> &a2
-) { a1.swap(a2); }
+) noexcept { a1.swap(a2); }
 
 template<typename T, int Size, int Alignment, typename TypeSwitch>
 inline T *anyContainerCast(AnyContainer<Size, Alignment, TypeSwitch> *ptr) {
     return reinterpret_cast<T *>(ptr->container()->value());
-}
-
-template<int Size, int Alignment, typename TypeSwitch>
-template<
-    typename Initializer,
-    std::enable_if_t<
-        meta::NotBasedOn<
-            Initializer, AnyContainer<Size, Alignment, TypeSwitch>
-        >(),
-        int
-    >
->
-AnyContainer<Size, Alignment, TypeSwitch>::AnyContainer(Initializer &&i) {
-    using Decayed = std::decay_t<Initializer>;
-    static_assert(std::is_copy_constructible<Decayed>::value, "");
-    using Implementation =
-        typename TypeSwitch::template Implementation<Size, Alignment, Decayed>;
-    new(m_space) Implementation(std::forward<Initializer>(i));
 }
 
 using Any = AnyContainer<sizeof(void *), alignof(void *), PolymorphicTypeSwitch>;
@@ -226,6 +249,6 @@ using Any = AnyContainer<sizeof(void *), alignof(void *), PolymorphicTypeSwitch>
 template<typename T>
 inline T *any_cast(Any *ptr) { return anyContainerCast<T>(ptr); }
 
-inline void swap(Any &a1, Any &a2) { anyContainerSwap(a1, a2); }
+inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
 }

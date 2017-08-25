@@ -1,5 +1,13 @@
 #include "util/internals/any.h"
 
+namespace compileTime_AnyContainer {
+
+void moveConstructorNoexcept(zoo::Any a) {
+    static_assert(noexcept(zoo::Any{std::move(a)}), "");
+}
+
+}
+
 #ifdef TESTS
     #define CATCH_CONFIG_MAIN
 #else
@@ -130,10 +138,12 @@ TEST_CASE("Any", "[contract]") {
         REQUIRE(Moves::MOVING == p->kind);
     }
     zoo::Any empty;
-    SECTION("empty") {
-        REQUIRE(empty.empty());
+    SECTION("reset()") {
+        REQUIRE(!empty.has_value());
         empty = 5;
-        REQUIRE(!empty.empty());
+        REQUIRE(empty.has_value());
+        empty.reset();
+        REQUIRE(!empty.has_value());
     }
     SECTION("typeid") {
         REQUIRE(typeid(void) == empty.type());
