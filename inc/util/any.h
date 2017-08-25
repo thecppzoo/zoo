@@ -126,13 +126,30 @@ struct AnyContainer {
     ~AnyContainer() { container()->destroy(); }
 
     AnyContainer &operator=(const AnyContainer &model) {
-        return *this = AnyContainer{model};
+        auto myself = container();
+        myself->destroy();
+        model.container()->copy(myself);
+        return *this;
     }
 
-    AnyContainer &operator=(AnyContainer &&moveable) {
+    AnyContainer &operator=(AnyContainer &&moveable) noexcept {
         auto myself = container();
         myself->destroy();
         moveable.container()->move(myself);
+        return *this;
+    }
+
+    template<
+        typename Argument,
+        std::enable_if_t<
+            meta::NotBasedOf<Argument, AnyContainer>(),
+            int
+        > = 0
+    >
+    AnyContainer &operator=(Argument &&argument) {
+        container()->destroy();
+        new(this) AnyContainer(std::forward<Argument>(argument));
+        return *this;
     }
 
     Container *container() const {
@@ -140,8 +157,10 @@ struct AnyContainer {
     }
 };
 
-template<typename T, int Size, int Alignment, typename TypeSwitch>
-inline T *any_cast(AnyContainer<Size, Alignment, TypeSwitch> *ptr) {
+using Any = AnyContainer<8, 8, PolymorphicTypeSwitch>;
+
+template<typename T>
+inline T *any_cast(Any *ptr) {
     return reinterpret_cast<T *>(ptr->container()->value());
 }
 
@@ -162,7 +181,5 @@ AnyContainer<Size, Alignment, TypeSwitch>::AnyContainer(Initializer &&i) {
         typename TypeSwitch::template Implementation<Size, Alignment, Decayed>;
     new(m_space) Implementation(std::forward<Initializer>(i));
 }
-
-using Any = AnyContainer<8, 8, PolymorphicTypeSwitch>;
 
 }

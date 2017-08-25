@@ -97,4 +97,36 @@ TEST_CASE("Any", "[contract]") {
         REQUIRE(Moves::MOVED == def.kind);
         REQUIRE(Moves::MOVING == zoo::any_cast<Moves>(&moving)->kind);
     }
+    SECTION("Assignments") {
+        using namespace zoo;
+        zoo::Any integer{5};
+        int willChange = 0;
+        zoo::Any willBeTrampled{Destructor{&willChange}};
+        willBeTrampled = integer;
+        auto asInt = any_cast<int>(&willBeTrampled);
+        REQUIRE(nullptr != asInt);
+        REQUIRE(5 == *asInt);
+        REQUIRE(1 == willChange);
+        willChange = 0;
+        zoo::Any anotherTrampled{D2{&willChange}};
+        *asInt = 9;
+        anotherTrampled = willBeTrampled;
+        asInt = any_cast<int>(&anotherTrampled);
+        REQUIRE(nullptr != asInt);
+        REQUIRE(9 == *asInt);
+        REQUIRE(1 == willChange);
+        integer = Moves{};
+        auto movPtr = any_cast<Moves>(&integer);
+        REQUIRE(nullptr != movPtr);
+        REQUIRE(Moves::MOVING == movPtr->kind);
+        debug();
+        willBeTrampled = *movPtr;
+        auto movPtr2 = any_cast<Moves>(&willBeTrampled);
+        REQUIRE(nullptr != movPtr2);
+        REQUIRE(Moves::COPIED == movPtr2->kind);
+        anotherTrampled = std::move(*movPtr2);
+        REQUIRE(Moves::MOVED == movPtr2->kind);
+        auto p = any_cast<Moves>(&anotherTrampled);
+        REQUIRE(Moves::MOVING == p->kind);
+    }
 }
