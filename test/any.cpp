@@ -140,4 +140,12 @@ TEST_CASE("Any", "[contract]") {
         empty = Big{};
         REQUIRE(typeid(Big) == empty.type());
     }
+    SECTION("swap") {
+        zoo::Any other{5};
+        anyContainerSwap(empty, other);
+        REQUIRE(typeid(int) == empty.type());
+        REQUIRE(typeid(void) == other.type());
+        auto valuePointerAtEmpty = zoo::any_cast<int>(&empty);
+        REQUIRE(5 == *valuePointerAtEmpty);
+    }
 }

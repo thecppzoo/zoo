@@ -192,6 +192,12 @@ struct AnyContainer {
     }
 };
 
+template<int Size, int Alignment, typename TypeSwitch>
+inline void anyContainerSwap(
+    AnyContainer<Size, Alignment, TypeSwitch> &a1,
+    AnyContainer<Size, Alignment, TypeSwitch> &a2
+) { a1.swap(a2); }
+
 template<typename T, int Size, int Alignment, typename TypeSwitch>
 inline T *anyContainerCast(AnyContainer<Size, Alignment, TypeSwitch> *ptr) {
     return reinterpret_cast<T *>(ptr->container()->value());
@@ -219,5 +225,7 @@ using Any = AnyContainer<sizeof(void *), alignof(void *), PolymorphicTypeSwitch>
 
 template<typename T>
 inline T *any_cast(Any *ptr) { return anyContainerCast<T>(ptr); }
+
+inline void swap(Any &a1, Any &a2) { anyContainerSwap(a1, a2); }
 
 }
