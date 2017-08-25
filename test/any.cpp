@@ -39,7 +39,7 @@ struct Moves {
 
     Moves(const Moves &): kind{COPIED} {}
 
-    Moves(Moves &&moveable): kind{MOVING} {
+    Moves(Moves &&moveable) noexcept: kind{MOVING} {
         moveable.kind = MOVED;
     }
 };

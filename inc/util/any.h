@@ -99,30 +99,37 @@ struct PolymorphicImplementationDecider<Size, Alignment, ValueType, true> {
     using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
+template<int Size_, int Alignment_>
 struct PolymorphicTypeSwitch {
-    template<int Size, int Alignment>
-    using empty = IAnyContainer<Size, Alignment>;
+    constexpr static auto Size = Size_;
+    constexpr static auto Alignment = Alignment_;
 
-    template<int Size, int Alignment, typename ValueType>
+    using Switch = IAnyContainer<Size, Alignment>;
+
+    template<typename ValueType>
     static constexpr bool useValueSemantics() {
         return
             Alignment % alignof(ValueType) == 0 &&
-            sizeof(ValueType) <= Size;
+            sizeof(ValueType) <= Size &&
+            std::is_nothrow_move_constructible<ValueType>::value;
     }
 
-    template<int Size, int Alignment, typename ValueType>
+    template<typename ValueType>
     using Implementation =
         typename PolymorphicImplementationDecider<
             Size,
             Alignment,
             ValueType,
-            useValueSemantics<Size, Alignment, ValueType>()
+            useValueSemantics<ValueType>()
         >::type;
 };
 
-template<int Size, int Alignment, typename TypeSwitch = PolymorphicTypeSwitch>
+template<typename TypeSwitch>
 struct AnyContainer {
-    using Container = typename TypeSwitch::template empty<Size, Alignment>;
+    constexpr static auto Size = TypeSwitch::Size;
+    constexpr static auto Alignment = TypeSwitch::Alignment;
+
+    using Container = typename TypeSwitch::Switch;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
@@ -154,8 +161,7 @@ struct AnyContainer {
     >
     AnyContainer(Initializer &&initializer) {
         using Implementation =
-            typename
-                TypeSwitch::template Implementation<Size, Alignment, Decayed>;
+            typename TypeSwitch::template Implementation<Decayed>;
         new(m_space) Implementation(std::forward<Initializer>(initializer));
     }
 
@@ -173,7 +179,7 @@ struct AnyContainer {
     AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
         using Implementation =
             typename
-                TypeSwitch::template Implementation<Size, Alignment, Decayed>;
+                TypeSwitch::template Implementation<Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
     }
 
@@ -197,7 +203,7 @@ struct AnyContainer {
     ) {
         using Implementation =
             typename
-                TypeSwitch::template Implementation<Size, Alignment, Decayed>;
+                TypeSwitch::template Implementation<Decayed>;
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
     #endif
@@ -260,18 +266,23 @@ struct AnyContainer {
     }
 };
 
-template<int Size, int Alignment, typename TypeSwitch>
+template<typename TypeSwitch>
 inline void anyContainerSwap(
-    AnyContainer<Size, Alignment, TypeSwitch> &a1,
-    AnyContainer<Size, Alignment, TypeSwitch> &a2
+    AnyContainer<TypeSwitch> &a1, AnyContainer<TypeSwitch> &a2
 ) noexcept { a1.swap(a2); }
 
-template<typename T, int Size, int Alignment, typename TypeSwitch>
-inline T *anyContainerCast(AnyContainer<Size, Alignment, TypeSwitch> *ptr) {
-    return reinterpret_cast<T *>(ptr->container()->value());
+template<typename T, typename TypeSwitch>
+inline T *anyContainerCast(const AnyContainer<TypeSwitch> *ptr) {
+    return
+        reinterpret_cast<T *>(
+            const_cast<AnyContainer<TypeSwitch> *>(ptr)->container()->value()
+        );
 }
 
-using Any = AnyContainer<sizeof(void *), alignof(void *), PolymorphicTypeSwitch>;
+using CanonicalTypeSwitch =
+    PolymorphicTypeSwitch<sizeof(void *), alignof(void *)>;
+
+using Any = AnyContainer<CanonicalTypeSwitch>;
 
 template<typename T>
 inline T *any_cast(Any *ptr) { return anyContainerCast<T>(ptr); }
