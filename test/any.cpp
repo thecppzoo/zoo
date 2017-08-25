@@ -48,6 +48,21 @@ struct BuildsFromInt {
     BuildsFromInt(int) {};
 };
 
+struct TakesInitializerList {
+    int s;
+    double v;
+    TakesInitializerList(std::initializer_list<int> il, double val):
+        s(il.size()), v(val)
+    {}
+};
+
+struct TwoArgumentConstructor {
+    bool boolean;
+    int value;
+
+    TwoArgumentConstructor(void *p, int q): boolean(p), value(q) {};
+};
+
 void debug() {};
 
 TEST_CASE("Any", "[contract]") {
@@ -166,6 +181,18 @@ TEST_CASE("Any", "[contract]") {
     SECTION("inplace") {
         zoo::Any bfi{std::in_place_type<BuildsFromInt>, 5};
         REQUIRE(typeid(BuildsFromInt) == bfi.type());
+        zoo::Any il{std::in_place_type<TakesInitializerList>, { 9, 8, 7 }, 2.2};
+        REQUIRE(typeid(TakesInitializerList) == il.type());
+        auto ptr = zoo::any_cast<TakesInitializerList>(&il);
+        REQUIRE(3 == ptr->s);
+        REQUIRE(2.2 == ptr->v);
+    }
+    SECTION("Multiple argument constructor -- value") {
+        zoo::Any mac{TwoArgumentConstructor{nullptr, 3}};
+        REQUIRE(zoo::internals::AnyExtensions::isAValue<TwoArgumentConstructor>(mac));
+        auto ptr = zoo::any_cast<TwoArgumentConstructor>(&mac);
+        REQUIRE(false == ptr->boolean);
+        REQUIRE(3 == ptr->value);
     }
     #endif
 }

@@ -34,9 +34,9 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
 
     ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
 
-    template<typename Value>
-    ValueContainer(Value &&value) {
-        new(this->m_space) ValueType{std::forward<Value>(value)};
+    template<typename... Values>
+    ValueContainer(Values &&... values) {
+        new(this->m_space) ValueType{std::forward<Values>(values)...};
     }
 
     void destroy() override { thy()->~ValueType(); }
@@ -57,6 +57,8 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
 template<int Size, int Alignment, typename ValueType>
 struct ReferentialContainer: IAnyContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
+    using NONE = void (ReferentialContainer::*)();
+    constexpr static NONE None = nullptr;
 
     ValueType **pThy() {
         return reinterpret_cast<ValueType **>(this->m_space);
@@ -64,19 +66,19 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
 
     ValueType *thy() { return *pThy(); }
 
-    template<typename Value>
-    ReferentialContainer(Value &&value) {
-        *pThy() = new ValueType{std::forward<Value>(value)};
+    template<typename... Values>
+    ReferentialContainer(Values &&... values) {
+        *pThy() = new ValueType{std::forward<Values>(values)...};
     }
 
-    ReferentialContainer(ValueType *ptr) { *pThy() = ptr; }
+    ReferentialContainer(NONE, ValueType *ptr) { *pThy() = ptr; }
 
     void destroy() override { thy()->~ValueType(); }
 
     void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
 
     void move(IAC *to) noexcept override {
-        new(to) ReferentialContainer{thy()};
+        new(to) ReferentialContainer{None, thy()};
         *pThy() = nullptr;
     }
 
@@ -168,12 +170,35 @@ struct AnyContainer {
             int
         > = 0
     >
-    inline
     AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
         using Implementation =
             typename
                 TypeSwitch::template Implementation<Size, Alignment, Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
+    }
+
+    template<
+        typename ValueType,
+        typename UL,
+        typename... Args,
+        typename Decayed = std::decay_t<ValueType>,
+        std::enable_if_t<
+            std::is_copy_constructible<Decayed>::value &&
+                std::is_constructible<
+                    Decayed, std::initializer_list<UL> &, Args...
+                >::value,
+            int
+        > = 0
+    >
+    AnyContainer(
+        std::in_place_type_t<ValueType>,
+        std::initializer_list<UL> il,
+        Args &&... args
+    ) {
+        using Implementation =
+            typename
+                TypeSwitch::template Implementation<Size, Alignment, Decayed>;
+        new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
     #endif
 
