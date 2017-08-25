@@ -1,6 +1,7 @@
 #include "meta/NotBasedOn.h"
 
 #include <new>
+#include <typeinfo>
 
 namespace zoo {
 
@@ -11,6 +12,7 @@ struct IAnyContainer {
     virtual void move(IAnyContainer *to) noexcept { new(to) IAnyContainer; }
     virtual void *value() noexcept { return nullptr; }
     virtual bool empty() const noexcept { return true; }
+    virtual const std::type_info &type() const noexcept { return typeid(void); }
 
     alignas(Alignment)
     char m_space[Size];
@@ -41,6 +43,10 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
     }
 
     void *value() noexcept override { return thy(); }
+
+    const std::type_info &type() const noexcept override {
+        return typeid(ValueType);
+    }
 };
 
 template<int Size, int Alignment, typename ValueType>
@@ -70,6 +76,10 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
     }
 
     void *value() noexcept override { return thy(); }
+
+    const std::type_info &type() const noexcept override {
+        return typeid(ValueType);
+    }
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>
@@ -172,6 +182,10 @@ struct AnyContainer {
     }
  
     bool empty() const noexcept { return container()->empty(); }
+
+    const std::type_info &type() const noexcept {
+        return container()->type();
+    }
 
     Container *container() const {
         return reinterpret_cast<Container *>(const_cast<char *>(m_space));
