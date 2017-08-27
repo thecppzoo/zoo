@@ -238,7 +238,7 @@ struct AnyContainer {
         > = 0
     >
     AnyContainer &operator=(Argument &&argument) {
-        emplace<Argument>(std::forward<Argument>(argument));
+        emplace_impl<Argument>(std::forward<Argument>(argument));
         return *this;
     }
 
