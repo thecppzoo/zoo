@@ -13,9 +13,11 @@ in_place_type_t<T> in_place_type;
 #endif
 #include "meta/InplaceType.h"
 
+#ifndef NO_STANDARD_INCLUDES
 #include <new>
 #include <initializer_list>
 #include <typeinfo>
+#endif
 
 namespace zoo {
 
