@@ -1,8 +1,17 @@
 #include "meta/NotBasedOn.h"
 
-#ifdef MODERN_COMPILER
-#include "meta/InplaceType.h"
+#ifndef MODERN_COMPILER
+namespace std {
+
+template<typename T>
+struct in_place_type_t {};
+
+template<typename T>
+in_place_type_t<T> in_place_type;
+
+}
 #endif
+#include "meta/InplaceType.h"
 
 #include <new>
 #include <initializer_list>
@@ -154,13 +163,9 @@ struct AnyContainer {
         typename Decayed = std::decay_t<Initializer>,
         std::enable_if_t<
             meta::NotBasedOn<Initializer, AnyContainer>() &&
-                std::is_copy_constructible<Decayed>::value
-                #ifdef MODERN_COMPILER
-                && !meta::InplaceType<Initializer>::value
-                #endif
-            ,
-            int
-        > = 0
+                std::is_copy_constructible<Decayed>::value &&
+                !meta::InplaceType<Initializer>::value,
+        int> = 0
     >
     AnyContainer(Initializer &&initializer) {
         using Implementation =
@@ -168,7 +173,6 @@ struct AnyContainer {
         new(m_space) Implementation(std::forward<Initializer>(initializer));
     }
 
-    #ifdef MODERN_COMPILER
     template<
         typename ValueType,
         typename... Initializers,
@@ -209,7 +213,6 @@ struct AnyContainer {
                 TypeSwitch::template Implementation<Decayed>;
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
-    #endif
 
     ~AnyContainer() { container()->destroy(); }
 
@@ -235,18 +238,57 @@ struct AnyContainer {
         > = 0
     >
     AnyContainer &operator=(Argument &&argument) {
-        container()->destroy();
-        new(this) AnyContainer(std::forward<Argument>(argument));
+        emplace<Argument>(std::forward<Argument>(argument));
         return *this;
     }
 
     template<typename ValueType, typename... Arguments>
-    std::decay_t<ValueType> &emplace(Arguments  &&...);
+    std::enable_if_t<
+        std::is_constructible<std::decay_t<ValueType>, Arguments...>::value &&
+            std::is_copy_constructible<std::decay_t<ValueType>>::value,
+        ValueType &
+    >
+    emplace(Arguments  &&... arguments) {
+        emplace_impl<ValueType>(std::forward<Arguments>(arguments)...);
+        return *state<std::decay_t<ValueType>>();
+    }
 
     template<typename ValueType, typename U, typename... Arguments>
-    std::decay_t<ValueType> &
-    emplace(std::initializer_list<U>, Arguments &&...);
+    std::enable_if_t<
+        std::is_constructible<
+            std::decay_t<ValueType>,
+            std::initializer_list<U> &,
+            Arguments...
+        >::value &&
+            std::is_copy_constructible<std::decay_t<ValueType>>::value,
+        ValueType &
+    >
+    emplace(std::initializer_list<U> il, Arguments &&... args) {
+        emplace_impl(il, std::forward<Arguments>(args)...);
+        return *state<std::decay_t<ValueType>>();
+    }
 
+protected:
+    template<typename ValueType, typename... Arguments>
+    void emplace_impl(Arguments  &&... arguments) {
+        container()->destroy();
+        new(this) AnyContainer(
+            std::in_place_type<std::decay_t<ValueType>>,
+            std::forward<Arguments>(arguments)...
+        );
+    }
+
+    template<typename ValueType, typename U, typename... Arguments>
+    void emplace_impl(std::initializer_list<U> &il, Arguments &&... args) {
+        container()->destroy();
+        new(this) AnyContainer(
+            std::in_place_type<std::decay_t<ValueType>>,
+            il,
+            std::forward<Arguments>(args)...
+        );
+    }
+
+public:
     void reset() noexcept {
         container()->destroy();
         new(this) AnyContainer;
@@ -264,6 +306,16 @@ struct AnyContainer {
         return container()->type();
     }
 
+    template<typename ValueType>
+    ValueType *state() noexcept {
+        return reinterpret_cast<ValueType *>(container()->value());
+    }
+
+    template<typename ValueType>
+    const ValueType *state() const noexcept {
+        return const_cast<AnyContainer *>(this)->state<ValueType>();
+    }
+
     Container *container() const {
         return reinterpret_cast<Container *>(const_cast<char *>(m_space));
     }
@@ -275,11 +327,8 @@ inline void anyContainerSwap(
 ) noexcept { a1.swap(a2); }
 
 template<typename T, typename TypeSwitch>
-inline T *anyContainerCast(const AnyContainer<TypeSwitch> *ptr) {
-    return
-        reinterpret_cast<T *>(
-            const_cast<AnyContainer<TypeSwitch> *>(ptr)->container()->value()
-        );
+inline T *anyContainerCast(const AnyContainer<TypeSwitch> *ptr) noexcept {
+    return const_cast<T *>(ptr->template state<T>());
 }
 
 using CanonicalTypeSwitch =

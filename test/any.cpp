@@ -179,6 +179,7 @@ TEST_CASE("Any", "[contract]") {
     }
     SECTION("any_cast") {
         REQUIRE_THROWS_AS(zoo::any_cast<int>(empty), std::bad_cast &);
+        REQUIRE_THROWS_AS(zoo::any_cast<int>(empty), zoo::bad_any_cast);
         REQUIRE(nullptr == zoo::any_cast<int>(&empty));
         const zoo::Any *constAny = nullptr;
         REQUIRE(nullptr == zoo::any_cast<int>(constAny));
@@ -186,7 +187,6 @@ TEST_CASE("Any", "[contract]") {
         empty = 7;
         REQUIRE(nullptr != zoo::any_cast<int>(constAny));
     }
-    #ifdef MODERN_COMPILER
     SECTION("inplace") {
         zoo::Any bfi{std::in_place_type<BuildsFromInt>, 5};
         REQUIRE(typeid(BuildsFromInt) == bfi.type());
@@ -203,5 +203,4 @@ TEST_CASE("Any", "[contract]") {
         REQUIRE(false == ptr->boolean);
         REQUIRE(3 == ptr->value);
     }
-    #endif
 }
