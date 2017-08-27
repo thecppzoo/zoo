@@ -381,4 +381,9 @@ const ValueType *any_cast(const Any *ptr) {
 
 inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
+template<typename T, typename... Args>
+Any make_any(Args &&... args) {
+    return Any(std::in_place_type<T>, std::forward<Args>(args)...);
+}
+
 }
