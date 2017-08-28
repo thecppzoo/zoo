@@ -104,17 +104,17 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>
-struct PolymorphicImplementationDecider {
+struct RuntimePolymorphicImplementationDecider {
     using type = ReferentialContainer<Size, Alignment, ValueType>;
 };
 
 template<int Size, int Alignment, typename ValueType>
-struct PolymorphicImplementationDecider<Size, Alignment, ValueType, true> {
+struct RuntimePolymorphicImplementationDecider<Size, Alignment, ValueType, true> {
     using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
 template<int Size_, int Alignment_>
-struct PolymorphicTypeSwitch {
+struct RuntimePolymorphicImplementation {
     constexpr static auto Size = Size_;
     constexpr static auto Alignment = Alignment_;
 
@@ -130,7 +130,7 @@ struct PolymorphicTypeSwitch {
 
     template<typename ValueType>
     using Implementation =
-        typename PolymorphicImplementationDecider<
+        typename RuntimePolymorphicImplementationDecider<
             Size,
             Alignment,
             ValueType,
@@ -334,7 +334,7 @@ inline T *anyContainerCast(const AnyContainer<TypeSwitch> *ptr) noexcept {
 }
 
 using CanonicalTypeSwitch =
-    PolymorphicTypeSwitch<sizeof(void *), alignof(void *)>;
+    RuntimePolymorphicImplementation<sizeof(void *), alignof(void *)>;
 
 using Any = AnyContainer<CanonicalTypeSwitch>;
 
