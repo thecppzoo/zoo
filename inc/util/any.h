@@ -118,7 +118,7 @@ struct RuntimePolymorphicImplementation {
     constexpr static auto Size = Size_;
     constexpr static auto Alignment = Alignment_;
 
-    using Switch = IAnyContainer<Size, Alignment>;
+    using Empty = IAnyContainer<Size, Alignment>;
 
     template<typename ValueType>
     static constexpr bool useValueSemantics() {
@@ -143,7 +143,7 @@ struct AnyContainer {
     constexpr static auto Size = TypeSwitch::Size;
     constexpr static auto Alignment = TypeSwitch::Alignment;
 
-    using Container = typename TypeSwitch::Switch;
+    using Container = typename TypeSwitch::Empty;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
