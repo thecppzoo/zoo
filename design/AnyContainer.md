@@ -34,7 +34,40 @@ The standard allows and encourages the optimization of holding the value inside 
 
 In my implementation, the alignment and the size are user-selectable as easily as integer template prameters.
 
-In libc++ and libstdc++ there can be a single `any`, with an implementation of holding the value inside or externally, and no further choices.  In my implementation
+In libc++ and libstdc++ there can be a single `any`, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a configuration type with the programmer choices.  There is a `CanonicalTypeSwitch`  for a default `any` with sensible choices:  The values are held inside the `any` object or through a pointer, with the value allocated dynamically, maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicImplementation`](https://github.com/thecppzoo/zoo/blob/9a11f1018ebb360d8cb93b763a4ce796dbdf88cd/inc/util/any.h#L117):
+
+```c++
+template<int Size_, int Alignment_>
+struct RuntimePolymorphicImplementation {
+    constexpr static auto Size = Size_;
+    constexpr static auto Alignment = Alignment_;
+
+    using Empty = IAnyContainer<Size, Alignment>;
+
+    template<typename ValueType>
+    static constexpr bool useValueSemantics() {
+        return
+            Alignment % alignof(ValueType) == 0 &&
+            sizeof(ValueType) <= Size &&
+            std::is_nothrow_move_constructible<ValueType>::value;
+    }
+
+    template<typename ValueType>
+    using Implementation =
+        typename RuntimePolymorphicImplementationDecider<
+            Size,
+            Alignment,
+            ValueType,
+            useValueSemantics<ValueType>()
+        >::type;
+};
+```
+
+The configuration type argument to `AnyContainer` must provide `Size`, `Alignment`, `Empty` which mean what their names indicate, and a template `Implementation` that chooses, given an argument type, what should be the implementation for it (for example, whether to hold the value internally or referentially).
+
+`Empty` determines the memory layout characteristics of the instance of `AnyContainer`, as a matter of fact, `AnyContainer` is just a container capable of holding raw bytes with the same size and alignment as `TypeSwitch::Empty`.  All of the implementation of `AnyContainer` is summarized as interpreting the bytes as a `TypeSwitch::Empty` to forward the management of the held object to the implementation handler chosen by `TypeSwitch::Implementaiton<ValueType>`
+
+At the time of writing only the canonical internal/external implementations have been implemented.
 
 In Clang's libc++ we can see, at line 141 the different commands:
 
