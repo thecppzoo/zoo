@@ -310,7 +310,12 @@ public:
 
     template<typename ValueType>
     ValueType *state() noexcept {
-        return reinterpret_cast<ValueType *>(container()->value());
+        using Decayed = std::decay_t<ValueType>;
+        using Implementation =
+            typename TypeSwitch::template Implementation<Decayed>;
+        return reinterpret_cast<ValueType *>(
+            static_cast<Implementation *>(container())->thy()
+        );
     }
 
     template<typename ValueType>
