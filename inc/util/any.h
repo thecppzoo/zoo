@@ -143,12 +143,12 @@ struct RuntimePolymorphicAnyPolicy {
         >::type;
 };
 
-template<typename TypeSwitch>
+template<typename Policy>
 struct AnyContainer {
-    constexpr static auto Size = TypeSwitch::Size;
-    constexpr static auto Alignment = TypeSwitch::Alignment;
+    constexpr static auto Size = Policy::Size;
+    constexpr static auto Alignment = Policy::Alignment;
 
-    using Container = typename TypeSwitch::Empty;
+    using Container = typename Policy::Empty;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
@@ -176,7 +176,7 @@ struct AnyContainer {
     >
     AnyContainer(Initializer &&initializer) {
         using Implementation =
-            typename TypeSwitch::template Implementation<Decayed>;
+            typename Policy::template Implementation<Decayed>;
         new(m_space) Implementation(std::forward<Initializer>(initializer));
     }
 
@@ -193,7 +193,7 @@ struct AnyContainer {
     AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
         using Implementation =
             typename
-                TypeSwitch::template Implementation<Decayed>;
+                Policy::template Implementation<Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
     }
 
@@ -217,7 +217,7 @@ struct AnyContainer {
     ) {
         using Implementation =
             typename
-                TypeSwitch::template Implementation<Decayed>;
+                Policy::template Implementation<Decayed>;
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
 
@@ -317,7 +317,7 @@ public:
     ValueType *state() noexcept {
         using Decayed = std::decay_t<ValueType>;
         using Implementation =
-            typename TypeSwitch::template Implementation<Decayed>;
+            typename Policy::template Implementation<Decayed>;
         return reinterpret_cast<ValueType *>(
             static_cast<Implementation *>(container())->thy()
         );
@@ -333,20 +333,20 @@ public:
     }
 };
 
-template<typename TypeSwitch>
+template<typename Policy>
 inline void anyContainerSwap(
-    AnyContainer<TypeSwitch> &a1, AnyContainer<TypeSwitch> &a2
+    AnyContainer<Policy> &a1, AnyContainer<Policy> &a2
 ) noexcept { a1.swap(a2); }
 
-template<typename T, typename TypeSwitch>
-inline T *anyContainerCast(const AnyContainer<TypeSwitch> *ptr) noexcept {
+template<typename T, typename Policy>
+inline T *anyContainerCast(const AnyContainer<Policy> *ptr) noexcept {
     return const_cast<T *>(ptr->template state<T>());
 }
 
-using CanonicalTypeSwitch =
+using CanonicalPolicy =
     RuntimePolymorphicAnyPolicy<sizeof(void *), alignof(void *)>;
 
-using Any = AnyContainer<CanonicalTypeSwitch>;
+using Any = AnyContainer<CanonicalPolicy>;
 
 struct bad_any_cast: std::bad_cast {
     const char *what() const noexcept override {
