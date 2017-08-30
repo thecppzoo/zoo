@@ -35,6 +35,9 @@ struct IAnyContainer {
 
     alignas(Alignment)
     char m_space[Size];
+
+    using NONE = void (IAnyContainer::*)();
+    constexpr static NONE None = nullptr;
 };
 
 template<int Size, int Alignment>
@@ -47,6 +50,8 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
 
     ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
+
+    ValueContainer(typename IAC::NONE) {}
 
     template<typename... Values>
     ValueContainer(Values &&... values) {
@@ -71,8 +76,6 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
 template<int Size, int Alignment, typename ValueType>
 struct ReferentialContainer: IAnyContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
-    using NONE = void (ReferentialContainer::*)();
-    constexpr static NONE None = nullptr;
 
     ValueType **pThy() {
         return reinterpret_cast<ValueType **>(this->m_space);
@@ -80,19 +83,21 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
 
     ValueType *thy() { return *pThy(); }
 
+    ReferentialContainer(typename IAC::NONE) {}
+
     template<typename... Values>
     ReferentialContainer(Values &&... values) {
         *pThy() = new ValueType{std::forward<Values>(values)...};
     }
 
-    ReferentialContainer(NONE, ValueType *ptr) { *pThy() = ptr; }
+    ReferentialContainer(typename IAC::NONE, ValueType *ptr) { *pThy() = ptr; }
 
     void destroy() override { thy()->~ValueType(); }
 
     void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
 
     void move(IAC *to) noexcept override {
-        new(to) ReferentialContainer{None, thy()};
+        new(to) ReferentialContainer{IAC::None, thy()};
         *pThy() = nullptr;
     }
 
@@ -104,17 +109,17 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>
-struct RuntimePolymorphicImplementationDecider {
+struct RuntimePolymorphicAnyPolicyDecider {
     using type = ReferentialContainer<Size, Alignment, ValueType>;
 };
 
 template<int Size, int Alignment, typename ValueType>
-struct RuntimePolymorphicImplementationDecider<Size, Alignment, ValueType, true> {
+struct RuntimePolymorphicAnyPolicyDecider<Size, Alignment, ValueType, true> {
     using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
 template<int Size_, int Alignment_>
-struct RuntimePolymorphicImplementation {
+struct RuntimePolymorphicAnyPolicy {
     constexpr static auto Size = Size_;
     constexpr static auto Alignment = Alignment_;
 
@@ -130,7 +135,7 @@ struct RuntimePolymorphicImplementation {
 
     template<typename ValueType>
     using Implementation =
-        typename RuntimePolymorphicImplementationDecider<
+        typename RuntimePolymorphicAnyPolicyDecider<
             Size,
             Alignment,
             ValueType,
@@ -339,7 +344,7 @@ inline T *anyContainerCast(const AnyContainer<TypeSwitch> *ptr) noexcept {
 }
 
 using CanonicalTypeSwitch =
-    RuntimePolymorphicImplementation<sizeof(void *), alignof(void *)>;
+    RuntimePolymorphicAnyPolicy<sizeof(void *), alignof(void *)>;
 
 using Any = AnyContainer<CanonicalTypeSwitch>;
 
