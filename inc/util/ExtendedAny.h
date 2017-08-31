@@ -178,12 +178,8 @@ struct TypedConverterContainer: ConverterContainer<S, A> {
     }
 };
 
-template<int Size_, int Alignment_>
+template<int Size, int Alignment>
 struct ConverterPolicy {
-    constexpr static auto
-        Size = Size_,
-        Alignment = Alignment_;
-
     using Empty = ConverterContainer<Size, Alignment>;
 
     template<typename ValueType>
