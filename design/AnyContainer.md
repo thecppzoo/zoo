@@ -159,6 +159,122 @@ libstc++ and libc++ both follow choice #2, but only my implementation of #2 allo
 
 My implementations are free of conditional branches, what is accomplished with conditional branches in libstdc++ and libc++ is accomplished by properties of types in my implementations.  All of these implementations need to make indexed calls, and for each operation all perform only one indexed call.  Meaning my implementations are better performing.
 
+## Code styles
+
+I have a practical interest in these library components, reflected in some idioms I use, present in this code base, that are not popular.
+
+### Chaining code
+
+In my code I try to reutilize code as much as possible, not to write less, but for these reasons:
+
+1. Reutilized code is used more than once, it is tested from more than one purpose
+2. Code that is hard to reuse typically is bad code, the effort to try to reuse code leads to more clean components
+3. Reusing code forces the behavior to be the same.  For example, the `const` member function should do the same thing as the non-const.  I force this by making the `const` member function a wrapper around the non-const or vice versa.
+
+### Deconstifying to leverage the non-const versions
+
+Frequently the only difference between the `const` and non-const versions of functions is that they are covariant with respect to the constness of the return type.  I see more danger in copying and pasting the code than in making one call be a wrapper of the other.
+
+### Inheriting implementations, interfaces with associated data, aggressive use of the CRTP
+
+These things are against common recommendations, in this code they are used because interfaces are not an abstract concept, but an implementation choice with specific memory layouts with carefully controlled subtype variations.
+
+### Using polymorphic objects through raw bytes
+
+Has to do with *strict aliasing*, below.  In general, an `any` in any of its variants needs to be able to change the type of the member that controls the held object, because the `any` needs to reflect the last type assigned or constructed into it.  It is essential, then, to understand how the *strict aliasing rule* allows the compiler to make the assumption (and it actually does) that the type of objects in memory never changes (except very few exceptions).  I wrote this code to illustrate the issue:
+
+```c++
+long strict1(int *ip, long *lp) {
+    *lp = 0;
+    *ip = 1;
+    return *lp;
+}
+
+long strict2(char *pi, char *pl) {
+    auto lp = reinterpret_cast<long *>(pl);
+    *lp = 0;
+    *reinterpret_cast<int *>(pi) = 1;
+    return *lp;
+}
+
+long strict3(void *pi, void *pl) {
+    *reinterpret_cast<long *>(pl) = 0;
+    *reinterpret_cast<int *>(pi) = 1;
+    return *reinterpret_cast<long *>(pl);
+}
+
+#include <new>
+
+long notStrict(void *pi, void *pl) {
+    new(pl) long(0);
+    new(pi) long(1);
+    return *reinterpret_cast<long *>(pl);
+}
+
+long fool(long &l) {
+    return strict3(&l, &l);
+}
+
+long smart(long &l) {
+    return notStrict(&l, &l);
+}
+```
+
+In the `strict` functions above, the type of the memory behind the pointers is "set" via assignment to `int` and `long`.  Even though an `int` is smaller than a `long`, GCC and Clang both, legitimately, apply the rules of the language in the optimizer to conclude that the pointers can't refer to the same memory (because then that memory would have more than one type) and so decide that the return value of the `long` is not affected by the assignment to the `int`.
+
+As you can see in the generated assembler,
+
+```assembly
+strict1(int*, long*):                         # @strict1(int*, long*)
+        mov     qword ptr [rsi], 0
+        mov     dword ptr [rdi], 1
+        xor     eax, eax
+        ret
+
+strict2(char*, char*):                         # @strict2(char*, char*)
+        mov     qword ptr [rsi], 0
+        mov     dword ptr [rdi], 1
+        xor     eax, eax
+        ret
+
+strict3(void*, void*):                         # @strict3(void*, void*)
+        mov     qword ptr [rsi], 0
+        mov     dword ptr [rdi], 1
+        xor     eax, eax
+        ret
+
+notStrict(void*, void*):                       # @notStrict(void*, void*)
+        mov     qword ptr [rsi], 0
+        mov     qword ptr [rdi], 1
+        mov     rax, qword ptr [rsi]
+        ret
+
+fool(long&):                              # @fool(long&)
+        mov     qword ptr [rdi], 0
+        mov     dword ptr [rdi], 1
+        xor     eax, eax
+        ret
+
+smart(long&):                             # @smart(long&)
+        mov     qword ptr [rdi], 1
+        mov     eax, 1
+        ret
+```
+
+the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined...
+
+This code base uses one fully portable way to change the type of objects in memory: *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
+
+### Further commentary on strict aliasing
+
+There is quite a lot of broken code out there because it breaks the strict aliasing.  [This](https://blog.regehr.org/archives/1307)("The Strict Aliasing Situation is Pretty Bad") is a good, concise description of some issues related. Related are problems with type punning, using members not the so-called "active" member in an union.
+
+Some people may think strict aliasing is more trouble than it is worth, but that's because of a mindset of using values through their addresses.  A vice.  Take the complitations of strict aliasing as a reason to become appreciative of value semantics.
+
+## What are the policies? `Empty` and the "value builders"
+
+The implementation of `any` uses a policy type that configures how it does its job.
+
 ## Summary
 
 In this implementation of `std::any`:
