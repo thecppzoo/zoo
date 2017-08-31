@@ -326,7 +326,7 @@ public:
         using Implementation =
             typename Policy::template Implementation<Decayed>;
         return reinterpret_cast<ValueType *>(
-            static_cast<Implementation *>(container())->thy()
+            static_cast<Implementation *>(container())->Implementation::value()
         );
     }
 

@@ -131,8 +131,9 @@ struct ConverterContainer {
     alignas(A)
     char m_space[S];
 
-    ConverterDriver *driver() {
-        return reinterpret_cast<ConverterDriver *>(m_driver);
+    ConverterDriver *driver() const {
+        auto unconst = const_cast<ConverterContainer *>(this);
+        return reinterpret_cast<ConverterDriver *>(unconst->m_driver);
     }
 
     ConverterContainer() { new(driver()) ConverterDriver; }
@@ -147,9 +148,9 @@ struct ConverterContainer {
         driver()->move(to->driver(), to->m_space, m_space);
     }
 
-    void *value() noexcept { return driver()->value(); }
+    void *value() noexcept { return driver()->value(m_space); }
 
-    bool nonEmpty() const noexcept { return driver()->value(); }
+    bool nonEmpty() const noexcept { return const_cast<ConverterContainer *>(this)->value(); }
 
     const std::type_info &type() const noexcept { return driver()->type(); }
 };
