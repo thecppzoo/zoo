@@ -11,7 +11,7 @@ struct ConverterDriver {
         new(dd) ConverterDriver;
     }
 
-    virtual void move(ConverterDriver *dd, void *spc, const void *source) {
+    virtual void move(ConverterDriver *dd, void *spc, void *source) {
         new(dd) ConverterDriver;
     }
 
@@ -51,11 +51,6 @@ struct BaseConverter: ConverterDriver {
         new(dd) CRTP;
     }
 
-    void move(ConverterDriver *dd, void *spc, const void *source) override {
-        new(spc) ValueType{std::move(*thy(source))};
-        new(dd) CRTP;
-    }
-
     void *value(void *spc) override { return thy(spc); }
 
     const std::type_info &type() override { return typeid(ValueType); }
@@ -73,10 +68,17 @@ struct ConverterValue: BaseConverter<ValueType, ConverterValue<ValueType>> {
     static void recclaim(void *) {}
 
     static void *val(void *arg) { return arg; }
+
+    void move(ConverterDriver *dd, void *spc, void *source) override {
+        new(spc) ValueType{std::move(*this->thy(source))};
+        new(dd) ConverterValue;
+    }
 };
 
 template<typename ValueType>
-struct ConverterReferential {
+struct ConverterReferential:
+    BaseConverter<ValueType, ConverterReferential<ValueType>>
+{
     struct alignas(alignof(ValueType)) AlignedSpace {
         char spc[sizeof(ValueType)];
     };
@@ -92,10 +94,16 @@ struct ConverterReferential {
     }
 
     static void *val(void *arg) { return valPtr(arg); }
+
+    void move(ConverterDriver *dd, void *spc, void *source) override {
+        new(dd) ConverterReferential;
+        valPtr(spc) = valPtr(source);
+        valPtr(source) = nullptr;
+    }
 };
 
 template<typename ValueType, typename... Args>
-void makeReferential(ConverterDriver *dd, void *space, Args &&... args) {
+void makeReferential(void *dd, void *space, Args &&... args) {
     using Reference = ConverterReferential<ValueType>;
     Reference::make(space);
     try {

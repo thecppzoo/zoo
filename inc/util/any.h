@@ -2,7 +2,9 @@
 
 #include "meta/NotBasedOn.h"
 
-#ifndef MODERN_COMPILER
+#ifdef MODERN_COMPILER
+#include <utility>
+#else
 namespace std {
 
 template<typename T>
@@ -406,3 +408,5 @@ Any make_any(Args &&... args) {
 }
 
 }
+
+/// \todo Improve moving reclassifying source, guarantee alignment new
