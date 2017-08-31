@@ -143,11 +143,11 @@ In this implementation of `std::any`:
 
 1. Implements all of the contract for `std::any` that allows to program without imposing arbitrary type hierarchies to relax type strictness
 2. Extends the proposal to allow users to make their own tradeoffs, which among other things allows them to minimize almost arbitrarily the performance penalty associated.
-    2.1 Allows a diversity of `any` variations to coexist within the same program
-    2.2 Allows mutually compatible variations
+    1. Allows a diversity of `any` variations to coexist within the same program
+    2. Allows mutually compatible variations
 3. The mechanisms for implementing a canonical `any` are re-used for extensions
-    3.1 Users could build their own extensions
+    1. Users could build their own extensions
 4. Three ways for doing type erasure are presented:
-    4.1 The container of values belongs to a class hierarchy
-    4.2 The value container has a driver in a class hierarchy
-    4.3 Ad-hoc type switching
+    1. The container of values belongs to a class hierarchy
+    2. The value container has a driver in a class hierarchy
+    3. Ad-hoc type switching
