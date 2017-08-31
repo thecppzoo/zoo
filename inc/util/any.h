@@ -1,3 +1,5 @@
+#pragma once
+
 #include "meta/NotBasedOn.h"
 
 #ifndef MODERN_COMPILER
@@ -118,6 +120,14 @@ struct RuntimePolymorphicAnyPolicyDecider<Size, Alignment, ValueType, true> {
     using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
+template<typename ValueType>
+constexpr bool canUseValueSemantics(int size, int alignment) {
+    return
+        alignment % alignof(ValueType) == 0 &&
+        sizeof(ValueType) <= size &&
+        std::is_nothrow_move_constructible<ValueType>::value;
+}
+
 template<int Size_, int Alignment_>
 struct RuntimePolymorphicAnyPolicy {
     constexpr static auto Size = Size_;
@@ -127,10 +137,7 @@ struct RuntimePolymorphicAnyPolicy {
 
     template<typename ValueType>
     static constexpr bool useValueSemantics() {
-        return
-            Alignment % alignof(ValueType) == 0 &&
-            sizeof(ValueType) <= Size &&
-            std::is_nothrow_move_constructible<ValueType>::value;
+        return canUseValueSemantics<ValueType>(Size, Alignment);
     }
 
     template<typename ValueType>
