@@ -97,14 +97,11 @@ The standard allows and encourages the optimization of holding the value inside 
 
 In my implementation, the alignment and the size are user-selectable as easily as integer template prameters.
 
-In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  There is a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or through a pointer, with the value allocated dynamically, maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/6045dfebd4b41e873727fa27fc1a75438ad80f60/inc/util/any.h#L134):
+In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  There is a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or through a pointer, with the value allocated dynamically, maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/50f500fc02cda844234b7d0cbcf887946380883c/inc/util/any.h#L134):
 
 ```c++
-template<int Size_, int Alignment_>
+template<int Size, int Alignment>
 struct RuntimePolymorphicAnyPolicy {
-    constexpr static auto Size = Size_;
-    constexpr static auto Alignment = Alignment_;
-
     using Empty = IAnyContainer<Size, Alignment>;
 
     template<typename ValueType>
@@ -123,7 +120,7 @@ struct RuntimePolymorphicAnyPolicy {
 };
 ```
 
-The configuration type argument to `AnyContainer` must provide `Size`, `Alignment`, `Empty` which mean what their names indicate, and a template `Implementation` that chooses, given an argument type, what should be the implementation for it (for example, whether to hold the value internally or referentially).
+The configuration type argument to `AnyContainer` must provide an `Empty` type and a template `Implementation` that chooses, given an argument type, what should be the implementation for it (for example, whether to hold the value internally or referentially).
 
 `Empty` determines the memory layout characteristics of the instance of `AnyContainer`, as a matter of fact, `AnyContainer` is just a container capable of holding raw bytes with the same size and alignment as `Policy::Empty`.  All of the implementation of `AnyContainer` is summarized as interpreting the bytes as a `Policy::Empty` to forward the management of the held object to the implementation handler chosen by `Policy::Implementaiton<ValueType>`
 
