@@ -121,6 +121,7 @@ TEST_CASE("Any", "[contract]") {
     SECTION("Referential Semantics - Size") {
         zoo::Any v{Big{}};
         REQUIRE(zoo::isRuntimeReference<Big>(v));
+        REQUIRE(v.has_value());
     }
     SECTION("Copy constructor - value held is not an \"Any\"") {
         zoo::Any a{5};
@@ -142,6 +143,8 @@ TEST_CASE("Any", "[contract]") {
         auto original = zoo::any_cast<Big>(&movingFrom);
         zoo::Any movingTo{std::move(movingFrom)};
         auto afterMove = zoo::any_cast<Big>(&movingTo);
+        bool shouldNotHaveValue = !movingFrom.has_value();
+        CHECK(shouldNotHaveValue);
         REQUIRE(original == afterMove);
         REQUIRE(nullptr == zoo::any_cast<Big>(&movingFrom));
     }
@@ -262,6 +265,7 @@ TEST_CASE("AnyExtensions", "[contract]") {
     SECTION("Referential Semantics - Size") {
         ExtAny v{Big{}};
         REQUIRE(zoo::isRuntimeReference<Big>(v));
+        REQUIRE(v.has_value());
     }
     SECTION("Move constructor -- Value") {
         ExtAny movingFrom{Moves{}};
@@ -278,6 +282,7 @@ TEST_CASE("AnyExtensions", "[contract]") {
         auto original = zoo::anyContainerCast<Big>(&movingFrom);
         ExtAny movingTo{std::move(movingFrom)};
         auto afterMove = zoo::anyContainerCast<Big>(&movingTo);
+        CHECK(!movingFrom.has_value());
         REQUIRE(original == afterMove);
         REQUIRE(nullptr == zoo::anyContainerCast<Big>(&movingFrom));
     }

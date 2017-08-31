@@ -78,7 +78,7 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
 };
 
 template<int Size, int Alignment, typename ValueType>
-struct ReferentialContainer: IAnyContainer<Size, Alignment> {
+struct ReferentialContainer: BaseContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
 
     ValueType **pThy() {
@@ -96,13 +96,13 @@ struct ReferentialContainer: IAnyContainer<Size, Alignment> {
 
     ReferentialContainer(typename IAC::NONE, ValueType *ptr) { *pThy() = ptr; }
 
-    void destroy() override { thy()->~ValueType(); }
+    void destroy() override { delete thy(); }
 
     void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
 
     void move(IAC *to) noexcept override {
         new(to) ReferentialContainer{IAC::None, thy()};
-        *pThy() = nullptr;
+        new(this) IAnyContainer<Size, Alignment>;
     }
 
     void *value() noexcept override { return thy(); }
@@ -409,4 +409,4 @@ Any make_any(Args &&... args) {
 
 }
 
-/// \todo Improve moving reclassifying source, guarantee alignment new
+/// \todo Improve moving reclassifying source, guarantee alignment new, tests
