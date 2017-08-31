@@ -124,10 +124,32 @@ The configuration type argument to `AnyContainer` must provide an `Empty` type a
 
 `Empty` determines the memory layout characteristics of the instance of `AnyContainer`, as a matter of fact, `AnyContainer` is just a container capable of holding raw bytes with the same size and alignment as `Policy::Empty`.  All of the implementation of `AnyContainer` is summarized as interpreting the bytes as a `Policy::Empty` to forward the management of the held object to the implementation handler chosen by `Policy::Implementaiton<ValueType>`
 
+## Comparison with the other two major implementations
+
 At the time of writing only the canonical internal/external implementations have been implemented, but in two varieties:
 
-1. The value container is also polymorphic on the type of value held
-2. The value container and the type switch are separated
+1. The value container is also polymorphic on the type of value held (see `RuntimePolymorphicAnyPolicy` above)
+2. The value container and the type switch are separated.  [The policy](https://github.com/thecppzoo/zoo/blob/2560c3a3c314ecff34188ac58d21847ca9aacb22/inc/util/ExtendedAny.h#L182) (disregard the functions):
+
+```c++
+template<int Size, int Alignment>
+struct ConverterPolicy {
+    using Empty = ConverterContainer<Size, Alignment>;
+
+    template<typename ValueType>
+    using Implementation = TypedConverterContainer<Size, Alignment, ValueType>;
+
+    template<typename V>
+    bool isRuntimeValue(Empty &e) {
+        return dynamic_cast<ConverterValue<V> *>(e.driver());
+    }
+
+    template<typename V>
+    bool isRuntimeReference(Empty &e) {
+        return dynamic_cast<ConverterReferential<V> *>(e.driver());
+    }
+};
+```
 
 The choice of making the value container also be a type switch is slightly higher performing than the other choice, because it implicitly "knows" where is the space, when they are separated it must be passed as another parameter to all of the operations.  Since these operations are behind a wall of type-switching, the compiler has no chance to optimize out the passing of each parameter.
 
