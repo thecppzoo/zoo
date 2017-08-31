@@ -130,11 +130,8 @@ constexpr bool canUseValueSemantics(int size, int alignment) {
         std::is_nothrow_move_constructible<ValueType>::value;
 }
 
-template<int Size_, int Alignment_>
+template<int Size, int Alignment>
 struct RuntimePolymorphicAnyPolicy {
-    constexpr static auto Size = Size_;
-    constexpr static auto Alignment = Alignment_;
-
     using Empty = IAnyContainer<Size, Alignment>;
 
     template<typename ValueType>
@@ -154,9 +151,6 @@ struct RuntimePolymorphicAnyPolicy {
 
 template<typename Policy>
 struct AnyContainer {
-    constexpr static auto Size = Policy::Size;
-    constexpr static auto Alignment = Policy::Alignment;
-
     using Container = typename Policy::Empty;
 
     alignas(alignof(Container))
