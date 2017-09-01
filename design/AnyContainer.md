@@ -163,6 +163,10 @@ My implementations are free of conditional branches, what is accomplished with c
 
 I have a practical interest in these library components, reflected in some idioms I use, present in this code base, that are not popular.
 
+## User-defined `any`
+
+Although the policy mechanism allows for very flexible adaptations, the library already makes the proviso that the `AnyContainer` itself may be modified via inheritance by the user.  The copy and move constructors, as well as the copy and move assignment are inheritance-aware in very subtle SFINAE overloads.  Of course the user has to take care of the issue of return type covariance but this the only thing they must do and this can't be helped in C++.
+
 ### Chaining code
 
 In my code I try to reutilize code as much as possible, not to write less, but for these reasons:
@@ -275,6 +279,41 @@ Some people may think strict aliasing is more trouble than it is worth, but that
 
 The implementation of `any` uses a policy type that configures how it does its job.
 
+### `Empty`
+
+This type determines the memory layout.  An `any` object just contains an `Empty` object.
+
+This is the interface it must implement, if it were named `Container`:
+
+```c++
+    Container(); // <- default constructible
+    void destroy();
+    void copy(Container *to);
+    void move(ConverterContainer *to) noexcept;
+    void *value() noexcept;
+    bool nonEmpty() const noexcept;
+    const std::type_info &type() const noexcept;
+    // trivially destructible
+```
+
+I believe the interface is self-explanatory.  Help to implement the verification of the existence of this interface at compilation time is welcome.
+
+Please notice that those functions may be virtual, or not, inlined or not.
+
+### `Implementation`
+
+This is a template that determines the types capable of producing values of the argument type, any `ValueBuilder` must:
+
+1. have this constructor: `template<typename Args...> ValueBuilder(Args &&...)` and use perfect forwarding to the constructor of the value.
+2. The memory layout of any value builder must coincide with that of the `Empty`.  `any` builds a value only indirectly by building the value builder at the location of `Empty`.
+3. Just as `Empty`, the value builders must be trivially destructible
+
+### Consequences of inlining
+
+Since this implementation of `any` is header only, and that `any` does not make assumptions about the members of the policy type, users can downgrade the `any` interface by not providing parts of it and not use the features where they are required.  For example, the user may not implement `move` operations if it is not going to use move-constructions, assignments or swapping.
+
+The value builders may restrict implicitly the universe of types suitable for that `any` variant.  For example, if the template `Policy::Implementation` only works with `int`, `double`; then those would be the only types of values that the variant `any` could contain.
+
 ## Summary
 
 In this implementation of `std::any`:
@@ -285,6 +324,7 @@ In this implementation of `std::any`:
     2. Allows mutually compatible variations
 3. The mechanisms for implementing a canonical `any` are re-used for extensions
     1. Users could build their own extensions
+        1. Users could inherit from `AnyContainer` and make more profound adaptations
 4. Three ways for doing type erasure are presented:
     1. The container of values belongs to a class hierarchy
     2. The value container has a driver in a class hierarchy
