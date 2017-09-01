@@ -226,7 +226,7 @@ long smart(long &l) {
 
 In the `strict` functions above, the type of the memory behind the pointers is "set" via assignment to `int` and `long`.  Even though an `int` is smaller than a `long`, GCC and Clang both, legitimately, apply the rules of the language in the optimizer to conclude that the pointers can't refer to the same memory (because then that memory would have more than one type) and so decide that the return value of the `long` is not affected by the assignment to the `int`.
 
-As you can see in the generated assembler,
+As you can see in the [generated assembler](https://godbolt.org/g/WjL6XN),
 
 ```assembly
 strict1(int*, long*):                         # @strict1(int*, long*)
@@ -268,6 +268,8 @@ smart(long&):                             # @smart(long&)
 the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined...
 
 This code base uses one fully portable way to change the type of objects in memory: *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
+
+**Note**: Readers are encouraged to note the awful code GCC 7.2 and predecessors generate for `notStrict` and `smart`: not only it checks for `nullptr` in placement new, it also checks for whether a reference is null.
 
 ### Further commentary on strict aliasing
 
