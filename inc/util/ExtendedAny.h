@@ -180,18 +180,18 @@ struct TypedConverterContainer: ConverterContainer<S, A> {
 
 template<int Size, int Alignment>
 struct ConverterPolicy {
-    using Empty = ConverterContainer<Size, Alignment>;
+    using MemoryLayout = ConverterContainer<Size, Alignment>;
 
     template<typename ValueType>
-    using Implementation = TypedConverterContainer<Size, Alignment, ValueType>;
+    using Builder = TypedConverterContainer<Size, Alignment, ValueType>;
 
     template<typename V>
-    bool isRuntimeValue(Empty &e) {
+    bool isRuntimeValue(MemoryLayout &e) {
         return dynamic_cast<ConverterValue<V> *>(e.driver());
     }
 
     template<typename V>
-    bool isRuntimeReference(Empty &e) {
+    bool isRuntimeReference(MemoryLayout &e) {
         return dynamic_cast<ConverterReferential<V> *>(e.driver());
     }
 };

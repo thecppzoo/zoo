@@ -132,7 +132,7 @@ constexpr bool canUseValueSemantics(int size, int alignment) {
 
 template<int Size, int Alignment>
 struct RuntimePolymorphicAnyPolicy {
-    using Empty = IAnyContainer<Size, Alignment>;
+    using MemoryLayout = IAnyContainer<Size, Alignment>;
 
     template<typename ValueType>
     static constexpr bool useValueSemantics() {
@@ -140,7 +140,7 @@ struct RuntimePolymorphicAnyPolicy {
     }
 
     template<typename ValueType>
-    using Implementation =
+    using Builder =
         typename RuntimePolymorphicAnyPolicyDecider<
             Size,
             Alignment,
@@ -151,7 +151,7 @@ struct RuntimePolymorphicAnyPolicy {
 
 template<typename Policy>
 struct AnyContainer {
-    using Container = typename Policy::Empty;
+    using Container = typename Policy::MemoryLayout;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
@@ -179,7 +179,7 @@ struct AnyContainer {
     >
     AnyContainer(Initializer &&initializer) {
         using Implementation =
-            typename Policy::template Implementation<Decayed>;
+            typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(std::forward<Initializer>(initializer));
     }
 
@@ -196,7 +196,7 @@ struct AnyContainer {
     AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
         using Implementation =
             typename
-                Policy::template Implementation<Decayed>;
+                Policy::template Builder<Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
     }
 
@@ -220,7 +220,7 @@ struct AnyContainer {
     ) {
         using Implementation =
             typename
-                Policy::template Implementation<Decayed>;
+                Policy::template Builder<Decayed>;
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
 
@@ -320,7 +320,7 @@ public:
     ValueType *state() noexcept {
         using Decayed = std::decay_t<ValueType>;
         using Implementation =
-            typename Policy::template Implementation<Decayed>;
+            typename Policy::template Builder<Decayed>;
         return reinterpret_cast<ValueType *>(
             static_cast<Implementation *>(container())->Implementation::value()
         );
