@@ -1,5 +1,6 @@
 #pragma once
 
+// missing dependency?
 #include "meta/NotBasedOn.h"
 
 #ifdef MODERN_COMPILER
@@ -57,9 +58,9 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
 
     ValueContainer(typename IAC::NONE) {}
 
-    template<typename... Values>
-    ValueContainer(Values &&... values) {
-        new(this->m_space) ValueType{std::forward<Values>(values)...};
+    template<typename... Args>
+    ValueContainer(Args &&... args) {
+        new(this->m_space) ValueType{std::forward<Args>(args)...};
     }
 
     void destroy() override { thy()->~ValueType(); }
