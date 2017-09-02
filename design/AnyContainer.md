@@ -264,7 +264,9 @@ smart(long&):                             # @smart(long&)
 
 the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1 according to the rules, actually, it is *undefined behavior*.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined... a good exercise for the reader is to make it so that the compiler sees the advantage of changing the order of assignments given in the source code.
 
-This code base uses one fully portable way to change the type of objects in memory: *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
+This code base uses one fully portable way to change the type of objects in memory: using `char *` or `char[]` to alias to the  space, according with [basic.lval paragraph 8, numeral 8](http://eel.is/c++draft/basic.lval#8.8) of the standard, which is an exception of strictness, and *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
+
+**Note**: Please notice how `strict2`, which takes `char *` arguments still activate strict aliasing.  The compilers are right, this is not the same kind of access as described in basic.lval$8.8
 
 **Note**: Readers are encouraged to note the awful code GCC 7.2 and predecessors generate for `notStrict` and `smart`: not only it checks for `nullptr` in placement new, older versions also check for whether a reference is null.
 
