@@ -96,6 +96,16 @@ TEST_CASE("IAnyContainer") {
     }
 }
 
+TEST_CASE("Resolved bugs") {
+    using namespace zoo;
+    SECTION("ReferentialContainer not a BaseContainer") {
+        ReferentialContainer<1, 1, char> c{'a'};
+        using Base = BaseContainer<1, 1>;
+        CHECK(dynamic_cast<Base *>(&c));
+        c.destroy();
+    }
+}
+
 struct Destructor {
     int *ptr;
 
