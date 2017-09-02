@@ -83,7 +83,7 @@ libc++ is better, but still expensive enough that I couldn't recommend putting i
 
 C++ does not prescribe the "vtable" way to support virtual method overrides.  I fail to appreciate the benefit in this, but I see the harm in how hard it is to have fine-grained control of type switching consequence of that.
 
-Careful inspection shows that the more programmer effort intensive way in which libstdc++ and libc++ implemented `any` compared to my two fully compliant implementations do not perform any better than the choice I used, C++ runtime polymorphism based on overrides of virtual methods, if anything, I suspect the choice of type switching through a function-with-a-switch leads to code that performs *worse* (more on this later) and also seems error prone compared to the very straightforward code I wrote.  In any case, my choice is simpler for programmers to use and extend the foundation work I've done.
+Careful inspection shows that the more programmer effort-intensive way in which both libstdc++ and libc++ implemented `any` do not perform any better when compared to my two fully compliant implementations, which use C++ runtime polymorphism based on overrides of virtual methods. If anything, I suspect the choice of type switching through a function-with-a-switch leads to code that performs *worse* (more on this later) and also seems error-prone compared to the very straightforward code I wrote.  In any case, my choice is simpler for programmers to use and extend the foundation work I've done.
 
 The key insight to circumvent this problem of lack of fine-grained control of type switching was to use raw bytes.  It is strange that this circumlocutious way to do inheritance leads to performance and also pays for itself in terms of later programming ease.
 
@@ -101,7 +101,7 @@ Pending concrete benchmarks, I will contact the standards to propose a solution.
 
 The standard allows and encourages the optimization of holding the value inside the `any` object itself, provided it "fits" inside and its type is no-throw-move-constructible.  Both libc++ and libstdc++ set the largest alignment of the holdable-inside objects to the same of `void *`, and the maximum size [in libc++ to 3 `void *`](http://llvm.org/viewvc/llvm-project/libcxx/trunk/include/any?view=markup&pathrev=300123#l133), [one `void *` in libstdc++](https://github.com/gcc-mirror/gcc/blob/bfe9c13002a83b7a2e992a0f10f279fa6e0d8f71/libstdc%2B%2B-v3/include/std/any#L93).  These parameters in both implementations are rigid, there is absolutely no way to change them except rewriting the code, and even then, the implementation does not support a variety of `any` with different choices.
 
-In my implementation, the alignment and the size are user-selectable as easily as integer template prameters.
+In my implementation, the alignment and the size are easily user-selectable as integral template prameters.
 
 In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  The library supplies a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or indirectly, with the value allocated dynamically; maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/45e0075888727ee37900397291b4580c7c3d46ec/inc/util/any.h#L134):
 
