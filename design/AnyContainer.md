@@ -266,7 +266,7 @@ the function `fool` that passes the same pointer as both arguments ends up retur
 
 This code base uses one fully portable way to change the type of objects in memory: *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
 
-**Note**: Readers are encouraged to note the awful code GCC 7.2 and predecessors generate for `notStrict` and `smart`: not only it checks for `nullptr` in placement new, it also checks for whether a reference is null.
+**Note**: Readers are encouraged to note the awful code GCC 7.2 and predecessors generate for `notStrict` and `smart`: not only it checks for `nullptr` in placement new, older versions also check for whether a reference is null.
 
 ### Further commentary on strict aliasing
 
