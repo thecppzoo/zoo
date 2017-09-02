@@ -182,7 +182,7 @@ These things are against common recommendations, in this code they are used beca
 
 ### Using polymorphic objects through raw bytes
 
-Has to do with *strict aliasing*, below.  In general, an `any` in any of its variants needs to be able to change the type of the member that controls the held object, because the `any` needs to reflect the last type assigned or constructed into it.  It is essential, then, to understand how the *strict aliasing rule* allows the compiler to make the assumption (and it actually makes it) that the type of objects in memory never changes (except very few exceptions).  I wrote this code to illustrate the issue:
+Has to do with *strict aliasing*, below.  In general, an `any` in any of its variants needs to be able to change the type of the member that controls the held object, because the `any` needs to reflect the last type assigned or constructed into it.  It is essential, then, to understand how the *strict aliasing rule* allows the compiler to make the assumption (and it actually makes it) that the type of objects in memory never changes (except very few exceptions).  I extended code referenced below to illustrate the issue:
 
 ```c++
 long strict1(int *ip, long *lp) {
@@ -221,7 +221,7 @@ long smart(long &l) {
 }
 ```
 
-In the `strict` functions above, with variations on the type of pointers that illustrate that the problem is not only that but that the compiler sees that some memory acquires some type and then applies strict aliasing.  The type of the memory behind the pointers is "set" via assignment to `int` and `long`.  Even though an `int` is smaller than a `long`, GCC and Clang both, legitimately, apply the rules of the language in the optimizer to conclude that the pointers can't refer to the same memory (because then that memory would have more than one type) and so decide that the return value of the `long` is not affected by the assignment to the `int`.
+The `strict` functions above, with variations on the type of pointers, illustrate how the problem is not only the pointer types but also that the compiler sees that some memory acquires some type and then applies strict aliasing.  The type of the memory behind the pointers is "set" via assignment to `int` and `long`.  Even though an `int` is smaller than a `long`, GCC and Clang both, legitimately, apply the rules of the language in the optimizer to conclude that the pointers can't refer to the same memory (because then that memory would have more than one type) and so decide that the return value of the `long` is not affected by the assignment to the `int`.
 
 As you can see in the [generated assembler](https://godbolt.org/g/WjL6XN),
 
@@ -262,7 +262,7 @@ smart(long&):                             # @smart(long&)
         ret
 ```
 
-the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1 according to the rules, actually, it is *undefined behavior*.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined...
+the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1 according to the rules, actually, it is *undefined behavior*.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined... a good exercise for the reader is to make it so that the compiler sees the advantage of changing the order of assignments given in the source code.
 
 This code base uses one fully portable way to change the type of objects in memory: *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
 
@@ -270,9 +270,9 @@ This code base uses one fully portable way to change the type of objects in memo
 
 ### Further commentary on strict aliasing
 
-There is quite a lot of broken code out there because it breaks the strict aliasing, the authors are not even aware they need building with `-fno-strict-aliasing`.  [This](https://blog.regehr.org/archives/1307)("The Strict Aliasing Situation is Pretty Bad") is a good, concise description of some issues related. Related are problems with type punning, using members not the so-called "active" member in an union.
+There is quite a lot of broken code out there because it breaks the strict aliasing, the authors are not even aware they need building with a compilation option like GCC's, Clang's `-fno-strict-aliasing`.  [This](https://blog.regehr.org/archives/1307)("The Strict Aliasing Situation is Pretty Bad") is a good, concise description of some issues related. Related are problems with type punning, using members not the so-called "active" member in an union.
 
-Personally, I am annoyed by some undefined behavior rules, but not when they lead to more performing code, as strict aliasing.
+Personally, I am annoyed by some undefined behavior rules, but not when they lead to more performing code, as strict aliasing.  I recommend, whenever you are sure your code does not rely on third party strict-aliasing broken code, to never disable strict aliasing.
 
 Some people may think strict aliasing is more trouble than it is worth, but that's because of a mindset of using values through their addresses.  A vice.  Take the complications of strict aliasing as a reason to become appreciative of value semantics.
 
@@ -301,12 +301,12 @@ I believe the interface is self-explanatory.
 
 Please notice that those functions may be virtual, or not, inlined or not, mixed however the programmer sees best.
 
-### `Builder`
+### `template<typename ValueType> (class|struct|using) Builder`
 
 This is a template that determines the types capable of producing values of the argument type, any `ValueBuilder` must:
 
 1. have this constructor: `template<typename Args...> ValueBuilder(Args &&...)` and use perfect forwarding to the constructor of the value.
-2. The memory layout of any value builder must coincide with that of the `MemoryLayout`.  `any` builds a value only indirectly by building the value builder at the location of `MemoryLayout`.
+2. The memory layout of any value builder must be compatible with that of the `MemoryLayout`.  `any` builds a value only indirectly by building the value builder at the location of `MemoryLayout`.
 3. Just as `MemoryLayout`, the value builders must be trivially destructible
 
 ### Consequences of inlining
@@ -314,6 +314,11 @@ This is a template that determines the types capable of producing values of the 
 Since this implementation of `any` is header only, and that `any` does not make assumptions about the members of the policy type, users can downgrade the `any` interface by not providing parts of it and not use the features where they are required.  For example, the user may not implement `move` operations if it is not going to use move-constructions, assignments or swapping.
 
 The value builders may restrict implicitly the universe of types suitable for that `any` variant.  For example, if the template `Policy::Builder` only works with `int`, `double`; then those would be the only types of values that the variant `any` could contain.
+
+## Changes under consideration
+
+1. Using the CRTP on the cases where `AnyContainer` methods return an `AnyContainer`, to help inheritance of `AnyContainer`
+2. Not requiring `Policy::MemoryLayout` and `Policy::Builder<T>` to be trivially destructible
 
 ## Summary
 
