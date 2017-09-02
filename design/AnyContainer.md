@@ -2,29 +2,35 @@
 
 ## Motivation
 
-In C++ 17 there are new library components `any`, `variant` and `optional` that have existed in the boost libraries for a while.  They have related functionality.  Since `any` can emulate the functionality of `variant` and `optional` this document explains their functionality from the perspective of `any` and will serve the basis for discussions of `variant` and `optional`.
+In C++ 17 there are new library components `any`, `variant` and `optional` that have existed in the boost libraries for a while.  They have related functionality.  Since `any` can emulate the functionality of `variant` and `optional` this document explains their functionality from the perspective of `any` and will serve as a basis to discuss of `variant` and `optional` in other documents.
 
-`any` allows holding a value of *any* type, hence the name.  It also allows holding no value.  It is conceptually similar to the concept of value or object in JavaScript.  `any` allows the applicaton of type-less programming techniques.
+`any` allows holding a value of *any* type, hence the name.  It also allows holding no value.  It is conceptually similar to the concept of value or object in JavaScript, (an implementation of something similar is coming here).  `any` allows the applicaton of type-less programming techniques.
 
-There are use cases in which strong typing make things harder.  For example, a processor of a non-trivial language to specify things like configurations; when the processor attempts to parse a particular configuration in that language, it does not know exactly what is the kind of objects that it will be generating.
+There are use cases in which strong typing makes things harder.  For example, a processor of a non-trivial language to specify things like configurations; when the processor attempts to parse a particular configuration in that language, it does not know exactly what is the kind of objects that it will be generating.
+
+We are also working in a library of callables, event-based programming interfaces are easier to use if programmers can supply callables of arbitrary types (function pointers, capturing lambdas, etc), the techniques for implementing "type erasure" (concept to be discussed below) here in `any` will be very useful there.
 
 ### Alternatives to `any`
 
-In the C family of languages relaxation of type strictness is typically achieved through the use of referential semantics (that is, dealing with the values through their addresses as opposed to they themselves) with the intention of using `void *`, the generic pointer type.  In languages such as Java, type relaxation is typically achieved through the "objectification" of values (converting values such as an `int`, which is a primitive type, one of the few types in the Java language that has value semantics, into an `Integer`, an object, that has referential semantics) and using references to a common base class.  In Java all objects inherit from the universal object type, `Object`, and frequently Java programmers use `Object` for this very reason, for example the library of containers:  The container library want to hold objects of any type, thus they rely on the type `Object`.  Also, in Java, as well as other strongly object oriented languages, including C++, the need for type strictness relaxation encourages class hierarchies and the use of references (or pointers) to base classes.  My experience working with JavaScript allowed me to understand that the superimposition of arbitrary taxonomies solely to relax type strictness is pure busy work.  On the other hand, using referential semantics plus `void *` leads to just as underperforming code but also ardous and error prone, it is strictly the worst approach available in C++ so I won't discuss it further.
+In the C family of languages relaxation of type strictness is typically achieved through the use of referential semantics (that is, dealing with the values through their addresses as opposed to they themselves) with the intention of using `void *`, the generic pointer type.
+
+In languages such as Java, type relaxation is typically achieved through the "objectification" of values (converting values such as an `int`, which is a primitive type, one of the few types in the Java language that has value semantics, into an `Integer`, an object, that has referential semantics) and using references to a common base class.  In Java all objects inherit from the universal object type, `Object`, and frequently Java programmers use `Object` for this very reason, for example the library of containers:  The container library wants to hold objects of any type, thus containers hold `Object`s.  Also, in Java, as well as other object oriented and strongly typed languages, including C++, the need for type strictness relaxation encourages class hierarchies and the use of references (or pointers) to base classes.  On the other side, languages like Python sometimes are easier to use because of "duck typing".  C++ templates allow all combinations, programmers should be free to use the approach they prefer.  My experience working with JavaScript allowed me to understand that the superimposition of arbitrary taxonomies solely to relax type strictness is pure busy work.  Using referential semantics plus `void *` leads to just as underperforming code but also ardous and error prone, it is strictly the worst approach available in C++ so I won't discuss it further.
 
 Continuing with the example of a configuration language interpreter, the programming language representation for the different types of objects in the specification language may have common properties, *cohesion* that asks for them being represented as variations on a type, hence a taxonomy or class hierarchy may be appropriate.  The requirement of relaxing type stricness should not interfere with the taxonomy or class hierarchy the application domain suggests.
 
-Using inheritance to relax type strictness and as an option to achieve runtime polymorphism has several drawbacks.  To begin with, it forces referential semantics (things must be handled through their addresses as opposed to not caring about where they reside in memory), which has the problems of extra indirection, allocation/deallocation of dynamic objects, managing their lifetime, and all the ways in which these things may fail.  It also blocks any other alternative to implement type switching (concept to be defined later).
+Using inheritance and runtime polymorphism to relax type strictness has several drawbacks.  To begin with, it forces referential semantics (things must be handled through their addresses as opposed to not caring about where they reside in memory), which has the problems of extra indirection, allocation/deallocation of dynamic objects, managing their lifetime, and all the ways in which these things may fail, such as memory exhaustion exceptions, etc.  It also blocks any other alternative to implement type switching (concept to be defined later).
 
-Since support for runtime polymorphism in C++ through inheritance and virtual methods is among the best (for example, it fully supports multiple inheritance of implementations and choices on how to deal with the diamond problem), C++ programmers tend to accept as unavoidable some performance and software development costs associated with using it, however, as shown in the libstdc++, libc++ and my three implementations of `any`, very fine grained control of *type switching* leads to performance and programmer effort economies beyond plain vanilla inheritance-virtual-method.
+Since support for runtime polymorphism in C++ through inheritance and virtual methods is among the best for comparable languages (for example, it fully supports multiple inheritance of implementations and choices on how to deal with the diamond issue), C++ programmers tend to accept as unavoidable some performance and software development costs associated with using it, however, as shown in the libstdc++, libc++ and my three implementations of `any`, very fine grained control of *type switching* leads to performance and programmer effort economies beyond plain vanilla inheritance-virtual-method.
 
 Therefore there is desirability for getting rid of the strictness of types while at the same time not imposing type hierarchies and preserving advantges of type strictness, especially the object lifetime guarantees, the **RAII** idiom.  Hopefully some advantages of value semantics as well.
 
-Then the good news is that using `any` may be performance and programming effort cheaper than the alternative of imposing a hierarchy to achieve type strictness relaxation, my implementations, in summary, guarantee that the programmer will be able to fine tune `any` to pay the minimum.
+The good news is that using `any` may be performance and programming effort cheaper than the alternative of imposing a hierarchy to achieve type strictness relaxation, my implementations, in summary, guarantee that the programmer will be able to fine tune `any` to pay the minimum.
 
 ## Type Erasure
 
-The technique for type strictness relaxation is called **type erasure**.  ["Type Erasure"](https://en.wikipedia.org/wiki/Type_erasure) refers to whenever the type of an entity ceases to be compilation-time information and becomes runtime information.  Hence it implies a run time penalty.  Type erasure can be accomplished in many different ways, all revolving around the concept of **type switching**, any of the mechanisms for discovering the type of an object at runtime.  In C++ type switching is very well supported through the same features that support run time polymorphism, the "virtual" methods, overrides and the virtual function pointer table, the "**vtable**".  To my knowledge, the requirements of C++ virtual methods are universally implemented as that objects begin with the vtable pointer, a hidden member value.  The vtable is the type switch: type-specific features are accessible as indices into the vtable.  Another popular type switching mechanism, applicable to C and C++ is to use a type-switch field and have explicit switching, typically with a switch itself: `switch(object.typeId) { case TYPE1: ... }`.  One advantage that sometimes justifies all the extra programming effort for this kind of type switching is that the type switch can be as small as one bit.  Also, some commonality between the types can be achieved in cascading if-then-elses on the type id field.
+The technique for type strictness relaxation is called **type erasure**.  ["Type Erasure"](https://en.wikipedia.org/wiki/Type_erasure) refers to whenever the type of an entity ceases to be compilation-time information and becomes runtime information.  Hence it implies a run time penalty.  Type erasure can be accomplished in many different ways, all revolving around the concept of **type switching**, any of the mechanisms for discovering the type of an object at runtime.  In C++ type switching is very well supported through the same features that support run time polymorphism, the "virtual" methods, overrides, which tend to be implemented using the virtual function pointer table technique, the "**vtable**".  To my knowledge, the requirements of C++ virtual methods are universally implemented as that objects begin with the vtable pointer, a hidden member value.  The vtable is the type switch: type-specific features are accessible as indices into the vtable.
+
+Another popular type switching mechanism, applicable to C and C++, is for "structs" to have an explicit type-switch member, which typically will be handled with a `switch` itself: `switch(object.typeId) { case TYPE1: ... }`.  One advantage that sometimes justifies all the extra programming effort for this kind of type switching is that the type switch can be as small as one bit.  Also, some commonality between the types can be achieved in cascading if-then-elses on the type id field.
 
 Curiously, both GCC libstdc++ and Clang's libc++ implement the type erasure needed in `any` by instantiating a template function which "knows" what is the type of the held object and internally has a switch with the many tasks required to manage the held object.  Perhaps the implementers did not use inheritance-virtual-method because of how cumbersome it is to have fine grain control of type switching when using it; however, by not using "polymorphic objects" directly, but working with them as raw bytes I have found fully portable (standard-compliant) ways to have very fine grained control of type switching, leading to my implementation looking relatively straightforward.
 
@@ -77,13 +83,13 @@ libstdc++ is better, but still expensive enough that I couldn't recommend puttin
 
 C++ does not prescribe the "vtable" way to support virtual method overrides.  I fail to appreciate the benefit in this, but I see the harm in how hard it is to have fine-grained control of type switching consequence of that.
 
-Careful inspection shows that the programmer effort more intensive way in which libstdc++ and libc++ implemented `any` compared to my two fully compliant implementations do not perform any better than the choice I used, C++ runtime polymorphism based on overrides of virtual methods, if anything, I suspect the choice of type switching through a function-with-a-switch leads to code that performs *worse* (more on this later) and also seems error prone compared to the very straightforward code I wrote.
+Careful inspection shows that the more programmer effort intensive way in which libstdc++ and libc++ implemented `any` compared to my two fully compliant implementations do not perform any better than the choice I used, C++ runtime polymorphism based on overrides of virtual methods, if anything, I suspect the choice of type switching through a function-with-a-switch leads to code that performs *worse* (more on this later) and also seems error prone compared to the very straightforward code I wrote.  In any case, my choice is simpler for programmers to use and extend the foundation work I've done.
 
-The key insight to circumvent this problem of lack of fine-grained control of type switching was to use raw bytes.  It is strange that the circumlocutious way to do inheritance leads to performance and also pays for itself in terms of later programming ease.
+The key insight to circumvent this problem of lack of fine-grained control of type switching was to use raw bytes.  It is strange that this circumlocutious way to do inheritance leads to performance and also pays for itself in terms of later programming ease.
 
 ## Limitations of C++ 17 `any`
 
-`any` is a valuable addition to the standard library.  However, there is a big, obvious performance error in the standard specification that is trivial to fix but neither libc++ nor libstdc++ have fixed, and the implementaitons of both libc++ and libstdc++ are too rigid to allow any significant improvements.  In particular my implementation allows the programmer to easily make a diversity of performance tradeoff choices, and also more profound variations to make `any` resemble more "value semantics" values or `variant` or `optional`.
+`any` is a valuable addition to the standard library.  However, there is a big, obvious performance error in the standard specification that is trivial to fix but neither libc++ nor libstdc++ have fixed, and the implementations of both libc++ and libstdc++ are too rigid to allow any significant improvements.  In particular my implementation allows the programmer to easily make a diversity of performance tradeoff choices, and also more profound variations to make `any` resemble more "value semantics" values or `variant` or `optional`.
 
 ### Performance bug in the specification
 
@@ -97,20 +103,17 @@ The standard allows and encourages the optimization of holding the value inside 
 
 In my implementation, the alignment and the size are user-selectable as easily as integer template prameters.
 
-In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  There is a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or through a pointer, with the value allocated dynamically, maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/50f500fc02cda844234b7d0cbcf887946380883c/inc/util/any.h#L134):
+In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  The library supplies a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or indirectly, with the value allocated dynamically; maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/45e0075888727ee37900397291b4580c7c3d46ec/inc/util/any.h#L134):
 
 ```c++
 template<int Size, int Alignment>
 struct RuntimePolymorphicAnyPolicy {
-    using Empty = IAnyContainer<Size, Alignment>;
+    using MemoryLayout = IAnyContainer<Size, Alignment>;
+
+    ...
 
     template<typename ValueType>
-    static constexpr bool useValueSemantics() {
-        return canUseValueSemantics<ValueType>(Size, Alignment);
-    }
-
-    template<typename ValueType>
-    using Implementation =
+    using Builder =
         typename RuntimePolymorphicAnyPolicyDecider<
             Size,
             Alignment,
@@ -120,52 +123,46 @@ struct RuntimePolymorphicAnyPolicy {
 };
 ```
 
-The configuration type argument to `AnyContainer` must provide an `Empty` type and a template `Implementation` that chooses, given an argument type, what should be the implementation for it (for example, whether to hold the value internally or referentially).
+The configuration type argument to `AnyContainer` must provide a `MemoryLayout` type and a `template<typename> Builder` that chooses, given an argument type, how to build a value for the given type, this is where, for example, the decision to hold the value internally or referentially.
 
-`Empty` determines the memory layout characteristics of the instance of `AnyContainer`, as a matter of fact, `AnyContainer` is just a container capable of holding raw bytes with the same size and alignment as `Policy::Empty`.  All of the implementation of `AnyContainer` is summarized as interpreting the bytes as a `Policy::Empty` to forward the management of the held object to the implementation handler chosen by `Policy::Implementaiton<ValueType>`
+`MemoryLayout` determines the memory layout characteristics of the instance of `AnyContainer`, as a matter of fact, `AnyContainer` is just a container capable of holding raw bytes with the same size and alignment as `Policy::MemoryLayout`.  All of the implementation of `AnyContainer` is summarized as interpreting the bytes as a `Policy::MemoryLayout` to forward the management of the held object to the implementation handler chosen by `Policy::Builder<ValueType>`
 
 ## Comparison with the other two major implementations
 
 At the time of writing only the canonical internal/external implementations have been implemented, but in two varieties:
 
 1. The value container is also polymorphic on the type of value held (see `RuntimePolymorphicAnyPolicy` above)
-2. The value container and the type switch are separated.  [The policy](https://github.com/thecppzoo/zoo/blob/2560c3a3c314ecff34188ac58d21847ca9aacb22/inc/util/ExtendedAny.h#L182) (disregard the functions):
+2. The value container and the type switch are separated.  [The policy](https://github.com/thecppzoo/zoo/blob/45e0075888727ee37900397291b4580c7c3d46ec/inc/util/ExtendedAny.h#L182) (disregard the functions):
 
 ```c++
 template<int Size, int Alignment>
 struct ConverterPolicy {
-    using Empty = ConverterContainer<Size, Alignment>;
+    using MemoryLayout = ConverterContainer<Size, Alignment>;
 
     template<typename ValueType>
-    using Implementation = TypedConverterContainer<Size, Alignment, ValueType>;
+    using Builder = TypedConverterContainer<Size, Alignment, ValueType>;
 
-    template<typename V>
-    bool isRuntimeValue(Empty &e) {
-        return dynamic_cast<ConverterValue<V> *>(e.driver());
-    }
-
-    template<typename V>
-    bool isRuntimeReference(Empty &e) {
-        return dynamic_cast<ConverterReferential<V> *>(e.driver());
-    }
+    ...
 };
 ```
 
-The choice of making the value container also be a type switch is slightly higher performing than the other choice, because it implicitly "knows" where is the space, when they are separated it must be passed as another parameter to all of the operations.  Since these operations are behind a wall of type-switching, the compiler has no chance to optimize out the passing of each parameter.
+The choice of making the value container also be a type switch is slightly higher performing than the other choice, because it implicitly "knows" where is the space, when they are separated it must be passed as another parameter to all of the operations.  Since these operations are behind a wall of type-switching indexed call, the compiler has no chance to optimize out the passing of each parameter.  In the AMD64 (x86-64) architecture, for the compiler to be able to put hard-code displacements in the assembler leverages the "SIB" addressing mode, a base register, an scaled index register and an "immediate" displacement, leading for the tighest code (which improves instruction cache effectiveness) and directly raw performance.
 
-Choice #1 is rigid with respect to automatic conversion of `any` of different size, alignments, but choice #2 make it natural.
+Choice #1 is rigid with respect to automatic conversion of `any` of different size, alignments, but choice #2 make it natural.  One well known difficulty of inheritance-runtime-polymorphism is how difficult it is to program templates covariant with class hierarchies, as a matter of fact, one of my greatest annoyances with respect to object orientation in general is that class hierarchies only allow one covariant aspect, the aspect that is super or sub-classified, when there are more aspects covariant, code complexity explodes and performance crashes as with the visitor design pattern.  It is doable, but not practical, to have for a `template<int Size, int Alignment, typename ValueType> struct Thing` to achieve automatic (as in the programmer does not have to supply the template arguments directly) interoperability between `Thing<Size1, Alignment1, Type>` and `Thing<Size2, Alignment2, Type>`.  If the type switch and value-space are separated, then this interoperation becomes practical.
 
-libstc++ and libc++ both follow choice #2, but only my implementation of #2 allows automatic conversion of `any` of different sizes and alignments.
+libstc++ and libc++ both follow choice #2, but only [my implementation](https://github.com/thecppzoo/zoo/blob/45e0075888727ee37900397291b4580c7c3d46ec/inc/util/ExtendedAny.h#L201) of #2 allows automatic conversion of `any` of different sizes and alignments.  This automatic conversion relieves the programmer from "Goldilocks" problems of "too big `any` for some types, too small for others" by allowing the size, alignments, that make the most sense in runtime scenarios and easily and cheaply converting from one to the other when necessary.
 
-My implementations are free of conditional branches, what is accomplished with conditional branches in libstdc++ and libc++ is accomplished by properties of types in my implementations.  All of these implementations need to make indexed calls, and for each operation all perform only one indexed call.  Meaning my implementations are better performing.
+My implementations are free of conditional branches, what is accomplished with conditional branches in libstdc++ and libc++ is accomplished by properties of types in my implementations.  Not only this is "the proper way to do things, to fully leverage the types to prevent unnecessary runtime costs", but conditional branching is a performance pit that my most recent performance experience proves more important than commonly assumed:  Even when the conditional branching is predictable, it has inherent and increasing costs as processor architectures deepen execution pipelines, plus they tie branch prediction resources that when benchmarking tend to underestimate their costs, because the branch prediction resources are more effective in tiny benchmarks compared to real life programs.
+
+All of these implementations need to make indexed calls, and for each operation all perform only one indexed call, my implementation makes the most of these indexed calls.
+
+## User-defined `any`
+
+Although the policy mechanism allows for very flexible adaptations, the library already makes the proviso that the `AnyContainer` itself may be modified via inheritance by the user.  The copy and move constructors, as well as the copy and move assignment are inheritance-aware in very subtle SFINAE overloads.  The user still has to take care of the issue of return type covariance, but perhaps I may apply the CRTP (Curiously Recurring Template Pattern) idiom to `AnyContainer` to help with this.
 
 ## Code styles
 
 I have a practical interest in these library components, reflected in some idioms I use, present in this code base, that are not popular.
-
-## User-defined `any`
-
-Although the policy mechanism allows for very flexible adaptations, the library already makes the proviso that the `AnyContainer` itself may be modified via inheritance by the user.  The copy and move constructors, as well as the copy and move assignment are inheritance-aware in very subtle SFINAE overloads.  Of course the user has to take care of the issue of return type covariance but this the only thing they must do and this can't be helped in C++.
 
 ### Chaining code
 
@@ -173,7 +170,7 @@ In my code I try to reutilize code as much as possible, not to write less, but f
 
 1. Reutilized code is used more than once, it is tested from more than one purpose
 2. Code that is hard to reuse typically is bad code, the effort to try to reuse code leads to more clean components
-3. Reusing code forces the behavior to be the same.  For example, the `const` member function should do the same thing as the non-const.  I force this by making the `const` member function a wrapper around the non-const or vice versa.
+3. Reusing code expresses/forces the behavior to be the same.  For example, the `const` member function should do the same thing as the non-const.  I force this by making the `const` member function a wrapper around the non-const or vice versa.
 
 ### Deconstifying to leverage the non-const versions
 
@@ -185,7 +182,7 @@ These things are against common recommendations, in this code they are used beca
 
 ### Using polymorphic objects through raw bytes
 
-Has to do with *strict aliasing*, below.  In general, an `any` in any of its variants needs to be able to change the type of the member that controls the held object, because the `any` needs to reflect the last type assigned or constructed into it.  It is essential, then, to understand how the *strict aliasing rule* allows the compiler to make the assumption (and it actually does) that the type of objects in memory never changes (except very few exceptions).  I wrote this code to illustrate the issue:
+Has to do with *strict aliasing*, below.  In general, an `any` in any of its variants needs to be able to change the type of the member that controls the held object, because the `any` needs to reflect the last type assigned or constructed into it.  It is essential, then, to understand how the *strict aliasing rule* allows the compiler to make the assumption (and it actually makes it) that the type of objects in memory never changes (except very few exceptions).  I wrote this code to illustrate the issue:
 
 ```c++
 long strict1(int *ip, long *lp) {
@@ -224,7 +221,7 @@ long smart(long &l) {
 }
 ```
 
-In the `strict` functions above, the type of the memory behind the pointers is "set" via assignment to `int` and `long`.  Even though an `int` is smaller than a `long`, GCC and Clang both, legitimately, apply the rules of the language in the optimizer to conclude that the pointers can't refer to the same memory (because then that memory would have more than one type) and so decide that the return value of the `long` is not affected by the assignment to the `int`.
+In the `strict` functions above, with variations on the type of pointers that illustrate that the problem is not only that but that the compiler sees that some memory acquires some type and then applies strict aliasing.  The type of the memory behind the pointers is "set" via assignment to `int` and `long`.  Even though an `int` is smaller than a `long`, GCC and Clang both, legitimately, apply the rules of the language in the optimizer to conclude that the pointers can't refer to the same memory (because then that memory would have more than one type) and so decide that the return value of the `long` is not affected by the assignment to the `int`.
 
 As you can see in the [generated assembler](https://godbolt.org/g/WjL6XN),
 
@@ -265,7 +262,7 @@ smart(long&):                             # @smart(long&)
         ret
 ```
 
-the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined...
+the function `fool` that passes the same pointer as both arguments ends up returning 0 while it should return 1 in little endian where it not for *strict aliasing*, `fool` is free to return 0 or 1 according to the rules, actually, it is *undefined behavior*.  By the way, the compiler does not have to issue the assignments in the order set in the source code, since they refer to different objects, the end result does not depend on which is assigned first! And this may happen if the code is inlined...
 
 This code base uses one fully portable way to change the type of objects in memory: *in-place-new*.  It is clear that placement new would not make any sense if this operator wasn't an exception to the strict aliasing rules.
 
@@ -273,17 +270,19 @@ This code base uses one fully portable way to change the type of objects in memo
 
 ### Further commentary on strict aliasing
 
-There is quite a lot of broken code out there because it breaks the strict aliasing.  [This](https://blog.regehr.org/archives/1307)("The Strict Aliasing Situation is Pretty Bad") is a good, concise description of some issues related. Related are problems with type punning, using members not the so-called "active" member in an union.
+There is quite a lot of broken code out there because it breaks the strict aliasing, the authors are not even aware they need building with `-fno-strict-aliasing`.  [This](https://blog.regehr.org/archives/1307)("The Strict Aliasing Situation is Pretty Bad") is a good, concise description of some issues related. Related are problems with type punning, using members not the so-called "active" member in an union.
 
-Some people may think strict aliasing is more trouble than it is worth, but that's because of a mindset of using values through their addresses.  A vice.  Take the complitations of strict aliasing as a reason to become appreciative of value semantics.
+Personally, I am annoyed by some undefined behavior rules, but not when they lead to more performing code, as strict aliasing.
 
-## What are the policies? `Empty` and the "value builders"
+Some people may think strict aliasing is more trouble than it is worth, but that's because of a mindset of using values through their addresses.  A vice.  Take the complications of strict aliasing as a reason to become appreciative of value semantics.
+
+## What are the policies? `MemoryLayout` and the value `Builder`s
 
 The implementation of `any` uses a policy type that configures how it does its job.
 
-### `Empty`
+### `MemoryLayout`
 
-This type determines the memory layout.  An `any` object just contains an `Empty` object.
+This type determines the memory layout.  An `any` object just contains a `MemoryLayout` object.
 
 This is the interface it must implement, if it were named `Container`:
 
@@ -298,23 +297,23 @@ This is the interface it must implement, if it were named `Container`:
     // trivially destructible
 ```
 
-I believe the interface is self-explanatory.  Help to implement the verification of the existence of this interface at compilation time is welcome.
+I believe the interface is self-explanatory.
 
-Please notice that those functions may be virtual, or not, inlined or not.
+Please notice that those functions may be virtual, or not, inlined or not, mixed however the programmer sees best.
 
-### `Implementation`
+### `Builder`
 
 This is a template that determines the types capable of producing values of the argument type, any `ValueBuilder` must:
 
 1. have this constructor: `template<typename Args...> ValueBuilder(Args &&...)` and use perfect forwarding to the constructor of the value.
-2. The memory layout of any value builder must coincide with that of the `Empty`.  `any` builds a value only indirectly by building the value builder at the location of `Empty`.
-3. Just as `Empty`, the value builders must be trivially destructible
+2. The memory layout of any value builder must coincide with that of the `MemoryLayout`.  `any` builds a value only indirectly by building the value builder at the location of `MemoryLayout`.
+3. Just as `MemoryLayout`, the value builders must be trivially destructible
 
 ### Consequences of inlining
 
 Since this implementation of `any` is header only, and that `any` does not make assumptions about the members of the policy type, users can downgrade the `any` interface by not providing parts of it and not use the features where they are required.  For example, the user may not implement `move` operations if it is not going to use move-constructions, assignments or swapping.
 
-The value builders may restrict implicitly the universe of types suitable for that `any` variant.  For example, if the template `Policy::Implementation` only works with `int`, `double`; then those would be the only types of values that the variant `any` could contain.
+The value builders may restrict implicitly the universe of types suitable for that `any` variant.  For example, if the template `Policy::Builder` only works with `int`, `double`; then those would be the only types of values that the variant `any` could contain.
 
 ## Summary
 
