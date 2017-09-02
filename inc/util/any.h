@@ -78,6 +78,8 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
     }
 };
 
+// I can't see the case where the referential container needs its
+// size to be greater than sizeof(void*)
 template<int Size, int Alignment, typename ValueType>
 struct ReferentialContainer: BaseContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
@@ -123,6 +125,7 @@ struct RuntimePolymorphicAnyPolicyDecider<Size, Alignment, ValueType, true> {
     using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
+// This is masterful :D. I love the clarity of intent.
 template<typename ValueType>
 constexpr bool canUseValueSemantics(int size, int alignment) {
     return
