@@ -358,6 +358,11 @@ struct bad_any_cast: std::bad_cast {
     }
 };
 
+// should we make these more generic? otherwise the user has
+// to define a new set for every distinct Policy
+//   template<class ValueType, class Policy>
+//   ValueType any_cast(const AnyContainer<Policy> &operand) {
+//       ...
 template<class ValueType>
 ValueType any_cast(const Any &operand) {
     using U = uncvr_t<ValueType>;
@@ -397,6 +402,9 @@ const ValueType *any_cast(const Any *ptr) {
 
 inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
+// Here is more impractical... I'd like to be able to default the policy to CanonicalPolicy 
+//    template<typename T, typename Policy, typename... Args>
+//    AnyContainer<Policy> make_any(Args &&... args) {
 template<typename T, typename... Args>
 Any make_any(Args &&... args) {
     return Any(std::in_place_type<T>, std::forward<Args>(args)...);
