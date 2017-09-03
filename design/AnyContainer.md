@@ -8,7 +8,7 @@ In C++ 17 there are new library components `any`, `variant` and `optional` that 
 
 There are use cases in which strong typing makes things harder.  For example, a processor of a non-trivial language to specify things like configurations; when the processor attempts to parse a particular configuration in that language, it does not know exactly what is the kind of objects that it will be generating.
 
-We are also working in a library of callables, event-based programming interfaces are easier to use if programmers can supply callables of arbitrary types (function pointers, capturing lambdas, etc), the techniques for implementing "type erasure" (concept to be discussed below) here in `any` will be very useful there.
+This effort is related to a library of callables being developed. Event-based programming interfaces are easier to use if programmers can supply callables of arbitrary types (function pointers, capturing lambdas, etc), the techniques for implementing "type erasure" (concept to be discussed below) here in `any` will be very useful in the event-handling library.
 
 ### Alternatives to `any`
 
@@ -24,17 +24,17 @@ Since support for runtime polymorphism in C++ through inheritance and virtual me
 
 Therefore there is desirability for getting rid of the strictness of types while at the same time not imposing type hierarchies and preserving advantges of type strictness, especially the object lifetime guarantees, the **RAII** idiom.  Hopefully some advantages of value semantics as well.
 
-The good news is that using `any` may be performance and programming effort cheaper than the alternative of imposing a hierarchy to achieve type strictness relaxation, my implementations, in summary, guarantee that the programmer will be able to fine tune `any` to pay the minimum.
+The good news is that using `any` may be cheaper, in terms of run-time performance and programming effort, than the alternative of imposing a hierarchy to achieve type strictness relaxation. My implementations, in summary, guarantee that the programmer will be able to fine tune `any` to pay the minimum.
 
 ## Type Erasure
 
-The technique for type strictness relaxation is called **type erasure**.  ["Type Erasure"](https://en.wikipedia.org/wiki/Type_erasure) refers to whenever the type of an entity ceases to be compilation-time information and becomes runtime information.  Hence it implies a run time penalty.  Type erasure can be accomplished in many different ways, all revolving around the concept of **type switching**, any of the mechanisms for discovering the type of an object at runtime.  In C++ type switching is very well supported through the same features that support run time polymorphism, the "virtual" methods, overrides, which tend to be implemented using the virtual function pointer table technique, the "**vtable**".  To my knowledge, the requirements of C++ virtual methods are universally implemented as that objects begin with the vtable pointer, a hidden member value.  The vtable is the type switch: type-specific features are accessible as indices into the vtable.
+The technique for type strictness relaxation is called **type erasure**.  ["Type Erasure"](https://en.wikipedia.org/wiki/Type_erasure) refers to whenever the type of an entity ceases to be compilation-time information and becomes runtime information.  Hence it implies a run-time penalty.  Type erasure can be accomplished in many different ways, all revolving around the concept of **type switching**, any of the mechanisms for discovering the type of an object at run-time.  In C++ type switching is very well supported through the same features that support run-time polymorphism, the "virtual" methods, overrides, which tend to be implemented using the virtual function pointer table technique, the "**vtable**".  To my knowledge, the requirements of C++ virtual methods are universally implemented as that objects begin with the vtable pointer, a hidden member value.  The vtable is the type switch: type-specific features are accessible as indices into the vtable.
 
 Another popular type switching mechanism, applicable to C and C++, is for "structs" to have an explicit type-switch member, which typically will be handled with a `switch` itself: `switch(object.typeId) { case TYPE1: ... }`.  One advantage that sometimes justifies all the extra programming effort for this kind of type switching is that the type switch can be as small as one bit.  Also, some commonality between the types can be achieved in cascading if-then-elses on the type id field.
 
 Curiously, both GCC libstdc++ and Clang's libc++ implement the type erasure needed in `any` by instantiating a template function which "knows" what is the type of the held object and internally has a switch with the many tasks required to manage the held object.  Perhaps the implementers did not use inheritance-virtual-method because of how cumbersome it is to have fine grain control of type switching when using it; however, by not using "polymorphic objects" directly, but working with them as raw bytes I have found fully portable (standard-compliant) ways to have very fine grained control of type switching, leading to my implementation looking relatively straightforward.
 
-Why fine-grained type switching control is not possible directly may be because the inheritance-virtual-method mechanism is in my opinion under-specified in the standard, for example, determining if two polymorphic objects are of exactly the same type, using the standard way, results in ridiculous code that may explode into calling `strcmp` and all, at least using libstdc++:
+Why fine-grained type switching control is not possible directly because the inheritance-virtual-method mechanism is in my opinion under-specified in the standard. For example, determining if two polymorphic objects are of exactly the same type, using the standard way, results in ridiculous code that may explode into calling `strcmp` and all, at least using libstdc++:
 
 ```c++
 #include <typeinfo>
@@ -79,11 +79,11 @@ exactlyTheSameType(Polymorphic const&, Polymorphic const&): # @exactlyTheSameTyp
         ret
 ```
 
-libstdc++ is better, but still expensive enough that I couldn't recommend putting it in a performance critical loop.  However, determining whether two objects are of the exactly the same type is kind of essential if one wants to have fine-grained control of type switching...
+libc++ is better, but still expensive enough that I couldn't recommend putting it in a performance critical loop.  However, determining whether two objects are of the exactly the same type is kind of essential if one wants to have fine-grained control of type switching...
 
 C++ does not prescribe the "vtable" way to support virtual method overrides.  I fail to appreciate the benefit in this, but I see the harm in how hard it is to have fine-grained control of type switching consequence of that.
 
-Careful inspection shows that the more programmer effort intensive way in which libstdc++ and libc++ implemented `any` compared to my two fully compliant implementations do not perform any better than the choice I used, C++ runtime polymorphism based on overrides of virtual methods, if anything, I suspect the choice of type switching through a function-with-a-switch leads to code that performs *worse* (more on this later) and also seems error prone compared to the very straightforward code I wrote.  In any case, my choice is simpler for programmers to use and extend the foundation work I've done.
+Careful inspection shows that the more programmer effort-intensive way in which both libstdc++ and libc++ implemented `any` do not perform any better when compared to my two fully compliant implementations, which use C++ runtime polymorphism based on overrides of virtual methods. If anything, I suspect the choice of type switching through a function-with-a-switch leads to code that performs *worse* (more on this later) and also seems error-prone compared to the very straightforward code I wrote.  In any case, my choice is simpler for programmers to use and extend the foundation work I've done.
 
 The key insight to circumvent this problem of lack of fine-grained control of type switching was to use raw bytes.  It is strange that this circumlocutious way to do inheritance leads to performance and also pays for itself in terms of later programming ease.
 
@@ -101,7 +101,7 @@ Pending concrete benchmarks, I will contact the standards to propose a solution.
 
 The standard allows and encourages the optimization of holding the value inside the `any` object itself, provided it "fits" inside and its type is no-throw-move-constructible.  Both libc++ and libstdc++ set the largest alignment of the holdable-inside objects to the same of `void *`, and the maximum size [in libc++ to 3 `void *`](http://llvm.org/viewvc/llvm-project/libcxx/trunk/include/any?view=markup&pathrev=300123#l133), [one `void *` in libstdc++](https://github.com/gcc-mirror/gcc/blob/bfe9c13002a83b7a2e992a0f10f279fa6e0d8f71/libstdc%2B%2B-v3/include/std/any#L93).  These parameters in both implementations are rigid, there is absolutely no way to change them except rewriting the code, and even then, the implementation does not support a variety of `any` with different choices.
 
-In my implementation, the alignment and the size are user-selectable as easily as integer template prameters.
+In my implementation, the alignment and the size are easily user-selectable as integral template prameters.
 
 In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  The library supplies a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or indirectly, with the value allocated dynamically; maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/45e0075888727ee37900397291b4580c7c3d46ec/inc/util/any.h#L134):
 
