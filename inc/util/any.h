@@ -1,6 +1,5 @@
 #pragma once
 
-// missing dependency?
 #include "meta/NotBasedOn.h"
 
 #ifdef MODERN_COMPILER
@@ -154,15 +153,6 @@ struct AnyContainer {
 
     AnyContainer() noexcept { new(m_space) Container; }
 
-    // wouldn't we want to make these two ctors, as well
-    // as the assignment operators that take AnyContainer,
-    // templated (ie, arg= AnyContainer<SourcePolicy>)? 
-    // That way you could assign/construct between
-    // AnyContainers of different policies. I see something
-    // done along the same idea in the extended any/Converter, 
-    // but why not have it here? Converter also creates a 
-    // different type (by virtue of using a ConverterPolicy),
-    // which is inconvenient.
     AnyContainer(const AnyContainer &model) {
         auto source = model.container();
         source->copy(container());
@@ -356,11 +346,6 @@ struct bad_any_cast: std::bad_cast {
     }
 };
 
-// should we make these more generic? otherwise the user has
-// to define a new set for every distinct Policy
-//   template<class ValueType, class Policy>
-//   ValueType any_cast(const AnyContainer<Policy> &operand) {
-//       ...
 template<class ValueType>
 ValueType any_cast(const Any &operand) {
     using U = uncvr_t<ValueType>;
@@ -400,10 +385,6 @@ const ValueType *any_cast(const Any *ptr) {
 
 inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
-// Here the idea I'm suggesting above is more impractical, because
-//    the user is forced to explicitly specify the Policy template argument. 
-//    template<typename T, typename Policy, typename... Args>
-//    AnyContainer<Policy> make_any(Args &&... args) {
 template<typename T, typename... Args>
 Any make_any(Args &&... args) {
     return Any(std::in_place_type<T>, std::forward<Args>(args)...);
