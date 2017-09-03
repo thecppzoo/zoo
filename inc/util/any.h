@@ -78,8 +78,6 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
     }
 };
 
-// I can't see the case where the referential container needs its
-// size to be greater than sizeof(void*)
 template<int Size, int Alignment, typename ValueType>
 struct ReferentialContainer: BaseContainer<Size, Alignment> {
     using IAC = IAnyContainer<Size, Alignment>;
@@ -162,6 +160,10 @@ struct AnyContainer {
 
     AnyContainer() noexcept { new(m_space) Container; }
 
+    // wouldn't we want to make these two ctors, as well
+    // as the assignment operators that take AnyContainer,
+    // templated? That way you could assign/construct between
+    // AnyContainers of different policies.
     AnyContainer(const AnyContainer &model) {
         auto source = model.container();
         source->copy(container());
