@@ -135,17 +135,12 @@ struct RuntimePolymorphicAnyPolicy {
     using MemoryLayout = IAnyContainer<Size, Alignment>;
 
     template<typename ValueType>
-    static constexpr bool useValueSemantics() {
-        return canUseValueSemantics<ValueType>(Size, Alignment);
-    }
-
-    template<typename ValueType>
     using Builder =
         typename RuntimePolymorphicAnyPolicyDecider<
             Size,
             Alignment,
             ValueType,
-            useValueSemantics<ValueType>()
+            canUseValueSemantics<ValueType>(Size, Alignment)
         >::type;
 };
 
@@ -178,8 +173,7 @@ struct AnyContainer {
         int> = 0
     >
     AnyContainer(Initializer &&initializer) {
-        using Implementation =
-            typename Policy::template Builder<Decayed>;
+        using Implementation = typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(std::forward<Initializer>(initializer));
     }
 
@@ -194,9 +188,7 @@ struct AnyContainer {
         > = 0
     >
     AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
-        using Implementation =
-            typename
-                Policy::template Builder<Decayed>;
+        using Implementation = typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
     }
 
