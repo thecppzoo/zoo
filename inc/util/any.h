@@ -210,9 +210,7 @@ struct AnyContainer {
         std::initializer_list<UL> il,
         Args &&... args
     ) {
-        using Implementation =
-            typename
-                Policy::template Builder<Decayed>;
+        using Implementation = typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
 
@@ -311,8 +309,7 @@ public:
     template<typename ValueType>
     ValueType *state() noexcept {
         using Decayed = std::decay_t<ValueType>;
-        using Implementation =
-            typename Policy::template Builder<Decayed>;
+        using Implementation = typename Policy::template Builder<Decayed>;
         return reinterpret_cast<ValueType *>(
             static_cast<Implementation *>(container())->Implementation::value()
         );
@@ -395,4 +392,4 @@ Any make_any(Args &&... args) {
 
 }
 
-/// \todo Improve moving reclassifying source, guarantee alignment new, tests
+/// \todo guarantee alignment new, tests
