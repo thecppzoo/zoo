@@ -160,6 +160,12 @@ All of these implementations need to make indexed calls, and for each operation 
 
 Although the policy mechanism allows for very flexible adaptations, the library already makes the proviso that the `AnyContainer` itself may be modified via inheritance by the user.  The copy and move constructors, as well as the copy and move assignment are inheritance-aware in very subtle SFINAE overloads.  The user still has to take care of the issue of return type covariance, but perhaps I may apply the CRTP (Curiously Recurring Template Pattern) idiom to `AnyContainer` to help with this.
 
+## Choices about where to put the SFINAE pattern and whether to use auxiliar template parameters
+
+1. **Constructors**: they don't allow the specification of template parameters when called.  Hence, the library is free to use auxiliar template parameters since they are never part of the user interface.  There is no other place to put the SFINAE either.
+2. **Member assignment operators**: Even if normally programmers don't call assignment operators with template parameters specified, that well made assignment operator templates must be able to always deduce their template parameters, and that the specification of template parameters to assignments is in my opinion of interest only to experts, I chose to treat assignment operators like normal functions to minimize user interface noise.
+3. **Member functions**: The SFINAE pattern is applied in the return value, and there are no auxiliar patterns to prevent noise in the public interfaces.
+
 ## Code styles
 
 I have a practical interest in these library components, reflected in some idioms I use, present in this code base, that are not popular.
