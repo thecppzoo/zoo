@@ -20,6 +20,16 @@ Library components.
 4. Source files for applications, demoes at <repository>/src
 5. <repository>/design for design documents
 
+## Notes
+
+1. Wrong comments in the source code are considered a bug as serious as broken functionality, please report
+2. Poor choices of identifiers, that lead to otherwise unnecessary comments or explanations are considered a design error.  Please report, the sooner these errors are corrected, the easier to correct them and the less harm they cause in the projects that use the poor identifiers.
+3. Unnecessary comments in the source code are a clarity bug, reporting appreciated.
+4. I am poor on encapsulating public interfaces because of practical reasons:  Tactical opportunities to test internal mechanisms and because internal mechanisms are an evolving understanding of the subject matter.  Encapsulation is the result of source code maturity
+5. Unnecessary explicit typing (using data types explicitly when they can be deduced automatically) is considered a latent functionality bug, because if the code is good, sooner than later it will be upgraded to a template and then explicit types become dangerous.  If the reader of source code requires the help of the redundant explicit typing to understand what is the code doing is considered to be an indication that the code is confusing.
+
+In my doctrine of software engineering if the programmer can't write clear code they won't write worthy comments or documentation nor design documents (this precept was taken from Kevlin Henney).  Documentation, design documents and source code should mirror each other, each should express the best knowledge available about the subject matter.  Source code can double as documentation or design.
+
 ## Components
 
 ### `AnyContainer`
@@ -28,4 +38,4 @@ Currently not documented.
 
 Design discussion [here](https://github.com/thecppzoo/zoo/blob/master/design/AnyContainer.md).
 
-Tested at [any.cpp](https://github.com/thecppzoo/zoo/blob/master/test/any.cpp)
+Tested at [any.cpp](https://github.com/thecppzoo/zoo/blob/master/test/any.cpp) and [compilation/any.cpp](https://github.com/thecppzoo/zoo/blob/master/test/compilation/any.cpp)
