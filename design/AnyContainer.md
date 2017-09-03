@@ -289,8 +289,8 @@ This type determines the memory layout.  An `any` object just contains a `Memory
 This is the interface it must implement, if it were named `Container`:
 
 ```c++
-    Container(); // <- default constructible
-    void destroy();
+    Container() noexcept; // <- no-throw default constructible
+    void destroy(); // implicitly noexcept
     void copy(Container *to);
     void move(ConverterContainer *to) noexcept;
     void *value() noexcept;
