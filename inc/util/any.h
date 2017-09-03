@@ -123,7 +123,6 @@ struct RuntimePolymorphicAnyPolicyDecider<Size, Alignment, ValueType, true> {
     using type = ValueContainer<Size, Alignment, ValueType>;
 };
 
-// This is masterful :D. I love the clarity of intent.
 template<typename ValueType>
 constexpr bool canUseValueSemantics(int size, int alignment) {
     return
@@ -162,8 +161,13 @@ struct AnyContainer {
 
     // wouldn't we want to make these two ctors, as well
     // as the assignment operators that take AnyContainer,
-    // templated? That way you could assign/construct between
-    // AnyContainers of different policies.
+    // templated (ie, arg= AnyContainer<SourcePolicy>)? 
+    // That way you could assign/construct between
+    // AnyContainers of different policies. I see something
+    // done along the same idea in the extended any/Converter, 
+    // but why not have it here? Converter also creates a 
+    // different type (by virtue of using a ConverterPolicy),
+    // which is inconvenient.
     AnyContainer(const AnyContainer &model) {
         auto source = model.container();
         source->copy(container());
@@ -407,7 +411,8 @@ const ValueType *any_cast(const Any *ptr) {
 
 inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
-// Here is more impractical... I'd like to be able to default the policy to CanonicalPolicy 
+// Here the idea I'm suggesting above is more impractical, because
+//    the user is forced to explicitly specify the Policy template argument. 
 //    template<typename T, typename Policy, typename... Args>
 //    AnyContainer<Policy> make_any(Args &&... args) {
 template<typename T, typename... Args>
