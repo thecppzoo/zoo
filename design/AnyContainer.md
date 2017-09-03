@@ -343,3 +343,8 @@ In this implementation of `std::any`:
     1. The container of values belongs to a class hierarchy
     2. The value container has a driver in a class hierarchy
     3. Ad-hoc type switching
+
+## Upcoming changes to this document
+
+1. Comparison of explicit type switch + `union` with respect to the other two choices
+2. Better explanation of how `AnyContainer` transforms the primitives in `Policy` into a full-fledged software component
