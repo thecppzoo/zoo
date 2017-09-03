@@ -34,7 +34,7 @@ Another popular type switching mechanism, applicable to C and C++, is for "struc
 
 Curiously, both GCC libstdc++ and Clang's libc++ implement the type erasure needed in `any` by instantiating a template function which "knows" what is the type of the held object and internally has a switch with the many tasks required to manage the held object.  Perhaps the implementers did not use inheritance-virtual-method because of how cumbersome it is to have fine grain control of type switching when using it; however, by not using "polymorphic objects" directly, but working with them as raw bytes I have found fully portable (standard-compliant) ways to have very fine grained control of type switching, leading to my implementation looking relatively straightforward.
 
-Why fine-grained type switching control is not possible directly because the inheritance-virtual-method mechanism is in my opinion under-specified in the standard. For example, determining if two polymorphic objects are of exactly the same type, using the standard way, results in ridiculous code that may explode into calling `strcmp` and all, at least using libstdc++:
+Fine-grained type switching control is not possible directly because the inheritance-virtual-method mechanism is in my opinion under-specified in the standard.  For example, determining if two polymorphic objects are of exactly the same type, in any of the standards-compliant ways I know, results in ridiculous code that may explode into calling `strcmp` and all, at least using libstdc++:
 
 ```c++
 #include <typeinfo>
@@ -101,7 +101,7 @@ Pending concrete benchmarks, I will contact the standards to propose a solution.
 
 The standard allows and encourages the optimization of holding the value inside the `any` object itself, provided it "fits" inside and its type is no-throw-move-constructible.  Both libc++ and libstdc++ set the largest alignment of the holdable-inside objects to the same of `void *`, and the maximum size [in libc++ to 3 `void *`](http://llvm.org/viewvc/llvm-project/libcxx/trunk/include/any?view=markup&pathrev=300123#l133), [one `void *` in libstdc++](https://github.com/gcc-mirror/gcc/blob/bfe9c13002a83b7a2e992a0f10f279fa6e0d8f71/libstdc%2B%2B-v3/include/std/any#L93).  These parameters in both implementations are rigid, there is absolutely no way to change them except rewriting the code, and even then, the implementation does not support a variety of `any` with different choices.
 
-In my implementation, the alignment and the size are easily user-selectable as integral template prameters.
+In my implementation, the alignment and the size are easily user-selectable as `int` template prameters.
 
 In libc++ and libstdc++ `any` is a concrete class, with an implementation of holding the value inside or externally, and no further choices.  In my implementation, `AnyContainer` is a template that receives a policy type containing the programmer choices.  The library supplies a `CanonicalPolicy`  for a default `any` with sensible choices:  The values are held inside the `any` object or indirectly, with the value allocated dynamically; maximum alignment, size for the inside types to be the same as `void *`.  This is expressed in [`RuntimePolymorphicAnyPolicy`](https://github.com/thecppzoo/zoo/blob/45e0075888727ee37900397291b4580c7c3d46ec/inc/util/any.h#L134):
 
