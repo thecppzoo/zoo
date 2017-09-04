@@ -1,83 +1,170 @@
-#include "util/ExtendedAny.h"
-
+#ifndef NO_STANDARD_INCLUDES
 #include <stdint.h>
 #include <string>
+#include <algorithm>
+#endif
 
-union Tight {
-    struct Empty {
-        unsigned outcode:3;
-            // xx 1: Int63
-            // x0 0: Pointer
-            // 0 10: Empty
-            // 1 10: String7
-        long dontcare:61;
+#include "util/ExtendedAny.h"
 
-        Empty(): outcode{4} {}
 
-        using type = void;
-    } empty;
+constexpr auto VoidPtrSize = sizeof(void *);
+constexpr auto VoidPtrAlignment = alignof(void *);
 
-    struct Int63 {
-        bool outcode:1;
-        long integer:63;
+using Fallback =
+    zoo::AnyContainer<zoo::ConverterPolicy<VoidPtrSize, VoidPtrAlignment>>;
 
-        Int63(long v): outcode(1), integer(v << 1) {}
-        operator long() const { return integer >> 1; }
+struct Empty {
+    bool isInteger:1;
+    bool notPointer:1;
+    bool isString:1;
+        // xx 1: Int63
+        // x0 0: Pointer
+        // 0 10: Empty
+        // 1 10: String7
+    long dontcare:61;
 
-        using type = long;
-    } integer;
+    Empty(): isInteger{false}, notPointer{true}, isString{false} {}
 
-    struct Pointer62 {
-        unsigned outcode:2;
-        intptr_t pointer:62;
-
-        Pointer62(void *ptr):
-            outcode(0), pointer(~3 & reinterpret_cast<intptr_t>(ptr))
-        {}
-
-        operator void *() const {
-            return reinterpret_cast<void *>(pointer << 2);
-        }
-
-        using type = void *;
-    } pointer;
-
-    struct String7 {
-        struct {
-            unsigned outcode:3;
-            unsigned count: 5;
-        };
-        char bytes[7];
-
-        String7(std::string arg): outcode(6), count(arg.size()) {
-            arg.copy(bytes, count);
-        }
-
-        operator std::string() const {
-            return { bytes, bytes + count };
-        }
-
-        using type = std::string;
-    } string;
-
-    Tight(): empty{} {}
-
-    template<typename T>
-    struct Builder { using type = zoo::ConverterReferential<T>; };
+    using type = void;
 };
 
-template<>
-struct Tight::Builder<Tight::Int63> { using type = Int63; };
+struct Int63 {
+    bool outcode:1;
+    long integer:63;
 
-template<>
-struct Tight::Builder<Tight::Pointer62> { using type = Pointer62; };
+    Int63(): outcode(1) {}
+    Int63(long v): outcode(1), integer(v) {}
 
-template<>
-struct Tight::Builder<Tight::String7> { using type = String7; };
+    operator long() const { return integer; }
 
-struct TightPolicy {
-    template<typename T>
-    using Builder = typename Tight::template Builder<T>::type;
+    using type = long;
 };
 
-auto q(void *p) { return typename TightPolicy::template Builder<Tight::Pointer62>{p}; }
+struct Pointer62 {
+    unsigned outcode:2;
+    intptr_t pointer:62;
+
+    Pointer62(): outcode{0} {}
+    Pointer62(void *ptr):
+        outcode(0), pointer(~3 & reinterpret_cast<intptr_t>(ptr))
+    {}
+
+    operator void *() const {
+        return reinterpret_cast<void *>(pointer << 2);
+    }
+
+    using type = void *;
+};
+
+struct String7 {
+    struct {
+        uint8_t
+            outcode:3,
+            count: 5;
+    };
+    char bytes[7];
+
+    String7(): outcode{6}, count{0} {}
+    String7(const char *ptr, int size): outcode(6), count(size) {
+        std::copy(ptr, count + ptr, bytes);
+    }
+    String7(const std::string &arg): String7(arg.data(), arg.size()) {}
+
+    operator std::string() const {
+        return { bytes, bytes + count };
+    }
+
+    using type = std::string;
+};
+
+struct Tight { // Why can't you inherit from unions?
+    union Encodings {
+        Empty empty;
+        Int63 integer;
+        Pointer62 pointer;
+        String7 string;
+
+        Encodings(): empty{} {}
+    } code;
+
+    static_assert(sizeof(code) == VoidPtrSize, "");
+
+    Tight() { code.empty = Empty{}; }
+};
+
+static_assert(alignof(Tight) == VoidPtrAlignment, "");
+
+template<typename T, typename = void>
+struct Builder: Tight {
+    template<typename... Args>
+    inline
+    Builder(Args &&... args);
+};
+
+template<typename T>
+struct is_stringy_type: std::false_type {};
+
+template<>
+struct is_stringy_type<std::string>: std::true_type {};
+
+template<int L>
+struct is_stringy_type<char[L]>: std::true_type {
+    constexpr static int Size = L;
+};
+
+template<typename T, typename Void>
+template<typename... Args>
+Builder<T, Void>::Builder(Args &&... args) {
+    auto value =
+        new Fallback{std::in_place_type<T>, std::forward<Args>(args)...};
+    code.pointer = value;
+}
+
+template<typename T>
+struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
+    Builder(const std::string &s) {
+        if(s.size() < 8) {
+            code.string = s;
+        } else {
+            code.pointer = new Fallback{s};
+        }
+    }
+
+    Builder(std::string &&s) {
+        if(s.size() < 8) {
+            code.string = String7{s};
+        } else {
+            code.pointer = new Fallback{std::move(s)};
+        }
+    }
+
+    template<int L>
+    Builder(const char (&array)[L]) {
+        if(L < 8) {
+            code.string = String7{array, L};
+        } else {
+            code.pointer = new Fallback{
+                std::in_place_type<std::string>, array, array + L
+            };
+        }
+    }
+
+    template<typename... Args>
+    Builder(Args &&... args):
+        Builder{std::string{std::forward<Args>(args)...}}
+    {}
+};
+
+template<typename T>
+struct Builder<T, std::enable_if_t<std::is_integral<T>::value>>: Tight {
+    Builder(T arg) { code.integer = arg; }
+};
+
+static_assert(!is_stringy_type<int>::value, "");
+static_assert(is_stringy_type<std::string>::value, "");
+
+struct has_chars {
+    char spc[8];
+};
+
+static_assert(is_stringy_type<decltype(has_chars::spc)>::value, "");
