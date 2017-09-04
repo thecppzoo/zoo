@@ -44,11 +44,11 @@ struct Int63 {
 
 struct Pointer62 {
     unsigned outcode:2;
-    intptr_t pointer:62;
+    uintptr_t pointer:62;
 
     Pointer62(): outcode{0} {}
     Pointer62(void *ptr):
-        outcode(0), pointer(~3 & reinterpret_cast<intptr_t>(ptr))
+        outcode(0), pointer(reinterpret_cast<uintptr_t>(ptr) >> 2)
     {}
 
     operator void *() const {
