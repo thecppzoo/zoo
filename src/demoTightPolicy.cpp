@@ -1,5 +1,6 @@
 #define STRING7_TESTS
 
+#include "util/movedString.h"
 #include "TightPolicy.h"
 
 String7::ConstructorOverload lastOverload;
@@ -84,14 +85,18 @@ auto isPointer(Tight t) {
     return !e.isInteger && !e.notPointer;
 }
 
+Fallback *fallback(Pointer62 p) {
+    void *rv = p;
+    return static_cast<Fallback *>(rv);
+}
+
 template<typename T>
 struct DBuilder: Builder<T> {
     using Builder<T>::Builder;
  
     ~DBuilder() {
         if(!isPointer(*this)) { return; }
-        void *p = this->code.pointer;
-        delete static_cast<Fallback *>(p);
+        delete fallback(this->code.pointer);
     }
 };
 
@@ -105,7 +110,9 @@ TEST_CASE("Builders", "[TightPolicy]") {
         static_assert(is_stringy_type<char[343]>::value, "");
         static_assert(is_stringy_type<const char[3]>::value, "");
         static_assert(is_stringy_type<const std::string>::value, "");
+        static_assert(is_stringy_type<const char (&)[2]>::value, "");
         static_assert(!is_stringy_type<char>::value, "");
+
         auto isString = [](Tight t) {
             auto e = t.code.empty;
             return !e.isInteger && e.notPointer && e.isString;
@@ -129,14 +136,25 @@ TEST_CASE("Builders", "[TightPolicy]") {
         }
         SECTION("Temporary large string") {
             std::string s{"This is large enough to create buffer"};
-            auto characterBufferToMove = s.data();
+            auto characterBufferToMove = zoo::beforeMoving(s);
             DBuilder<std::string> b{std::move(s)};
             REQUIRE(isPointer(b));
             void *p = b.code.pointer;
             auto *f = static_cast<Fallback *>(p);
+            REQUIRE(typeid(std::string) == f->type());
             auto *ptr = zoo::anyContainerCast<std::string>(f);
-            auto finalBuffer = ptr->data();
-            CHECK(finalBuffer == characterBufferToMove);
+            #ifdef ENABLE_STRING_MOVE_CHECK
+            CHECK(zoo::bufferWasMoved(*ptr, characterBufferToMove));
+            #endif
+        }
+        SECTION("Small array") {
+            DBuilder<char[5]> small{hello};
+            REQUIRE(isString(small));
+        }
+        SECTION("Large array") {
+            char large[] = "This is a large buffer";
+            DBuilder<char[5]> allFine{large};
+            REQUIRE(isPointer(allFine));
         }
     }
 }
