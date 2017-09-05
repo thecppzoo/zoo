@@ -78,3 +78,45 @@ TEST_CASE("Encodings", "[TightPolicy]") {
         }
     }
 }
+
+auto isPointer(Tight t) {
+    auto e = t.code.empty;
+    return !e.isInteger && !e.notPointer;
+}
+
+template<typename T>
+struct DBuilder: Builder<T> {
+    using Builder<T>::Builder;
+ 
+    ~DBuilder() {
+        if(!isPointer(*this)) { return; }
+        void *p = this->code.pointer;
+        delete static_cast<Fallback *>(p);
+    }
+};
+
+TEST_CASE("Builders", "[TightPolicy]") {
+    SECTION("Fallback") {
+        DBuilder<double> b{3.1415265};
+        bool fellback = !b.code.empty.isInteger && !b.code.empty.notPointer;
+        REQUIRE(fellback);
+    }
+    SECTION("Stringies") {
+        auto isString = [](Tight t) {
+            auto e = t.code.empty;
+            return !e.isInteger && e.notPointer && e.isString;
+        };
+        char hello[] = "Hello!";
+        SECTION("Small strings") {
+            std::string ss{hello};
+            DBuilder<std::string> built(ss);
+            REQUIRE(isString(built));
+            CHECK(String7::POINTER_COUNT == lastOverload);
+        }
+        SECTION("Large string") {
+            std::string ls{"This is a large string"};
+            DBuilder<std::string> built(ls);
+            REQUIRE(isPointer(built));
+        }
+    }
+}
