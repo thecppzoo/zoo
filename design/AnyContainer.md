@@ -343,8 +343,8 @@ This is the interface it must implement, if it were named `Container`:
 ```c++
     Container() noexcept; // <- no-throw default constructible
     void destroy(); // implicitly noexcept
-    void copy(Container *to);
-    void move(ConverterContainer *to) noexcept;
+    void copy(Container *to) const;
+    void move(Container *to) noexcept;
     void *value() noexcept;
     bool nonEmpty() const noexcept;
     const std::type_info &type() const noexcept;
