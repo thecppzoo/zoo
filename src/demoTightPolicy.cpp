@@ -80,24 +80,11 @@ TEST_CASE("Encodings", "[TightPolicy]") {
     }
 }
 
-auto isPointer(Tight t) {
-    auto e = t.code.empty;
-    return !e.isInteger && !e.notPointer;
-}
-
-Fallback *fallback(Pointer62 p) {
-    void *rv = p;
-    return static_cast<Fallback *>(rv);
-}
-
 template<typename T>
 struct DBuilder: Builder<T> {
     using Builder<T>::Builder;
  
-    ~DBuilder() {
-        if(!isPointer(*this)) { return; }
-        delete fallback(this->code.pointer);
-    }
+    ~DBuilder() { this->destroy(); }
 };
 
 TEST_CASE("Builders", "[TightPolicy]") {
@@ -165,3 +152,9 @@ TEST_CASE("Builders", "[TightPolicy]") {
         CHECK(5 == bint.code.integer);
     }
 }
+
+TEST_CASE("TightAny", "") {
+    TightAny ta;
+    REQUIRE(typeid(void) == ta.type());
+}
+

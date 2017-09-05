@@ -111,9 +111,55 @@ struct Tight { // Why can't you inherit from unions?
     static_assert(sizeof(code) == VoidPtrSize, "");
 
     Tight() { code.empty = Empty{}; }
+
+    inline void destroy();
+    void copy(Tight *to) const;
+    void move(Tight *to) noexcept;
+    bool nonEmpty() const noexcept {
+        auto e = code.empty;
+        return !e.isInteger && e.notPointer && !e.isString;
+    }
+    const std::type_info &type() const noexcept;
 };
 
 static_assert(alignof(Tight) == VoidPtrAlignment, "");
+
+auto isPointer(Tight t) {
+    auto e = t.code.empty;
+    return !e.isInteger && !e.notPointer;
+}
+
+Fallback *fallback(Pointer62 p) {
+    void *rv = p;
+    return static_cast<Fallback *>(rv);
+}
+
+void Tight::destroy() {
+    if(!isPointer(*this)) { return; }
+    delete fallback(code.pointer);
+}
+
+void Tight::copy(Tight *to) const {
+    if(!isPointer(*this)) {
+        *to = *this;
+        return;
+    }
+    to->code.pointer = new Fallback{*fallback(code.pointer)};
+}
+
+void Tight::move(Tight *to) noexcept {
+    *to = *this;
+    if(isPointer(*this)) {
+        code.pointer = nullptr;
+    }
+}
+
+const std::type_info &Tight::type() const noexcept {
+    if(code.empty.isInteger) { return typeid(long); }
+    if(!code.empty.notPointer) { fallback(code.pointer)->type(); }
+    if(code.empty.isString) { return typeid(std::string); }
+    return typeid(void);
+}
 
 template<typename T, typename = void>
 struct Builder: Tight {
@@ -121,6 +167,21 @@ struct Builder: Tight {
     inline
     Builder(Args &&... args);
 };
+
+template<typename>
+struct is_char_array_impl: std::false_type {};
+
+template<int L>
+struct is_char_array_impl<char[L]>: std::true_type {};
+
+template<typename>
+struct array_length_impl { constexpr static auto value = 0; };
+
+template<typename T, int L>
+struct array_length_impl<T[L]> { constexpr static auto value = L; };
+
+template<typename T>
+constexpr auto array_length() { return array_length_impl<T>::value; }
 
 template<typename T>
 struct is_stringy_impl: std::false_type {};
@@ -183,3 +244,31 @@ template<typename T>
 struct Builder<T, std::enable_if_t<std::is_integral<T>::value>>: Tight {
     Builder(T arg) { code.integer = arg; }
 };
+
+struct TightPolicy {
+    using MemoryLayout = Tight;
+
+    template<typename T>
+    using Builder = ::Builder<T>;
+};
+
+using TightAny = zoo::AnyContainer<TightPolicy>;
+
+template<typename T>
+std::decay_t<T> &tightCast(TightAny &ta) {
+    return *zoo::anyContainerCast<std::decay_t<T>>(fallback(ta.container()->code.pointer));
+}
+
+template<typename T>
+std::enable_if_t<is_stringy_type<T>::value, std::string>
+tightCast(TightAny &ta) {
+    if(ta.container()->code.empty.notPointer) {
+        return ta.container()->code.string;
+    }
+    return *zoo::anyContainerCast<std::string>(fallback(ta.container()->code.pointer));
+}
+
+template<typename T>
+std::enable_if_t<std::is_integral<T>::value, T>
+tightCast(TightAny &ta) { return ta.container()->code.integer; }
+
