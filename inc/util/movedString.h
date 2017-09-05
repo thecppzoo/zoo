@@ -12,7 +12,7 @@ BeforeMovingType beforeMoving(const std::string &s) {
 	return s.data();
 }
 
-auto wasMoved(const std::string &to, BeforeMovingType b) {
+auto bufferWasMoved(const std::string &to, BeforeMovingType b) {
 	return to.data() == b;
 }
 
