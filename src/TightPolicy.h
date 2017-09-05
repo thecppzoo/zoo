@@ -66,10 +66,14 @@ struct String7 {
     };
     char bytes[7];
 
-    String7(): outcode{6}, count{0} {}
-    String7(const char *ptr, int size): outcode(6), count(size) {
+    String7(const char *ptr, std::size_t size): outcode(6), count(size) {
         std::copy(ptr, count + ptr, bytes);
     }
+    String7(): String7(nullptr, 0) {}
+
+    template<int L, std::enable_if_t<L < 8, int> = 0>
+    String7(const char (&array)[L]): String7(array, L) {}
+
     String7(const std::string &arg): String7(arg.data(), arg.size()) {}
 
     operator std::string() const {
@@ -134,7 +138,7 @@ struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
 
     Builder(std::string &&s) {
         if(s.size() < 8) {
-            code.string = String7{s};
+            code.string = String7{s.data(), s.size()};
         } else {
             code.pointer = new Fallback{std::move(s)};
         }
