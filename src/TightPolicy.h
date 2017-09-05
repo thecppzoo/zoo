@@ -123,15 +123,18 @@ struct Builder: Tight {
 };
 
 template<typename T>
-struct is_stringy_type: std::false_type {};
+struct is_stringy_impl: std::false_type {};
 
 template<>
-struct is_stringy_type<std::string>: std::true_type {};
+struct is_stringy_impl<std::string>: std::true_type {};
 
 template<int L>
-struct is_stringy_type<char[L]>: std::true_type {
+struct is_stringy_impl<char[L]>: std::true_type {
     constexpr static int Size = L;
 };
+
+template<typename T>
+using is_stringy_type = is_stringy_impl<zoo::uncvr_t<T>>;
 
 template<typename T, typename Void>
 template<typename... Args>

@@ -102,21 +102,41 @@ TEST_CASE("Builders", "[TightPolicy]") {
         REQUIRE(fellback);
     }
     SECTION("Stringies") {
+        static_assert(is_stringy_type<char[343]>::value, "");
+        static_assert(is_stringy_type<const char[3]>::value, "");
+        static_assert(is_stringy_type<const std::string>::value, "");
+        static_assert(!is_stringy_type<char>::value, "");
         auto isString = [](Tight t) {
             auto e = t.code.empty;
             return !e.isInteger && e.notPointer && e.isString;
         };
         char hello[] = "Hello!";
-        SECTION("Small strings") {
+        SECTION("Small string") {
             std::string ss{hello};
-            DBuilder<std::string> built(ss);
+            DBuilder<std::string> built{ss};
             REQUIRE(isString(built));
             CHECK(String7::POINTER_COUNT == lastOverload);
         }
         SECTION("Large string") {
             std::string ls{"This is a large string"};
-            DBuilder<std::string> built(ls);
+            DBuilder<std::string> built{ls};
             REQUIRE(isPointer(built));
+        }
+        SECTION("Temporary small string") {
+            DBuilder<std::string> b{std::string{"Hi!"}};
+            REQUIRE(isString(b));
+            CHECK(String7::POINTER_COUNT == lastOverload);
+        }
+        SECTION("Temporary large string") {
+            std::string s{"This is large enough to create buffer"};
+            auto characterBufferToMove = s.data();
+            DBuilder<std::string> b{std::move(s)};
+            REQUIRE(isPointer(b));
+            void *p = b.code.pointer;
+            auto *f = static_cast<Fallback *>(p);
+            auto *ptr = zoo::anyContainerCast<std::string>(f);
+            auto finalBuffer = ptr->data();
+            CHECK(finalBuffer == characterBufferToMove);
         }
     }
 }
