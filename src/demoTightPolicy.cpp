@@ -44,15 +44,11 @@ TEST_CASE("Encodings", "[TightPolicy]") {
         REQUIRE(0 < maxInt);
         t.code.integer = maxInt;
         REQUIRE(-1 == t.code.integer);
-        //long minInt = static_cast<unsigned long>(maxInt) + 1;
-        auto minInt = maxInt + 1;
-        static_assert(std::is_same<decltype(minInt), long>::value, "");
-        auto lessThanZero = minInt < long(0);
-        std::cout << std::hex << minInt << std::endl;
-        REQUIRE(lessThanZero);
+        long minInt = static_cast<unsigned long>(maxInt) + 1;
+        REQUIRE(minInt < 0); // proves maxInt is indeed max
         REQUIRE(-1 == maxInt + minInt);
         t.code.integer = minInt;
-        REQUIRE(0 == t.code.integer);
+        REQUIRE(0 == t.code.integer); // proves the most significant bit is lost
     }
     SECTION("Pointer62") {
         std::unique_ptr<int> forget{new int{8}};
