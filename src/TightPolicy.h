@@ -8,7 +8,6 @@
 
 #include "util/ExtendedAny.h"
 
-
 constexpr auto VoidPtrSize = sizeof(void *);
 constexpr auto VoidPtrAlignment = alignof(void *);
 
@@ -66,15 +65,31 @@ struct String7 {
     };
     char bytes[7];
 
+    enum ConstructorOverload {
+        POINTER_COUNT,
+        DEFAULT,
+        ARRAY,
+        STRING
+    };
+    static void c(ConstructorOverload)
+    #ifdef STRING7_TESTS
+    ;
+    #else
+    {}
+    #endif
+
     String7(const char *ptr, std::size_t size): outcode(6), count(size) {
         std::copy(ptr, count + ptr, bytes);
+        c(POINTER_COUNT);
     }
-    String7(): String7(nullptr, 0) {}
+    String7(): String7(nullptr, 0) { c(DEFAULT); }
 
     template<int L, std::enable_if_t<L < 8, int> = 0>
-    String7(const char (&array)[L]): String7(array, L) {}
+    String7(const char (&array)[L]): String7(array, L) { c(ARRAY); }
 
-    String7(const std::string &arg): String7(arg.data(), arg.size()) {}
+    String7(const std::string &arg):
+        String7(arg.data(), arg.size())
+    { c(STRING); }
 
     operator std::string() const {
         return { bytes, bytes + count };

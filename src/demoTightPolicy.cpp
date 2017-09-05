@@ -1,4 +1,9 @@
+#define STRING7_TESTS
+
 #include "TightPolicy.h"
+
+String7::ConstructorOverload lastOverload;
+void String7::c(ConstructorOverload o) { lastOverload = o; }
 
 static_assert(!is_stringy_type<int>::value, "");
 static_assert(is_stringy_type<std::string>::value, "");
@@ -18,15 +23,6 @@ static_assert(is_stringy_type<decltype(has_chars::spc)>::value, "");
 
 #include <memory>
 
-template<typename> struct Trick;
-
-TEST_CASE("WEIRD", "") {
-    long maxInt = static_cast<unsigned long>(long{-1}) >> 1;
-    auto minInt = maxInt + 1;
-    auto z = minInt < 0;
-    REQUIRE(z);
-}
-
 TEST_CASE("Encodings", "[TightPolicy]") {
     Tight t;
     auto &e = t.code.empty;
@@ -41,14 +37,18 @@ TEST_CASE("Encodings", "[TightPolicy]") {
     }
     SECTION("Int63 - not exactly 63 bits of precision") {
         long maxInt = static_cast<unsigned long>(long{-1}) >> 1;
-        REQUIRE(0 < maxInt);
-        t.code.integer = maxInt;
-        REQUIRE(-1 == t.code.integer);
-        long minInt = static_cast<unsigned long>(maxInt) + 1;
-        REQUIRE(minInt < 0); // proves maxInt is indeed max
-        REQUIRE(-1 == maxInt + minInt);
-        t.code.integer = minInt;
-        REQUIRE(0 == t.code.integer); // proves the most significant bit is lost
+        SECTION("Overflows at 63 bits") {
+            REQUIRE(0 < maxInt);
+            t.code.integer = maxInt;
+            REQUIRE(-1 == t.code.integer);
+        }
+        SECTION("Drops the most significant bit") {
+            long minInt = static_cast<unsigned long>(maxInt) + 1;
+            REQUIRE(minInt < 0);
+            REQUIRE(-1 == maxInt + minInt);
+            t.code.integer = minInt;
+            REQUIRE(0 == t.code.integer);
+        }
     }
     SECTION("Pointer62") {
         std::unique_ptr<int> forget{new int{8}};
@@ -62,21 +62,19 @@ TEST_CASE("Encodings", "[TightPolicy]") {
         char noNull[] = { 'H', 'e', 'l', 'l', 'o', '!' };
         static_assert(std::is_same<char[6], decltype(noNull)>::value, "");
         t.code.string = noNull;
-        bool stringness = !e.isInteger && e.notPointer && e.isString;
-        REQUIRE(stringness);
-        REQUIRE(6 == t.code.string.count);
-        std::string
-            asString = t.code.string,
-            helloStr{noNull, noNull + sizeof(noNull)};
-        REQUIRE(helloStr == asString);
-        char eightBytes[] = "1234567";
-        static_assert(8 == sizeof(eightBytes), "");
-        t.code.string = String7{eightBytes, 7};
-        asString = t.code.string;
-        REQUIRE(eightBytes == asString);
-        asString = "!";
-        asString += "!";
-        t.code.string = asString;
-        REQUIRE(2 == t.code.string.count);
+        SECTION("Correct encoding") {
+            bool stringness = !e.isInteger && e.notPointer && e.isString;
+            REQUIRE(stringness);
+            CHECK(String7::ARRAY == lastOverload);
+        }
+        SECTION("Correct count from char[]") {
+            REQUIRE(6 == t.code.string.count);
+        }
+        std::string asString = "hi!";
+        SECTION("Conversion to std::string") {
+            std::string helloStr{noNull, noNull + sizeof(noNull)};
+            asString = t.code.string;
+            REQUIRE(helloStr == asString);
+        }
     }
 }
