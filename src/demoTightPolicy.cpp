@@ -139,8 +139,7 @@ TEST_CASE("Builders", "[TightPolicy]") {
             auto characterBufferToMove = zoo::beforeMoving(s);
             DBuilder<std::string> b{std::move(s)};
             REQUIRE(isPointer(b));
-            void *p = b.code.pointer;
-            auto *f = static_cast<Fallback *>(p);
+            auto f = fallback(b.code.pointer);
             REQUIRE(typeid(std::string) == f->type());
             auto *ptr = zoo::anyContainerCast<std::string>(f);
             #ifdef ENABLE_STRING_MOVE_CHECK
@@ -155,6 +154,14 @@ TEST_CASE("Builders", "[TightPolicy]") {
             char large[] = "This is a large buffer";
             DBuilder<char[5]> allFine{large};
             REQUIRE(isPointer(allFine));
+            REQUIRE(
+                typeid(std::string) == fallback(allFine.code.pointer)->type()
+            );
         }
+    }
+    SECTION("Integral") {
+        Builder<int> bint{5};
+        REQUIRE(bint.code.empty.isInteger);
+        CHECK(5 == bint.code.integer);
     }
 }
