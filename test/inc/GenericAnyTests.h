@@ -179,34 +179,31 @@ void testAnyImplementation() {
     }
     SECTION("Assignments") {
         using namespace zoo;
-        ExtAny integer{5};
         int willChange = 0;
         ExtAny willBeTrampled{Destructor{&willChange}};
-        willBeTrampled = integer;
-        auto asInt = anyContainerCast<int>(&willBeTrampled);
-        REQUIRE(nullptr != asInt);
-        REQUIRE(5 == *asInt);
-        REQUIRE(1 == willChange);
-        willChange = 0;
-        ExtAny anotherTrampled{D2{&willChange}};
-        *asInt = 9;
-        anotherTrampled = willBeTrampled;
-        asInt = anyContainerCast<int>(&anotherTrampled);
-        REQUIRE(nullptr != asInt);
-        REQUIRE(9 == *asInt);
-        REQUIRE(1 == willChange);
-        integer = Moves{};
-        auto movPtr = anyContainerCast<Moves>(&integer);
-        REQUIRE(nullptr != movPtr);
-        REQUIRE(Moves::MOVING == movPtr->kind);
-        willBeTrampled = *movPtr;
-        auto movPtr2 = anyContainerCast<Moves>(&willBeTrampled);
-        REQUIRE(nullptr != movPtr2);
-        REQUIRE(Moves::COPIED == movPtr2->kind);
-        anotherTrampled = std::move(*movPtr2);
-        REQUIRE(Moves::MOVED == movPtr2->kind);
-        auto p = anyContainerCast<Moves>(&anotherTrampled);
-        REQUIRE(Moves::MOVING == p->kind);
+        ExtAny integer{5};
+        SECTION("Destroys trampled object") {
+            willBeTrampled = integer;
+            REQUIRE(typeid(int) == willBeTrampled.type());
+            auto asInt = anyContainerCast<int>(&willBeTrampled);
+            REQUIRE(nullptr != asInt);
+            CHECK(5 == *asInt);
+            CHECK(1 == willChange);
+        }
+        SECTION("Move and copy assignments") {
+            integer = Moves{};
+            auto movPtr = anyContainerCast<Moves>(&integer);
+            CHECK(Moves::MOVING == movPtr->kind);
+            willBeTrampled = *movPtr;
+            auto movPtr2 = anyContainerCast<Moves>(&willBeTrampled);
+            REQUIRE(nullptr != movPtr2);
+            CHECK(Moves::COPIED == movPtr2->kind);
+            ExtAny anotherTrampled{D2{&willChange}};
+            anotherTrampled = std::move(*movPtr2);
+            CHECK(Moves::MOVED == movPtr2->kind);
+            auto p = anyContainerCast<Moves>(&anotherTrampled);
+            CHECK(Moves::MOVING == p->kind);
+        }
     }
     ExtAny empty;
     SECTION("reset()") {
