@@ -165,16 +165,27 @@ struct ConverterContainer {
 
 template<int S, int A, typename T>
 struct TypedConverterContainer: ConverterContainer<S, A> {
-    template<typename... Args>
+    constexpr static auto ValueSemantics = canUseValueSemantics<T>(S, A);
+
+    template<
+        typename... Args,
+        std::enable_if_t<ValueSemantics && 0 <= sizeof...(Args), int> = 0
+    >
     TypedConverterContainer(Args &&...args) {
-        if(canUseValueSemantics<T>(S, A)) {
-            new(this->m_space) T{std::forward<Args>(args)...};
-            new(this->driver()) ConverterValue<T>;
-        } else {
-            makeReferential<T>(
-                this->driver(), this->m_space, std::forward<Args>(args)...
-            );
-        }
+        new(this->m_space) T{std::forward<Args>(args)...};
+        new(this->driver()) ConverterValue<T>;
+    }
+
+    template<
+        typename... Args,
+        std::enable_if_t<!ValueSemantics && 0 <= sizeof...(Args), int> = 0
+    >
+    TypedConverterContainer(Args &&...args) {
+        makeReferential<T>(
+            this->driver(),
+            this->m_space,
+            std::forward<Args>(args)...
+        );
     }
 };
 
