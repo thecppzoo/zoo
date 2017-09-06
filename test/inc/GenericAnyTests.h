@@ -105,6 +105,21 @@ struct TwoArgumentConstructor {
     TwoArgumentConstructor(void *p, int q): boolean(p), value(q) {};
 };
 
+template<typename>
+bool movedFromTest(zoo::Any &a) {
+    auto ac = a.container();
+        // strange warning
+        // warning: expression with side effects
+        // will be evaluated despite being used as an operand to 'typeid'
+        // [-Wpotentially-evaluated-expression]
+    return typeid(*ac) == typeid(zoo::Any::Container);
+}
+
+template<typename W, int S, int A>
+bool movedFromTest(zoo::AnyContainer<zoo::ConverterPolicy<S, A>> &a) {
+        return nullptr == zoo::anyContainerCast<W>(&a);
+}
+
 template<typename ExtAny>
 void testAnyImplementation() {
     SECTION("Value Destruction") {
@@ -147,7 +162,7 @@ void testAnyImplementation() {
         auto afterMove = zoo::anyContainerCast<Big>(&movingTo);
         CHECK(!movingFrom.has_value());
         REQUIRE(original == afterMove);
-        REQUIRE(nullptr == zoo::anyContainerCast<Big>(&movingFrom));
+        REQUIRE(movedFromTest<Moves>(movingFrom));
     }
     SECTION("Initializer constructor -- copying") {
         Moves value;
