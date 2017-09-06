@@ -3,6 +3,8 @@
 #include "util/movedString.h"
 #include "TightPolicy.h"
 
+#include "GenericAnyTests.h"
+
 String7::ConstructorOverload lastOverload;
 void String7::c(ConstructorOverload o) { lastOverload = o; }
 
@@ -153,8 +155,34 @@ TEST_CASE("Builders", "[TightPolicy]") {
     }
 }
 
-TEST_CASE("TightAny", "") {
-    TightAny ta;
-    REQUIRE(typeid(void) == ta.type());
+namespace zoo {
+
+template<typename>
+bool isRuntimeValue(Tight *ptr) {
+    return ptr->code.empty.notPointer;
+}
+
+template<typename>
+bool isRuntimeReference(Tight *ptr) {
+    return !ptr->code.empty.notPointer;
+}
+
+template<>
+struct RVD<TightPolicy> {
+    template<typename>
+    static bool runtimeValue(Tight *e) {
+        return e->code.empty.isInteger || e->code.empty.notPointer;
+    }
+
+    template<typename>
+    static bool runtimeReference(Tight *e) {
+        return !e->code.empty.isInteger && !e->code.empty.notPointer;
+    }
+};
+
+}
+
+TEST_CASE("TightAny", "[contract]") {
+    testAnyImplementation<TightAny>();
 }
 
