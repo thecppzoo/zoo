@@ -125,12 +125,9 @@ struct Tight { // Why can't you inherit from unions?
     void move(Tight *to) noexcept;
     bool nonEmpty() const noexcept {
         auto e = code.empty;
-        return !e.isInteger && e.notPointer && !e.isString;
+        return e.isInteger || !e.notPointer || e.isString;
     }
-    void *value() noexcept {
-        if(isPointer()) { return code.pointer; }
-        throw;
-    }
+    void *value();
     const std::type_info &type() const noexcept;
 };
 
@@ -156,14 +153,16 @@ void Tight::copy(Tight *to) const {
 
 void Tight::move(Tight *to) noexcept {
     *to = *this;
-    if(isPointer()) {
-        code.pointer = nullptr;
-    }
+    code.empty = Empty{};
 }
 
+void *Tight::value() {
+    if(!isPointer()) { throw; }
+    return fallback(code.pointer)->container()->value();
+}
 const std::type_info &Tight::type() const noexcept {
     if(code.empty.isInteger) { return typeid(long); }
-    if(!code.empty.notPointer) { fallback(code.pointer)->type(); }
+    if(!code.empty.notPointer) { return fallback(code.pointer)->type(); }
     if(code.empty.isString) { return typeid(std::string); }
     return typeid(void);
 }
@@ -262,7 +261,10 @@ struct TightPolicy {
 using TightAny = zoo::AnyContainer<TightPolicy>;
 
 template<typename T>
-std::decay_t<T> &tightCast(TightAny &ta) {
+std::enable_if_t<
+    !is_stringy_type<T>::value && !std::is_integral<T>::value,
+    std::decay_t<T> &
+> tightCast(TightAny &ta) {
     return *zoo::anyContainerCast<std::decay_t<T>>(fallback(ta.container()->code.pointer));
 }
 
@@ -276,6 +278,6 @@ tightCast(TightAny &ta) {
 }
 
 template<typename T>
-std::enable_if_t<std::is_integral<T>::value, T>
+std::enable_if_t<std::is_integral<T>::value, long>
 tightCast(TightAny &ta) { return ta.container()->code.integer; }
 

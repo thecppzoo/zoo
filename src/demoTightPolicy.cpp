@@ -167,10 +167,7 @@ struct RVD<TightPolicy> {
 
 }
 
-template<typename>
-void movedFromTest(TightAny &) {}
-
-TEST_CASE("TightAny", "[contract]") {
+TEST_CASE("TightAny", "[TightAny][contract]") {
     using ExtAny = TightAny;
     SECTION("Referential Semantics - Alignment, Destruction") {
         int value;
@@ -180,6 +177,100 @@ TEST_CASE("TightAny", "[contract]") {
             value = 0;
         }
         REQUIRE(1 == value);
+    }
+    SECTION("Referential Semantics - Size") {
+        ExtAny v{Big{}};
+        CHECK(zoo::isRuntimeReference<Big>(v));
+        CHECK(v.has_value());
+    }
+    SECTION("Move constructor -- Referential") {
+        ExtAny movingFrom{Big{}};
+        REQUIRE(zoo::isRuntimeReference<Big>(movingFrom));
+        auto original = zoo::anyContainerCast<Big>(&movingFrom);
+        ExtAny movingTo{std::move(movingFrom)};
+        auto afterMove = zoo::anyContainerCast<Big>(&movingTo);
+        CHECK(!movingFrom.has_value());
+        CHECK(original == afterMove);
+    }
+    SECTION("Initializer constructor -- copying") {
+        Moves value;
+        ExtAny copied{value};
+        auto &contained = copied.type();
+        CHECK(contained.name() == typeid(Moves).name());
+        REQUIRE(typeid(Moves) == copied.type());
+        auto ptr = zoo::anyContainerCast<Moves>(&copied);
+        CHECK(Moves::COPIED == ptr->kind);
+    }
+    SECTION("Initializer constructor -- moving") {
+        Moves def;
+        CHECK(Moves::DEFAULT == def.kind);
+        ExtAny moving{std::move(def)};
+        REQUIRE(Moves::MOVED == def.kind);
+        REQUIRE(Moves::MOVING == zoo::anyContainerCast<Moves>(&moving)->kind);
+    }
+    SECTION("Assignments") {
+        using namespace zoo;
+        int willChange = 0;
+        ExtAny willBeTrampled{Destructor{&willChange}};
+        ExtAny integer{5};
+        SECTION("Destroys trampled object") {
+            willBeTrampled = integer;
+            REQUIRE(typeid(long) == willBeTrampled.type());
+            auto asInt = tightCast<int>(willBeTrampled);
+            CHECK(5 == asInt);
+            CHECK(1 == willChange);
+        }
+        SECTION("Move and copy assignments") {
+            integer = Moves{};
+            auto movPtr = anyContainerCast<Moves>(&integer);
+            CHECK(Moves::MOVING == movPtr->kind);
+            willBeTrampled = *movPtr;
+            auto movPtr2 = anyContainerCast<Moves>(&willBeTrampled);
+            REQUIRE(nullptr != movPtr2);
+            CHECK(Moves::COPIED == movPtr2->kind);
+            ExtAny anotherTrampled{D2{&willChange}};
+            anotherTrampled = std::move(*movPtr2);
+            CHECK(Moves::MOVED == movPtr2->kind);
+            auto p = anyContainerCast<Moves>(&anotherTrampled);
+            CHECK(Moves::MOVING == p->kind);
+        }
+    }
+    ExtAny empty;
+    SECTION("reset()") {
+        REQUIRE(!empty.has_value());
+        empty = 5;
+        REQUIRE(empty.has_value());
+        empty.reset();
+        REQUIRE(!empty.has_value());
+    }
+    SECTION("typeid") {
+        REQUIRE(typeid(void) == empty.type());
+        empty = Big{};
+        REQUIRE(typeid(Big) == empty.type());
+    }
+    SECTION("swap") {
+        ExtAny other{5};
+        anyContainerSwap(empty, other);
+        REQUIRE(typeid(long) == empty.type());
+        REQUIRE(typeid(void) == other.type());
+        auto valuePointerAtEmpty = tightCast<int>(empty);
+        REQUIRE(5 == valuePointerAtEmpty);
+    }
+    SECTION("inplace") {
+        ExtAny bfi{std::in_place_type<BuildsFromInt>, 5};
+        REQUIRE(typeid(BuildsFromInt) == bfi.type());
+        ExtAny il{std::in_place_type<TakesInitializerList>, { 9, 8, 7 }, 2.2};
+        REQUIRE(typeid(TakesInitializerList) == il.type());
+        auto ptr = zoo::anyContainerCast<TakesInitializerList>(&il);
+        REQUIRE(3 == ptr->s);
+        REQUIRE(2.2 == ptr->v);
+    }
+    SECTION("Multiple argument constructor -- Referential") {
+        ExtAny mac{TwoArgumentConstructor{nullptr, 3}};
+        REQUIRE(zoo::isRuntimeReference<TwoArgumentConstructor>(mac));
+        auto ptr = zoo::anyContainerCast<TwoArgumentConstructor>(&mac);
+        REQUIRE(false == ptr->boolean);
+        REQUIRE(3 == ptr->value);
     }
 }
 
