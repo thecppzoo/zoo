@@ -92,8 +92,7 @@ struct DBuilder: Builder<T> {
 TEST_CASE("Builders", "[TightPolicy]") {
     SECTION("Fallback") {
         DBuilder<double> b{3.1415265};
-        bool fellback = !b.code.empty.isInteger && !b.code.empty.notPointer;
-        REQUIRE(fellback);
+        REQUIRE(b.isPointer());
     }
     SECTION("Stringies") {
         static_assert(is_stringy_type<char[343]>::value, "");
@@ -102,32 +101,28 @@ TEST_CASE("Builders", "[TightPolicy]") {
         static_assert(is_stringy_type<const char (&)[2]>::value, "");
         static_assert(!is_stringy_type<char>::value, "");
 
-        auto isString = [](Tight t) {
-            auto e = t.code.empty;
-            return !e.isInteger && e.notPointer && e.isString;
-        };
         char hello[] = "Hello!";
         SECTION("Small string") {
             std::string ss{hello};
             DBuilder<std::string> built{ss};
-            REQUIRE(isString(built));
+            REQUIRE(built.isString());
             CHECK(String7::POINTER_COUNT == lastOverload);
         }
         SECTION("Large string") {
             std::string ls{"This is a large string"};
             DBuilder<std::string> built{ls};
-            REQUIRE(isPointer(built));
+            REQUIRE(built.isPointer());
         }
         SECTION("Temporary small string") {
             DBuilder<std::string> b{std::string{"Hi!"}};
-            REQUIRE(isString(b));
+            REQUIRE(b.isString());
             CHECK(String7::POINTER_COUNT == lastOverload);
         }
         SECTION("Temporary large string") {
             std::string s{"This is large enough to create buffer"};
             auto characterBufferToMove = zoo::beforeMoving(s);
             DBuilder<std::string> b{std::move(s)};
-            REQUIRE(isPointer(b));
+            REQUIRE(b.isPointer());
             auto f = fallback(b.code.pointer);
             REQUIRE(typeid(std::string) == f->type());
             auto *ptr = zoo::anyContainerCast<std::string>(f);
@@ -137,12 +132,12 @@ TEST_CASE("Builders", "[TightPolicy]") {
         }
         SECTION("Small array") {
             DBuilder<char[5]> small{hello};
-            REQUIRE(isString(small));
+            REQUIRE(small.isString());
         }
         SECTION("Large array") {
             char large[] = "This is a large buffer";
             DBuilder<char[5]> allFine{large};
-            REQUIRE(isPointer(allFine));
+            REQUIRE(allFine.isPointer());
             REQUIRE(
                 typeid(std::string) == fallback(allFine.code.pointer)->type()
             );
@@ -156,16 +151,6 @@ TEST_CASE("Builders", "[TightPolicy]") {
 }
 
 namespace zoo {
-
-template<typename>
-bool isRuntimeValue(Tight *ptr) {
-    return ptr->code.empty.notPointer;
-}
-
-template<typename>
-bool isRuntimeReference(Tight *ptr) {
-    return !ptr->code.empty.notPointer;
-}
 
 template<>
 struct RVD<TightPolicy> {
@@ -182,7 +167,19 @@ struct RVD<TightPolicy> {
 
 }
 
+template<typename>
+void movedFromTest(TightAny &) {}
+
 TEST_CASE("TightAny", "[contract]") {
-    testAnyImplementation<TightAny>();
+    using ExtAny = TightAny;
+    SECTION("Referential Semantics - Alignment, Destruction") {
+        int value;
+        {
+            ExtAny a{D2{&value}};
+            REQUIRE(zoo::isRuntimeReference<D2>(a));
+            value = 0;
+        }
+        REQUIRE(1 == value);
+    }
 }
 

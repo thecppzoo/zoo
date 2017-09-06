@@ -108,6 +108,14 @@ struct Tight { // Why can't you inherit from unions?
         Encodings(): empty{} {}
     } code;
 
+    bool isInteger() const noexcept { return code.empty.isInteger; }
+    bool isPointer() const noexcept {
+        return !isInteger() && !code.empty.notPointer;
+    }
+    bool isString() const noexcept {
+        return !isInteger() && code.empty.isString;
+    }
+
     static_assert(sizeof(code) == VoidPtrSize, "");
 
     Tight() { code.empty = Empty{}; }
@@ -120,9 +128,7 @@ struct Tight { // Why can't you inherit from unions?
         return !e.isInteger && e.notPointer && !e.isString;
     }
     void *value() noexcept {
-        if(!code.empty.isInteger && !code.empty.notPointer) {
-            return code.pointer;
-        }
+        if(isPointer()) { return code.pointer; }
         throw;
     }
     const std::type_info &type() const noexcept;
@@ -130,23 +136,18 @@ struct Tight { // Why can't you inherit from unions?
 
 static_assert(alignof(Tight) == VoidPtrAlignment, "");
 
-auto isPointer(Tight t) {
-    auto e = t.code.empty;
-    return !e.isInteger && !e.notPointer;
-}
-
 Fallback *fallback(Pointer62 p) {
     void *rv = p;
     return static_cast<Fallback *>(rv);
 }
 
 void Tight::destroy() {
-    if(!isPointer(*this)) { return; }
+    if(!isPointer()) { return; }
     delete fallback(code.pointer);
 }
 
 void Tight::copy(Tight *to) const {
-    if(!isPointer(*this)) {
+    if(!isPointer()) {
         *to = *this;
         return;
     }
@@ -155,7 +156,7 @@ void Tight::copy(Tight *to) const {
 
 void Tight::move(Tight *to) noexcept {
     *to = *this;
-    if(isPointer(*this)) {
+    if(isPointer()) {
         code.pointer = nullptr;
     }
 }

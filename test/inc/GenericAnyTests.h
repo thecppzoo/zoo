@@ -106,18 +106,18 @@ struct TwoArgumentConstructor {
 };
 
 template<typename>
-bool movedFromTest(zoo::Any &a) {
+void movedFromTest(zoo::Any &a) {
     auto ac = a.container();
         // strange warning
         // warning: expression with side effects
         // will be evaluated despite being used as an operand to 'typeid'
         // [-Wpotentially-evaluated-expression]
-    return typeid(*ac) == typeid(zoo::Any::Container);
+    CHECK(typeid(*ac) == typeid(zoo::Any::Container));
 }
 
 template<typename W, int S, int A>
-bool movedFromTest(zoo::AnyContainer<zoo::ConverterPolicy<S, A>> &a) {
-        return nullptr == zoo::anyContainerCast<W>(&a);
+void movedFromTest(zoo::AnyContainer<zoo::ConverterPolicy<S, A>> &a) {
+    CHECK(nullptr == zoo::anyContainerCast<W>(&a));
 }
 
 template<typename ExtAny>
@@ -162,7 +162,7 @@ void testAnyImplementation() {
         auto afterMove = zoo::anyContainerCast<Big>(&movingTo);
         CHECK(!movingFrom.has_value());
         REQUIRE(original == afterMove);
-        REQUIRE(movedFromTest<Moves>(movingFrom));
+        movedFromTest<Moves>(movingFrom);
     }
     SECTION("Initializer constructor -- copying") {
         Moves value;
