@@ -119,6 +119,12 @@ struct Tight { // Why can't you inherit from unions?
         auto e = code.empty;
         return !e.isInteger && e.notPointer && !e.isString;
     }
+    void *value() noexcept {
+        if(!code.empty.isInteger && !code.empty.notPointer) {
+            return code.pointer;
+        }
+        throw;
+    }
     const std::type_info &type() const noexcept;
 };
 
