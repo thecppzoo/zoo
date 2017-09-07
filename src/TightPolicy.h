@@ -163,7 +163,7 @@ void *Tight::value() {
 const std::type_info &Tight::type() const noexcept {
     if(code.empty.isInteger) { return typeid(long); }
     if(!code.empty.notPointer) { return fallback(code.pointer)->type(); }
-    if(code.empty.isString) { return typeid(std::string); }
+    if(code.empty.isString) { return typeid(String7); }
     return typeid(void);
 }
 
@@ -236,6 +236,18 @@ struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
         } else {
             code.pointer = new Fallback{
                 std::in_place_type<std::string>, array, array + L
+            };
+        }
+    }
+
+    Builder(const char *base, std::size_t length) {
+        if(length < 8) {
+            code.string = String7{base, length};
+        } else {
+            code.pointer = new Fallback{
+                std::in_place_type<std::string>,
+                base,
+                base + length
             };
         }
     }
