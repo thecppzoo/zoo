@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/DisjointAnyContainer.h"
+#include "util/ConverterAny.h"
 
 namespace zoo {
 
@@ -16,12 +16,12 @@ bool isRuntimeReference(IAnyContainer<Size, Alignment> *ptr) {
 
 template<typename T, int Size, int Alignment>
 bool isRuntimeValue(ConverterContainer<Size, Alignment> *ptr) {
-    return dynamic_cast<ConverterValue<T> *>(ptr->driver());
+    return dynamic_cast<ConverterValueDriver<T> *>(ptr->driver());
 }
 
 template<typename T, int Size, int Alignment>
 bool isRuntimeReference(ConverterContainer<Size, Alignment> *ptr) {
-    return dynamic_cast<ConverterReferential<T> *>(ptr->driver());
+    return dynamic_cast<ConverterReferentialDriver<T> *>(ptr->driver());
 }
 
 template<typename Policy>

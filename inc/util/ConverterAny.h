@@ -32,7 +32,7 @@ struct ConverterDriver {
 };
 
 template<typename ValueType, typename CRTP>
-struct BaseConverter: ConverterDriver {
+struct ConverterDriverCommon: ConverterDriver {
     ValueType *thy(const void *src) {
         return reinterpret_cast<ValueType *>(
             CRTP::val(const_cast<void *>(src))
@@ -66,7 +66,9 @@ struct BaseConverter: ConverterDriver {
 };
 
 template<typename ValueType>
-struct ConverterValue: BaseConverter<ValueType, ConverterValue<ValueType>> {
+struct ConverterValueDriver:
+    ConverterDriverCommon<ValueType, ConverterValueDriver<ValueType>>
+{
     static void make(void *) {}
 
     static void recclaim(void *) {}
@@ -75,13 +77,13 @@ struct ConverterValue: BaseConverter<ValueType, ConverterValue<ValueType>> {
 
     void move(ConverterDriver *dd, void *spc, void *source) override {
         new(spc) ValueType{std::move(*this->thy(source))};
-        new(dd) ConverterValue;
+        new(dd) ConverterValueDriver;
     }
 };
 
 template<typename ValueType>
-struct ConverterReferential:
-    BaseConverter<ValueType, ConverterReferential<ValueType>>
+struct ConverterReferentialDriver:
+    ConverterDriverCommon<ValueType, ConverterReferentialDriver<ValueType>>
 {
     struct alignas(alignof(ValueType)) AlignedSpace {
         char spc[sizeof(ValueType)];
@@ -100,7 +102,7 @@ struct ConverterReferential:
     static void *val(void *arg) { return valPtr(arg); }
 
     void move(ConverterDriver *dd, void *spc, void *source) override {
-        new(dd) ConverterReferential;
+        new(dd) ConverterReferentialDriver;
         valPtr(spc) = valPtr(source);
         valPtr(source) = nullptr;
     }
@@ -108,7 +110,7 @@ struct ConverterReferential:
 
 template<typename ValueType, typename... Args>
 void makeReferential(void *dd, void *space, Args &&... args) {
-    using Reference = ConverterReferential<ValueType>;
+    using Reference = ConverterReferentialDriver<ValueType>;
     Reference::make(space);
     try {
         auto where = Reference::val(space);
@@ -124,7 +126,7 @@ void makeReferential(void *dd, void *space, Args &&... args) {
 }
 
 template<typename ValueType, typename CRTP>
-void BaseConverter<ValueType, CRTP>::copyConvert(
+void ConverterDriverCommon<ValueType, CRTP>::copyConvert(
     ConverterDriver *dd, void *spc, const void *source,
     int destinationSize, int destinationAlignment
 ) {
@@ -134,7 +136,7 @@ void BaseConverter<ValueType, CRTP>::copyConvert(
    
     if(canUseValueSemantics<ValueType>(destinationSize, destinationAlignment)) {
         new(spc) ValueType{*value};
-        new(dd) ConverterValue<ValueType>;
+        new(dd) ConverterValueDriver<ValueType>;
     } else {
         makeReferential<ValueType>(dd, spc, *value);
     }
@@ -181,7 +183,7 @@ struct TypedConverterContainer: ConverterContainer<S, A> {
     >
     TypedConverterContainer(Args &&...args) {
         new(this->m_space) T{std::forward<Args>(args)...};
-        new(this->driver()) ConverterValue<T>;
+        new(this->driver()) ConverterValueDriver<T>;
     }
 
     template<
@@ -194,7 +196,9 @@ struct TypedConverterContainer: ConverterContainer<S, A> {
             this->m_space,
             std::forward<Args>(args)...
         );
-        ANNOTATE_MAKE_REFERENTIAL(this->driver(), this->m_space, *(void **)this->m_space)
+        ANNOTATE_MAKE_REFERENTIAL(
+            this->driver(), this->m_space, *(void **)this->m_space
+        )
     }
 };
 
@@ -207,12 +211,12 @@ struct ConverterPolicy {
 
     template<typename V>
     bool isRuntimeValue(MemoryLayout &e) {
-        return dynamic_cast<ConverterValue<V> *>(e.driver());
+        return dynamic_cast<ConverterValueDriver<V> *>(e.driver());
     }
 
     template<typename V>
     bool isRuntimeReference(MemoryLayout &e) {
-        return dynamic_cast<ConverterReferential<V> *>(e.driver());
+        return dynamic_cast<ConverterReferentialDriver<V> *>(e.driver());
     }
 };
 
