@@ -235,6 +235,54 @@ TEST_CASE("TightAny", "[TightAny][contract]") {
             CHECK(Moves::MOVING == p->kind);
         }
     }
+    SECTION("Stringy TightAny") {
+        SECTION("Short String") {
+            std::string hello{"Hello"};
+            ExtAny aString{std::in_place_type<std::string>, hello};
+            REQUIRE(zoo::isRuntimeValue<void>(aString));
+            REQUIRE(typeid(String7) == aString.type());
+            auto val = tightCast<std::string>(aString);
+            CHECK(val == hello);
+        }
+        SECTION("Gutenberg") {
+            char gutenberg[] = "Gutenberg";
+            ExtAny inplaced{
+                std::in_place_type<std::string>, gutenberg, sizeof(gutenberg) - 1
+            };
+            REQUIRE(zoo::isRuntimeReference<void>(inplaced));
+            REQUIRE(typeid(std::string) == inplaced.type());
+            auto val = tightCast<std::string>(inplaced);
+            CHECK(val == gutenberg);
+        }
+        SECTION("Large string") {
+            std::string large{"Requires TightAny fallback"};
+            ExtAny str{large};
+            REQUIRE(zoo::isRuntimeReference<void>(str));
+            REQUIRE(typeid(std::string) == str.type());
+            auto val = tightCast<std::string>(str);
+            CHECK(val == large);
+        }
+        SECTION("Constructors") {
+            std::string gutenberg("Gutenberg");
+            ExtAny initial{gutenberg};
+            SECTION("Copies TightAny of string") {
+                ExtAny copiedTo{initial};
+                REQUIRE(zoo::isRuntimeReference<void>(copiedTo));
+                REQUIRE(typeid(std::string) == copiedTo.type());
+                auto val = tightCast<std::string>(copiedTo);
+                CHECK(val == gutenberg);
+            }
+            SECTION("Moves TightAny of string") {
+                std::string gutenberg("Gutenberg");
+                ExtAny initial{gutenberg};
+                ExtAny movedTo{std::move(initial)};
+                REQUIRE(zoo::isRuntimeReference<void>(movedTo));
+                REQUIRE(typeid(std::string) == movedTo.type());
+                auto val = tightCast<std::string>(movedTo);
+                CHECK(val == gutenberg);
+            }
+        }
+    }
     ExtAny empty;
     SECTION("reset()") {
         REQUIRE(!empty.has_value());

@@ -157,7 +157,7 @@ void Tight::move(Tight *to) noexcept {
 }
 
 void *Tight::value() {
-    if(!isPointer()) { throw; }
+    if(!isPointer()) { throw zoo::bad_any_cast{}; }
     return fallback(code.pointer)->container()->value();
 }
 const std::type_info &Tight::type() const noexcept {
@@ -211,9 +211,14 @@ Builder<T, Void>::Builder(Args &&... args) {
     code.pointer = value;
 }
 
+#ifndef TIGHT_CONSTRUCTOR_ANNOTATION
+#define TIGHT_CONSTRUCTOR_ANNOTATION(...)
+#endif
+
 template<typename T>
 struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
     Builder(const std::string &s) {
+        TIGHT_CONSTRUCTOR_ANNOTATION("c str &", &s)
         if(s.size() < 8) {
             code.string = s;
         } else {
@@ -222,6 +227,7 @@ struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
     }
 
     Builder(std::string &&s) {
+        TIGHT_CONSTRUCTOR_ANNOTATION("str &&", &s)
         if(s.size() < 8) {
             code.string = String7{s.data(), s.size()};
         } else {
@@ -231,6 +237,7 @@ struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
 
     template<int L>
     Builder(const char (&array)[L]) {
+        TIGHT_CONSTRUCTOR_ANNOTATION("c &[L]", array, L);
         if(L < 8) {
             code.string = String7{array, L};
         } else {
@@ -241,6 +248,7 @@ struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
     }
 
     Builder(const char *base, std::size_t length) {
+        TIGHT_CONSTRUCTOR_ANNOTATION("c *, l", base, length)
         if(length < 8) {
             code.string = String7{base, length};
         } else {
@@ -255,7 +263,9 @@ struct Builder<T, std::enable_if_t<is_stringy_type<T>::value>>: Tight {
     template<typename... Args>
     Builder(Args &&... args):
         Builder{std::string{std::forward<Args>(args)...}}
-    {}
+    {
+        TIGHT_CONSTRUCTOR_ANNOTATION("Args &&...", "12345678", sizeof...(Args))
+    }
 };
 
 template<typename T>
