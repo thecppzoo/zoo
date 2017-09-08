@@ -153,7 +153,7 @@ TEST_CASE("Builders", "[TightPolicy]") {
 namespace zoo {
 
 template<>
-struct RVD<TightPolicy> {
+struct RuntimeReferenceOrValueDiscriminator<TightPolicy> {
     template<typename>
     static bool runtimeValue(Tight *e) {
         return e->code.empty.isInteger || e->code.empty.notPointer;

@@ -51,7 +51,7 @@ long occupied(Iterator begin, Iterator end) {
             continue;
         }
         if(typeid(std::string) != cursor->type()) { throw; }
-        rv += cut + 3;
+        rv += cut + 3; // allocates an AnyContainer<ConverterPolicy>
         auto str = tightCast<std::string>(*cursor);
         auto strS = str.size();
         if(sibs <= strS) {

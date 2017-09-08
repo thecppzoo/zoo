@@ -2,53 +2,6 @@
 
 #include "util/ExtendedAny.h"
 
-namespace zoo {
-
-template<typename T, int Size, int Alignment>
-bool isRuntimeValue(IAnyContainer<Size, Alignment> *ptr) {
-    return dynamic_cast<ValueContainer<Size, Alignment, T> *>(ptr);
-}
-
-template<typename T, int Size, int Alignment>
-bool isRuntimeReference(IAnyContainer<Size, Alignment> *ptr) {
-    return dynamic_cast<ReferentialContainer<Size, Alignment, T> *>(ptr);
-}
-
-template<typename T, int Size, int Alignment>
-bool isRuntimeValue(ConverterContainer<Size, Alignment> *ptr) {
-    return dynamic_cast<ConverterValue<T> *>(ptr->driver());
-}
-
-template<typename T, int Size, int Alignment>
-bool isRuntimeReference(ConverterContainer<Size, Alignment> *ptr) {
-    return dynamic_cast<ConverterReferential<T> *>(ptr->driver());
-}
-
-template<typename Policy>
-struct RVD {
-    template<typename T>
-    static bool runtimeReference(typename Policy::MemoryLayout *ptr) {
-        return isRuntimeReference<T>(ptr);
-    }
-
-    template<typename T>
-    static bool runtimeValue(typename Policy::MemoryLayout *ptr) {
-        return isRuntimeValue<T>(ptr);
-    }
-};
-
-template<typename T, typename Policy>
-bool isRuntimeValue(AnyContainer<Policy> &a) {
-    return RVD<Policy>::template runtimeValue<T>(a.container());
-}
-
-template<typename T, typename Policy>
-bool isRuntimeReference(AnyContainer<Policy> &a) {
-    return RVD<Policy>::template runtimeReference<T>(a.container());
-}
-
-}
-
 #ifdef TESTS
     #define CATCH_CONFIG_MAIN
 #else

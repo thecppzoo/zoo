@@ -6,13 +6,16 @@
 #include <algorithm>
 #endif
 
-#include "util/ExtendedAny.h"
+#include "util/DisjointAnyContainer.h"
 
 constexpr auto VoidPtrSize = sizeof(void *);
 constexpr auto VoidPtrAlignment = alignof(void *);
 
 using Fallback =
-    zoo::AnyContainer<zoo::ConverterPolicy<VoidPtrSize, VoidPtrAlignment>>;
+    zoo::AnyContainer<
+        zoo::ConverterPolicy<
+            sizeof(std::string), alignof(std::string)
+    >>;
 
 struct Empty {
     bool isInteger:1;
@@ -302,4 +305,9 @@ tightCast(TightAny &ta) {
 template<typename T>
 std::enable_if_t<std::is_integral<T>::value, long>
 tightCast(TightAny &ta) { return ta.container()->code.integer; }
+
+template<>
+Fallback &tightCast<Fallback>(TightAny &ta) {
+    return *fallback(ta.container()->code.pointer);
+}
 
