@@ -2,6 +2,10 @@
 
 #include "util/any.h"
 
+#ifndef ANNOTATE_MAKE_REFERENTIAL
+#define ANNOTATE_MAKE_REFERENTIAL(...)
+#endif
+
 namespace zoo {
 
 struct ConverterDriver {
@@ -43,7 +47,7 @@ struct BaseConverter: ConverterDriver {
     void copy(ConverterDriver *dd, void *spc, const void *source) override {
         CRTP::make(spc);
         try {
-            new(spc) ValueType{*thy(source)};
+            new(CRTP::val(spc)) ValueType{*thy(source)};
         } catch(...) {
             CRTP::recclaim(spc);
             throw;
@@ -107,7 +111,11 @@ void makeReferential(void *dd, void *space, Args &&... args) {
     using Reference = ConverterReferential<ValueType>;
     Reference::make(space);
     try {
-        new(Reference::val(space)) ValueType{std::forward<Args>(args)...};
+        auto where = Reference::val(space);
+        ANNOTATE_MAKE_REFERENTIAL(
+            static_cast<Reference *>(dd), space, *(void **)space
+        )
+        new(where) ValueType{std::forward<Args>(args)...};
     } catch(...) {
         Reference::recclaim(space);
         throw;
@@ -186,6 +194,7 @@ struct TypedConverterContainer: ConverterContainer<S, A> {
             this->m_space,
             std::forward<Args>(args)...
         );
+        ANNOTATE_MAKE_REFERENTIAL(this->driver(), this->m_space, *(void **)this->m_space)
     }
 };
 

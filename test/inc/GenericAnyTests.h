@@ -145,6 +145,16 @@ void testAnyImplementation() {
         REQUIRE(zoo::isRuntimeReference<Big>(v));
         REQUIRE(v.has_value());
     }
+    SECTION("Copy constructor -- Referential") {
+        Big b = { 3.14159265, 2.7182 };
+        ExtAny big{b};
+        ExtAny copy{big};
+        REQUIRE(zoo::isRuntimeReference<Big>(copy));
+        REQUIRE(typeid(Big) == copy.type());
+        auto addr = zoo::anyContainerCast<Big>(&copy);
+        CHECK(addr->a == b.a);
+        CHECK(addr->b == b.b);
+    }
     SECTION("Move constructor -- Value") {
         ExtAny movingFrom{Moves{}};
         REQUIRE(zoo::isRuntimeValue<Moves>(movingFrom));

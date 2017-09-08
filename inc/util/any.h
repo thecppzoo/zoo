@@ -341,6 +341,8 @@ using CanonicalPolicy =
 using Any = AnyContainer<CanonicalPolicy>;
 
 struct bad_any_cast: std::bad_cast {
+    using std::bad_cast::bad_cast;
+
     const char *what() const noexcept override {
         return "Incorrect Any casting";
     }
