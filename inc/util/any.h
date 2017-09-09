@@ -392,6 +392,11 @@ Any make_any(Args &&... args) {
     return Any(std::in_place_type<T>, std::forward<Args>(args)...);
 }
 
+template<typename Policy>
+typename Policy::Visit *visits(const AnyContainer<Policy> &a) {
+    return a.container()->visits();
+}
+
 }
 
 /// \todo guarantee alignment new, tests
