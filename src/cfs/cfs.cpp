@@ -99,22 +99,33 @@ Sorted sortedToCacheFriendlySearch(const Sorted &s) {
 
 #include <ostream>
 
+template<typename T, typename...>
+using Valid = T;
+
 namespace std {
-template<typename T, std::size_t L>
-std::ostream &operator<<(std::ostream &out, const std::array<T, L> &a) {
+template<typename C>
+auto operator<<(std::ostream &out, const C &a)
+-> Valid<std::ostream &, decltype(a.cbegin()), decltype(a.cend())>
+{
     out << '(';
-    for(auto current{cbegin(a)}, sentry{cend(a)};;) {
-        out << *current++;
-        if(sentry == current) { break; }
-        out << ", ";
+    auto current{cbegin(a)}, sentry{cend(a)};
+    if(current != sentry) {
+        for(;;) {
+            out << *current++;
+            if(sentry == current) { break; }
+            out << ", ";
+        }
     }
     return out << ')';
 }
+
 }
 
 #include <catch.hpp>
 
-TEST_CASE("sorting", "[array]") {
+#include <iostream>
+
+TEST_CASE("Conversion", "[array]") {
     auto stcf = [](const auto &c) {
         return zoo::sortedToCacheFriendlySearch(c);
     };
@@ -123,6 +134,15 @@ TEST_CASE("sorting", "[array]") {
     auto single = std::array<int, 1>{0};
     REQUIRE(stcf(single) == single);
     auto bi = std::array<int, 2>{0, 1};
+    std::cout << bi << std::endl;
     REQUIRE(stcf(bi) == bi);
     REQUIRE(stcf(std::array<int, 3>{0, 1, 2}) == std::array<int, 3>{1, 0, 2});
+    REQUIRE(
+        stcf(std::array<int, 6>{0, 1, 2, 3, 4, 5}) ==
+        std::array<int, 6>{1, 0, 2, 4, 3, 5}
+    );
+    REQUIRE(
+        stcf(std::array<int, 8>{0, 1, 2, 3, 4, 5, 6, 7}) ==
+        std::array<int, 8>{8, 1, 5, 0, 2, 4, 6, 7}
+    );
 }
