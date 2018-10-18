@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <array>
 
 template<typename T, std::size_t S>
@@ -12,71 +14,80 @@ T *back_inserter(std::array<T, S> &a) {
 
 namespace zoo {
 
-constexpr unsigned long logPlus(unsigned long long arg) {
-    return 63 - __builtin_clzll(arg + 1);
+constexpr unsigned long long log2Floor(unsigned long long arg) {
+    return 63 - __builtin_clzll(arg);
 }
 
-/// Converts sorted container to cache-friendly search container
-/// of the same type.
-///
-/// \param input is a sorted container with <
-/// A sorted array implies a binary tree, in which the root
-/// is the median element of the range below it.
-/// The output is the bread-first traversal of this tree
-/// Assuming an initial size equal to (2^n) - 1 elements, the
-/// median element is at zero-based index 2^(n - 1) - 1.
-/// Assuming the root is at level 0,
-/// the first element of each level l is at zero-based index 2^(n - l - 1) - 1
-/// The next element in the traversal for an element at level l and
-/// index i is i + 2^(n - l)
-/// For the general case the size of the input S is such that
-/// (2^n) - 1 < S
-/// Then the algorithm will convert for the first (2^n) - 1 elements
-/// and recurr for the S - (2^n) + 1 remaining
-///
-/// []: nothing to do
-/// [0]: copy
-/// [0, 1]: s = 2, n = log+(2) = 2, 2^n - 1 = 3, s < 3, thus do 1 and 1, copy
-/// [0, 1, 2]: s = 3, n = log+(3) = 2, 2^n - 1 = 3, s == 3: 1, 0, 2
-/// [0, 1, 2, 3]: s = 4, n = log+(4) = 3, 2^n - 1 = 7, s < 7, do 3 and 1
-/// [0, 1, 2, 3, 4]: do 3 and 2
-/// [0 .. 5]: do 3 and 3
-/// [0 .. 6]: do 7
-/// [0 .. 7]: do 7 and 1
-/// Firsts: 255, 127, 63, 31, 15, 7, 3, 1
-/// 2^n - 1: [2^(n - 1) - 1] 1 [2^(n - 1) - 1]  
-template<typename C, typename Inserter>
-auto sortedToCacheFriendlySearch(
-    Inserter output, std::size_t base, const C &input
-) -> void {
-    auto
-        inputSize = input.size(),
-        remaining = inputSize - base;
-    if(remaining < 3) {
-        std::copy(input.begin() + base, input.end(), output);
+constexpr unsigned long long log2Ceiling(unsigned long long arg) {
+    return 63 - __builtin_clzll(2*arg - 1);
+}
+
+template<typename Output, typename Input>
+void transform(Output &output, Input base, Input end) {
+    auto s = end - base;
+    if(2 == s) {
+        while(s--) {
+            *output = *--end;
+        }
         return;
     }
-    auto
-        totalLog = logPlus(remaining),
-        totalPowerOf2 = 1lu << totalLog,
-        nLevels = remaining < totalPowerOf2 - 1 ? totalLog - 1 : totalLog,
-        straddle = 1lu << nLevels,
-        size = straddle - 1,
-        level = 1lu;
-    for(;;) {
-        auto
-            nextStraddle = straddle >> 1,
-            index = nextStraddle - 1;
-        do {
-            *output++ = input[base + index];
-            index += straddle;
-        } while(index < size);
-        if(nextStraddle < 2) { break; }
+    auto logP = log2Floor(s + 1); // n
+    auto power2 = 1ul << logP;
+    auto fullSubtreeSize = power2 - 1;
+    // Full tree has (2^n) - 1 elements
+    auto excess = s - fullSubtreeSize;
+    auto twiceExcess = excess << 1;
+    for(auto straddle = power2; 1 < straddle; )
+        auto nextStraddle = straddle >> 1;
+        auto unshifted = nextStraddle - 1;
+        auto shifted = unshifted + 3;
+        if(shifted < twiceExcess) { // below the "cut"
+            auto i = straddle - 1;
+            auto prevStraddle = straddle << 1;
+            auto addendum = 0;
+            do {
+                *output++ = *(base + i + addendum);
+                addendum += prevStraddle;
+            } while(i + addendum < twiceExcess);
+            auto halvedAddendum = addendum >> 1;
+            shifted += halvedAddendum;
+        }
+        while(shifted < s) {
+            *output++ = *(base + shifted);
+            shifted += nextStraddle;
+        }
         straddle = nextStraddle;
-        ++level;
     }
-    sortedToCacheFriendlySearch(output, base + size, input);
+
+    // now just write the excess leaves
+    for(auto ndx = 0, top = 2*excess; ndx < top; ndx += 2) {
+        *output++ = *(base + ndx);
+    }
 }
+// s = 0, n = 0, straddle = 1, nothing more
+// s = 1, n = 1, p2 = 2, e = 0, straddle = 2, ns = 1, copy(0)
+// s = 2, n = 1, p2 = 2, e = 1, e2 = 2, straddle = 2, ns = 1, us = 1, sh = 2
+// 6
+// 3    8
+// 1  5 7 9
+// 02 4
+// Example: s = 10, logP = 3, straddle = 8, fs = 7, e = 3, e2 = 6
+// Iteration: ns = 4, us = 3, sh = 6.
+    // not(sh < e2)
+    // copy(6)
+    // straddle = 4
+    // ns = 2, us = 1, sh = 4
+    // sh < e2
+        // i = 3, ps = 8, add = 0.  Copy(3), add = 8, exit
+        // ha = 4, sh = 8
+    // copy(8)
+    // straddle = 2
+    // ns = 1, us = 0, sh = 3
+    // sh < e2
+        // i = 1, ps = 4, add = 0
+        // copy(1), add = 4, copy(5), add = 8, exit
+        // ha = 4, sh = 7
+    // copy(7), copy(9)
 
 template<typename Container>
 inline auto reserveIfAvailable(Container &c, std::size_t s) ->
@@ -93,19 +104,40 @@ Sorted sortedToCacheFriendlySearch(const Sorted &s) {
     return rv;
 }
 
+
 }
 
 #endif
 
 #include <ostream>
 
-template<typename T, typename...>
-using Valid = T;
+#include <type_traits>
+
+namespace zoo {
+
+template<typename...>
+using void_t = void;
+
+template<typename T, typename = void>
+struct is_container_impl: std::false_type {};
+template<typename T>
+struct is_container_impl<
+    T,
+    void_t<
+        decltype(std::declval<T>().cbegin()),
+        decltype(std::declval<T>().cend())
+    >
+>: std::true_type {};
+
+template<typename T>
+constexpr auto is_container_v = is_container_impl<T>::value;
+
+}
 
 namespace std {
 template<typename C>
 auto operator<<(std::ostream &out, const C &a)
--> Valid<std::ostream &, decltype(a.cbegin()), decltype(a.cend())>
+-> std::enable_if_t<zoo::is_container_v<C>, std::ostream &>
 {
     out << '(';
     auto current{cbegin(a)}, sentry{cend(a)};
@@ -118,31 +150,30 @@ auto operator<<(std::ostream &out, const C &a)
     }
     return out << ')';
 }
+}
 
+template<typename C>
+auto operator==(const C &l, const C &r)
+-> std::enable_if_t<zoo::is_container_v<C>, bool>
+{
+    for(
+        auto
+            lb{cbegin(l)}, rb{cbegin(r)},
+            le{cend(l)}, re{cend(r)};
+        ;
+        ++lb, ++rb
+    ) {
+        if(lb == le) { return rb == re; } // termination at the same time
+        if(rb == re) { return false; } // r has fewer elements
+        if(not(*lb == *rb)) { return false; }
+    }
+    return true;
 }
 
 #include <catch.hpp>
 
 #include <iostream>
+#include <vector>
 
-TEST_CASE("Conversion", "[array]") {
-    auto stcf = [](const auto &c) {
-        return zoo::sortedToCacheFriendlySearch(c);
-    };
-    auto empty = std::array<int, 0>{};
-    REQUIRE(stcf(empty) == empty);
-    auto single = std::array<int, 1>{0};
-    REQUIRE(stcf(single) == single);
-    auto bi = std::array<int, 2>{0, 1};
-    std::cout << bi << std::endl;
-    REQUIRE(stcf(bi) == bi);
-    REQUIRE(stcf(std::array<int, 3>{0, 1, 2}) == std::array<int, 3>{1, 0, 2});
-    REQUIRE(
-        stcf(std::array<int, 6>{0, 1, 2, 3, 4, 5}) ==
-        std::array<int, 6>{1, 0, 2, 4, 3, 5}
-    );
-    REQUIRE(
-        stcf(std::array<int, 8>{0, 1, 2, 3, 4, 5, 6, 7}) ==
-        std::array<int, 8>{8, 1, 5, 0, 2, 4, 6, 7}
-    );
+TEST_CASE("CacheFriendlySearch", "[array]") {
 }
