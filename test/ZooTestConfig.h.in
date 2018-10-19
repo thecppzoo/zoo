@@ -1,0 +1,2 @@
+#define ZooTest_VERSION_MAJOR @ZooTest_VERSION_MAJOR@
+#define ZooTest_VERSION_MINOR @ZooTest_VERSION_MINOR@

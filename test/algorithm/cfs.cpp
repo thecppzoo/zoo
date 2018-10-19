@@ -63,7 +63,7 @@ auto operator==(const C1 &l, const C2 &r)
     return true;
 }
 
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 #include <vector>
 #include <utility>
