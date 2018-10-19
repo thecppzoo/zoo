@@ -23,11 +23,11 @@ constexpr unsigned long long log2Ceiling(unsigned long long arg) {
 }
 
 template<typename Output, typename Input>
-void transform(Output &output, Input base, Input end) {
+void transform(Output output, Input base, Input end) {
     auto s = end - base;
     if(2 == s) {
         while(s--) {
-            *output = *--end;
+            *output++ = *--end;
         }
         return;
     }
@@ -37,10 +37,10 @@ void transform(Output &output, Input base, Input end) {
     // Full tree has (2^n) - 1 elements
     auto excess = s - fullSubtreeSize;
     auto twiceExcess = excess << 1;
-    for(auto straddle = power2; 1 < straddle; )
+    for(auto straddle = power2; 1 < straddle; ) {
         auto nextStraddle = straddle >> 1;
         auto unshifted = nextStraddle - 1;
-        auto shifted = unshifted + 3;
+        auto shifted = unshifted + excess;
         if(shifted < twiceExcess) { // below the "cut"
             auto i = straddle - 1;
             auto prevStraddle = straddle << 1;
@@ -54,13 +54,13 @@ void transform(Output &output, Input base, Input end) {
         }
         while(shifted < s) {
             *output++ = *(base + shifted);
-            shifted += nextStraddle;
+            shifted += straddle;
         }
         straddle = nextStraddle;
     }
 
     // now just write the excess leaves
-    for(auto ndx = 0, top = 2*excess; ndx < top; ndx += 2) {
+    for(auto ndx = 0ul, top = 2*excess; ndx < top; ndx += 2) {
         *output++ = *(base + ndx);
     }
 }
@@ -152,17 +152,17 @@ auto operator<<(std::ostream &out, const C &a)
 }
 }
 
-template<typename C>
-auto operator==(const C &l, const C &r)
--> std::enable_if_t<zoo::is_container_v<C>, bool>
+template<typename C1, typename C2>
+auto operator==(const C1 &l, const C2 &r)
+-> std::enable_if_t<
+    zoo::is_container_v<C1> and
+        zoo::is_container_v<C2>,
+    bool
+>
 {
-    for(
-        auto
-            lb{cbegin(l)}, rb{cbegin(r)},
-            le{cend(l)}, re{cend(r)};
-        ;
-        ++lb, ++rb
-    ) {
+    auto lb{cbegin(l)}, le{cend(l)};
+    auto rb{cbegin(r)}, re{cend(r)};
+    for(;;++lb, ++rb){
         if(lb == le) { return rb == re; } // termination at the same time
         if(rb == re) { return false; } // r has fewer elements
         if(not(*lb == *rb)) { return false; }
@@ -176,4 +176,35 @@ auto operator==(const C &l, const C &r)
 #include <vector>
 
 TEST_CASE("CacheFriendlySearch", "[array]") {
+    SECTION("Empty") {
+        std::vector<int> empty, output;
+        zoo::transform(back_inserter(output), cbegin(empty), cend(empty));
+        REQUIRE(empty == output);
+    }
+    SECTION("Single element") {
+        std::array input{77};
+        std::vector<int> output;
+        zoo::transform(back_inserter(output), cbegin(input), cend(input));
+        REQUIRE(input == output);
+    }
+    SECTION("Two elements") {
+        const std::array input{77, 88}, expected{88, 77};
+        std::vector<int> output;
+        zoo::transform(back_inserter(output), cbegin(input), cend(input));
+        REQUIRE(expected == output);
+    }
+    SECTION("Three elements") {
+        const std::array input{77, 88, 99}, expected{88, 77, 99};
+        std::vector<int> output;
+        zoo::transform(back_inserter(output), cbegin(input), cend(input));
+        REQUIRE(expected == output);
+    }
+    SECTION("Ten elements") {
+        const std::array
+            input{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            expected{6, 3, 8, 1, 5, 7, 9, 0, 2, 4};
+        std::vector<int> output;
+        zoo::transform(back_inserter(output), cbegin(input), cend(input));
+        REQUIRE(expected == output);
+    }    
 }
