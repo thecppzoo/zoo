@@ -1,30 +1,6 @@
+#include <zoo/algorithm/cfs.h>
+
 #include <array>
-
-template<typename T, std::size_t S>
-T *back_inserter(std::array<T, S> &a) {
-    return a.data();
-}
-
-#include "cfs.h"
-
-namespace zoo {
-
-template<typename Container>
-inline auto reserveIfAvailable(Container &c, unsigned long long s) ->
-decltype(c.reserve(s), (void)0) {
-    c.reserve(s);
-}
-inline void reserveIfAvailable(...) {}
-
-template<typename Sorted>
-Sorted sortedToCacheFriendlySearch(const Sorted &s) {
-    Sorted rv;
-    reserveIfAvailable(rv, s.size());
-    sortedToCacheFriendlySearch(back_inserter(rv), 0, s);
-    return rv;
-}
-
-}
 
 #include <type_traits>
 
