@@ -12,7 +12,7 @@ constexpr unsigned long long log2Ceiling(unsigned long long arg) {
 }
 
 template<typename Output, typename Input>
-void transform(Output output, Input base, Input end) {
+void transformToCFS(Output output, Input base, Input end) {
     auto s = end - base;
     auto logP = log2Floor(s + 1); // n
     auto power2 = 1ul << logP;
@@ -48,21 +48,47 @@ void transform(Output output, Input base, Input end) {
     }
 }
 
-template<typename Container>
-inline auto reserveIfAvailable(Container &c, std::size_t s) ->
-decltype(c.reserve(s), (void)0) {
-    c.reserve(s);
+template<typename Base, typename E>
+// returns iterator to fst. element greater equal to e or end
+Base cfsLowerBound(Base base, Base end, const E &e) {
+    auto size = end - base;
+    if(0 == size) { return base; }
+    auto ndx = 0;
+    auto successorOfLeaf = [&]() {
+        while(not(ndx & 1)) {
+            if(0 == ndx) { return end; }
+            // in a higher branch, return successor of parent
+            ndx = (ndx >> 1) - 1;
+        }
+        // 0 < ndx => ndx has parent, ndx is in a lower branch
+        return base + (ndx >> 1);
+    };
+    auto predecessorOfLeaf = [&]() {
+        auto original = ndx;
+        for(;;) {
+            if(0 == ndx) { return base + original; }
+            if(not(ndx & 1)) { break; } // ndx is in a high-branch
+            ndx = (ndx >> 1);
+        }
+        // Not in the root, on a higher branch
+        return base + (ndx >> 1) - 1; 
+    };
+    for(;;) {
+        auto displaced = base + ndx;
+        auto &cmp = *displaced;
+        if(e < cmp) {
+            auto next = 2*ndx + 1;
+            if(size <= next) { return base + ndx; }
+            ndx = next;
+        }
+        else if(cmp < e) {
+            auto next = 2*ndx + 2;
+            if(size <= next) { return successorOfLeaf(); }
+            ndx = next;
+        }
+        else { return displaced; }
+    }
 }
-inline void reserveIfAvailable(...) {}
-
-template<typename Sorted>
-Sorted sortedToCacheFriendlySearch(const Sorted &s) {
-    Sorted rv;
-    reserveIfAvailable(rv, s.size());
-    sortedToCacheFriendlySearch(back_inserter(rv), 0, s);
-    return rv;
-}
-
 
 }
 
