@@ -174,6 +174,18 @@ auto operator==(const C1 &l, const C2 &r)
 
 #include <iostream>
 #include <vector>
+#include <utility>
+
+template<int... Pack>
+auto indices_to_array(std::integer_sequence<int, Pack...>)
+{
+    return std::array{Pack...};
+}
+
+template<int Size>
+std::array<int, Size> make_integer_array() {
+    return indices_to_array(std::make_integer_sequence<int, Size>{});
+}
 
 TEST_CASE("CacheFriendlySearch", "[array]") {
     SECTION("Empty") {
@@ -199,12 +211,33 @@ TEST_CASE("CacheFriendlySearch", "[array]") {
         zoo::transform(back_inserter(output), cbegin(input), cend(input));
         REQUIRE(expected == output);
     }
-    SECTION("Ten elements") {
+    SECTION("Ten elements (excess of 3)") {
         const std::array
             input{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
             expected{6, 3, 8, 1, 5, 7, 9, 0, 2, 4};
         std::vector<int> output;
         zoo::transform(back_inserter(output), cbegin(input), cend(input));
         REQUIRE(expected == output);
-    }    
+    }
+    SECTION("Exactly power of 2") {
+        const std::array
+            input = make_integer_array<8>(),
+            expected{4, 2, 6, 1, 3, 5, 7, 0};
+        std::vector<int> output;
+        zoo::transform(back_inserter(output), cbegin(input), cend(input));
+        REQUIRE(expected == output);
+    }
+    SECTION("Deficit of 3 (12 elements)") {
+        const std::array
+            input = make_integer_array<12>(),
+            expected{7, 3, 10, 1, 5, 9, 11, 0, 2, 4, 6, 8};
+            /*  7
+                3     10
+                1  5  9  11
+                02 46 8 */
+        std::vector<int> output;
+        zoo::transform(back_inserter(output), cbegin(input), cend(input));
+        REQUIRE(expected == output);
+        std::cout << output << std::endl;
+    } 
 }
