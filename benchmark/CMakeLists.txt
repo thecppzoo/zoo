@@ -13,6 +13,6 @@ link_directories(
     /Users/ed/git/benchmarkbuild/src
 )
 
-add_executable(zooBenchmark cfs.cpp)
+add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp)
 
 target_link_libraries(zooBenchmark benchmark)
