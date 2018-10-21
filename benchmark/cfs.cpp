@@ -62,37 +62,64 @@ void justVisitElement(benchmark::State &s) {
     }
 }
 
-void searchSTL(benchmark::State &s) {
+template<typename F>
+void search(benchmark::State &s) {
     auto n = s.range(0);
-    auto space = makeRandomVector(n);
+    auto space = F::makeSpace(n);
     auto b{cbegin(space)}, e{cend(space)};
     constexpr auto mask = (1 << 20) - 1;
     auto keys = makeRandomVector(mask + 1);
-    auto k = 0;
-    auto founds = 0, searched = 0;
+    auto kNdx = 0;
+    auto found = 0, searched = 0;
     for(auto _: s) {
-        auto r = std::lower_bound(b, e, keys[k++]);
-        k &= mask;
+        auto k = keys[kNdx++];
+        auto r = F::search(b, e, k);
+        if(e != r && k == *r) { ++found; }
+        ++searched;
+        kNdx &= mask;
         benchmark::DoNotOptimize(r);
+
     }
+    s.counters["found"] = found;
+    s.counters["searched"] = searched;
 }
 
-void searchCFS(benchmark::State &s) {
-    auto n = s.range(0);
-    auto raw = makeRandomVector(n);
-    std::vector<int> space;
-    space.reserve(n);
-    zoo::transformToCFS(back_inserter(space), raw.begin(), raw.end());
-    auto b{cbegin(space)}, e{cend(space)};
-    constexpr auto mask = (1 << 20) - 1;
-    auto keys = makeRandomVector(mask + 1);
-    auto k = 0;
-    auto founds = 0, searched = 0;
-    for(auto _: s) {
-        auto r = zoo::cfsLowerBound(b, e, keys[k++]);
-        k &= mask;
-        benchmark::DoNotOptimize(r);
+struct UseSTL {
+    static auto makeSpace(int q) {
+        auto rv = makeRandomVector(q);
+        std::sort(begin(rv), end(rv));
+        return rv;
+    };
+
+    template<typename I, typename E>
+    static auto search(I b, I e, const E &v) {
+        return std::lower_bound(b, e, v);
     }
+};
+
+struct UseCFS {
+    static auto makeSpace(int q) {
+        auto raw = makeRandomVector(q);
+        auto b{begin(raw)}, e{end(raw)};
+        std::sort(b, e);
+        std::vector<int> rv;
+        rv.reserve(q);
+        zoo::transformToCFS(back_inserter(rv), b, e);
+        return rv;
+    };
+
+    template<typename I, typename E>
+    static auto search(I b, I e, const E &v) {
+        return zoo::cfsLowerBound(b, e, v);
+    }
+};
+
+void searchCFS(benchmark::State &s) {
+    search<UseCFS>(s);
+}
+
+void searchSTL(benchmark::State &s) {
+    search<UseSTL>(s);
 }
 
 BENCHMARK(justARandomKey)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
