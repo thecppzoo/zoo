@@ -1,6 +1,7 @@
 #include <zoo/algorithm/cfs.h>
 
 #include <array>
+#include <vector>
 
 #include <type_traits>
 
@@ -27,11 +28,27 @@ constexpr auto is_container_v = is_container_impl<T>::value;
 
 #include <ostream>
 
+namespace zoo {
+template<typename T, typename = void>
+struct is_insertable_impl: std::false_type {};
+template<typename T>
+struct is_insertable_impl<
+    T,
+    void_t<decltype(std::declval<std::ostream &>() << std::declval<T>())>
+>: std::true_type {};
+
+template<typename T>
+constexpr auto is_insertable_v = is_insertable_impl<T>::value;
+}
+
+static_assert(not(zoo::is_insertable_v<std::vector<int>>));
+
 namespace std {
 template<typename C>
 auto operator<<(std::ostream &out, const C &a)
--> std::enable_if_t<zoo::is_container_v<C>, std::ostream &>
-{
+-> std::enable_if_t<
+    not(zoo::is_insertable_v<C>) && zoo::is_container_v<C>, std::ostream &
+> {
     out << '(';
     auto current{cbegin(a)}, sentry{cend(a)};
     if(current != sentry) {
@@ -44,6 +61,8 @@ auto operator<<(std::ostream &out, const C &a)
     return out << ')';
 }
 }
+
+static_assert(zoo::is_container_v<std::vector<int>>);
 
 template<typename C1, typename C2>
 auto operator==(const C1 &l, const C2 &r)
@@ -134,6 +153,47 @@ TEST_CASE("Cache friendly search conversion", "[cfs][conversion]") {
     } 
 }
 
+TEST_CASE("Cache friendly search validation", "[cfs][search][validator]") {
+    SECTION("Validation of empty cfs") {
+        std::array<int, 0> empty;
+        REQUIRE(zoo::validHeap(empty));
+    }
+    SECTION("Validation of single element") {
+        std::array singleElement{1};
+        REQUIRE(zoo::validHeap(singleElement));
+    }
+    SECTION("run of equal elements") {
+        std::array runOfEqual{0, 1, 1, 1, 1, 2};
+        std::vector<int> cfs;
+        zoo::transformToCFS(
+            back_inserter(cfs), runOfEqual.begin(), runOfEqual.end()
+        );
+        REQUIRE(zoo::validHeap(cfs));
+    }
+    SECTION("General validation") {
+        std::array lookup{14, 6, 20, 2, 10, 18, 22, 0, 4, 8, 12, 16};
+        REQUIRE(zoo::validHeap(lookup));
+    }
+    SECTION("Invalid lower tree") {
+        std::array invalid20{14, 6, 18, 2, 10, 20, 22, 0, 4, 8, 12, 16};
+            /*  14
+                6         18
+                2   10    20# 22
+                0 4 8  12 16 */
+
+        REQUIRE(not(zoo::validHeap(invalid20)));
+    }
+    SECTION("Invalid higher tree") {
+        std::array invalid10{14, 6, 20, 2, 12, 18, 22, 0, 4, 8, 10, 16};
+            /*  14
+                6          20
+                2   12     18 22
+                0 4 8  10# 16 */
+
+        REQUIRE(not(zoo::validHeap(invalid10)));
+    }
+}
+
 TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
     SECTION("Empty search") {
         std::array<int, 0> empty;
@@ -177,5 +237,28 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
         SECTION("Search for element higher than low-branch leaf (16)") {
             REQUIRE(18 == *zoo::cfsLowerBound(b, e, 17));
         }
+    }
+    SECTION("CFS with repetitions") {
+        std::array hasRepetitions{1, 4, 4, 6, 6, 6, 8};
+                                /*0  1  2  3  4  5  6
+                                  3
+                                  1  5
+                                  02 46
+                                  6, 4, 6, 1, 4, 6, 8
+                              */
+        std::vector<int> cfs;
+        zoo::transformToCFS(
+            back_inserter(cfs), hasRepetitions.begin(), hasRepetitions.end()
+        );
+        REQUIRE(std::array{6, 4, 6, 1, 4, 6, 8} == cfs);
+        auto b{cbegin(cfs)}, e{cend(cfs)};
+        REQUIRE(1 == *zoo::cfsLowerBound(b, e, 1));
+        REQUIRE(4 == *zoo::cfsLowerBound(b, e, 4));
+        REQUIRE(6 == *zoo::cfsLowerBound(b, e, 6));
+        REQUIRE(1 == *zoo::cfsLowerBound(b, e, 0));
+        REQUIRE(4 == *zoo::cfsLowerBound(b, e, 3));
+        REQUIRE(6 == *zoo::cfsLowerBound(b, e, 5));
+        REQUIRE(8 == *zoo::cfsLowerBound(b, e, 7));
+        REQUIRE(zoo::cfsLowerBound(b, e, 9) == e);
     }
 }

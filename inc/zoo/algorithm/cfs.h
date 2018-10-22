@@ -90,6 +90,37 @@ Base cfsLowerBound(Base base, Base end, const E &e) {
     }
 }
 
+template<typename I>
+bool validHeap(I base, int current, int max) {
+    for(;;) {
+        auto higherSubtree = current*2 + 2;
+        if(max <= higherSubtree) {
+            if(max < higherSubtree) { return true; } // current is a leaf
+            // max == higherSubtree, there is only the lower subtree
+            auto subLeaf = higherSubtree - 1;
+            return *(base + subLeaf) <= *(base + current);
+        }
+        // there are both branches
+        auto &element = *(base + current);
+        auto lowerSubtree = higherSubtree - 1;
+        if(element < *(base + lowerSubtree)) { return false; }
+        if(!validHeap(base, lowerSubtree, max)) { return false; }
+        if(*(base + higherSubtree) < element) { return false; }
+        current = higherSubtree;
+    }
+}
+
+template<typename I>
+bool validHeap(I begin, I end) {
+    return validHeap(begin, 0, end - begin);
+}
+
+template<typename R>
+bool validHeap(const R &range) {
+    //std::cout << range << std::endl;
+    return validHeap(range.begin(), range.end());
+}
+
 }
 
 #endif
