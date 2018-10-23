@@ -1,91 +1,16 @@
 #include <zoo/algorithm/cfs.h>
 
-#include <array>
+#include <zoo/util/container_insertion.h>
+
 #include <vector>
-
-#include <type_traits>
-
-namespace zoo {
-
-template<typename...>
-using void_t = void;
-
-template<typename T, typename = void>
-struct is_container_impl: std::false_type {};
-template<typename T>
-struct is_container_impl<
-    T,
-    void_t<
-        decltype(std::declval<T>().cbegin()),
-        decltype(std::declval<T>().cend())
-    >
->: std::true_type {};
-
-template<typename T>
-constexpr auto is_container_v = is_container_impl<T>::value;
-
-}
-
-#include <ostream>
-
-namespace zoo {
-template<typename T, typename = void>
-struct is_insertable_impl: std::false_type {};
-template<typename T>
-struct is_insertable_impl<
-    T,
-    void_t<decltype(std::declval<std::ostream &>() << std::declval<T>())>
->: std::true_type {};
-
-template<typename T>
-constexpr auto is_insertable_v = is_insertable_impl<T>::value;
-}
-
-static_assert(not(zoo::is_insertable_v<std::vector<int>>));
-
-namespace std {
-template<typename C>
-auto operator<<(std::ostream &out, const C &a)
--> std::enable_if_t<
-    not(zoo::is_insertable_v<C>) && zoo::is_container_v<C>, std::ostream &
-> {
-    out << '(';
-    auto current{cbegin(a)}, sentry{cend(a)};
-    if(current != sentry) {
-        for(;;) {
-            out << *current++;
-            if(sentry == current) { break; }
-            out << ", ";
-        }
-    }
-    return out << ')';
-}
-}
-
 static_assert(zoo::is_container_v<std::vector<int>>);
+#include <array>
+#include <zoo/util/range_equivalence.h>
 
-template<typename C1, typename C2>
-auto operator==(const C1 &l, const C2 &r)
--> std::enable_if_t<
-    zoo::is_container_v<C1> and
-        zoo::is_container_v<C2>,
-    bool
->
-{
-    auto lb{cbegin(l)}, le{cend(l)};
-    auto rb{cbegin(r)}, re{cend(r)};
-    for(;;++lb, ++rb){
-        if(lb == le) { return rb == re; } // termination at the same time
-        if(rb == re) { return false; } // r has fewer elements
-        if(not(*lb == *rb)) { return false; }
-    }
-    return true;
-}
+using zoo::operator==;
 
 #include <catch2/catch.hpp>
 
-#include <vector>
-#include <utility>
 
 template<int... Pack>
 auto indices_to_array(std::integer_sequence<int, Pack...>)
