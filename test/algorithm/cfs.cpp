@@ -238,6 +238,77 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
             REQUIRE(18 == *zoo::cfsLowerBound(b, e, 17));
         }
     }
+    SECTION("Upper bound") {
+        std::array lookup{14, 6, 20, 2, 10, 18, 22, 0, 4, 8, 12, 16};
+            /*  14
+                6         20
+                2   10    18 22
+                0 4 8  12 16 */
+        auto b{cbegin(lookup)}, e{cend(lookup)};
+        SECTION("Successor of root") {
+            REQUIRE(16 == *zoo::cfsHigherBound(b, e, 14));
+        }
+        SECTION("Epsilon after root") {
+            REQUIRE(16 == *zoo::cfsHigherBound(b, e, 15));
+        }
+        SECTION("Last element") {
+            REQUIRE(zoo::cfsHigherBound(b, e, 22) == e);
+        }
+        SECTION("Successor of high leaf") {
+            REQUIRE(14 == *zoo::cfsHigherBound(b, e, 12));
+        }
+        SECTION("Successor of epsilon after high leaf") {
+            REQUIRE(14 == *zoo::cfsHigherBound(b, e, 13));
+        }
+        SECTION("Successor of low leaf") {
+            REQUIRE(10 == *zoo::cfsHigherBound(b, e, 8));
+        }
+        SECTION("Successor of parent of high leaf") {
+            REQUIRE(12 == *zoo::cfsHigherBound(b, e, 10));
+        }
+        SECTION("Successor of past the end") {
+            REQUIRE(zoo::cfsHigherBound(b, e, 25) == e);
+        }
+    }
+}
+
+struct Equivalence {
+    int number;
+    char occurrence;
+    bool operator<(Equivalence o) const { return number < o.number; }
+};
+
+bool eq(Equivalence l, Equivalence r) {
+    return l.number == r.number && l.occurrence == r.occurrence;
+}
+
+TEST_CASE(
+    "Cache friendly search lookup with repetitions",
+    "[cfs][search][range][equalRange]"
+) {
+    SECTION("CFS equal ranges") {
+        std::array<Equivalence, 9> raw
+        {{
+            {1, 'a'},
+            // 0
+            {4, 'a'}, {4, 'b'}, {4, 'c'}, {4, 'd'},
+            // 1       2         3         4
+            {6, 'a'},
+            // 5
+            {8, 'a'}, {8, 'b'}, {8, 'c'},
+            // 6       7         8
+        }};
+        std::vector<Equivalence> cfs;
+        zoo::transformToCFS(back_inserter(cfs), cbegin(raw), cend(raw));
+        REQUIRE(zoo::validHeap(cfs));
+        auto b{cfs.begin()}, e{cfs.end()};
+        auto fours = zoo::cfsEqualRange(b, e, Equivalence{4, 'x'});
+        REQUIRE(eq(*fours.first, raw[1]));
+        REQUIRE(eq(*fours.second, raw[5]));
+        auto eights = zoo::cfsEqualRange(b, e, Equivalence{8, 'x'});
+        REQUIRE(eq(*eights.first, raw[6]));
+        REQUIRE(eights.second == e);
+    }
     SECTION("CFS with repetitions") {
         std::array hasRepetitions{1, 4, 4, 6, 8, 8, 10};
                                 /*0  1  2  3  4  5  6
@@ -252,8 +323,8 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
         );
         REQUIRE(std::array{6, 4, 8, 1, 4, 8, 10} == cfs);
                         /* 6
-                           4  8
-                           14 8 10*/
+                           4   8
+                           1 4 8 10*/
         auto b{cbegin(cfs)}, e{cend(cfs)};
         REQUIRE(1 == *zoo::cfsLowerBound(b, e, 1));
         auto rootOfSubtreeIndex1{zoo::cfsLowerBound(b, e, 4)};
@@ -268,7 +339,9 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
         REQUIRE(zoo::cfsLowerBound(b, e, 7) == lowLeafIndex5);
         REQUIRE(zoo::cfsLowerBound(b, e, 11) == e);
 
-        REQUIRE((b + 1) == zoo::cfsSearch(b, e, 4));
-        REQUIRE((b + 2) == zoo::cfsSearch(b, e, 8));
+        SECTION("Early return") {
+            REQUIRE((b + 1) == zoo::cfsSearch(b, e, 4));
+            REQUIRE((b + 2) == zoo::cfsSearch(b, e, 8));
+        }
     }
 }

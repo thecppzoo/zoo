@@ -3,13 +3,14 @@
 
 #ifndef SIMPLIFY_INCLUDES
 #include <utility>
+#include <type_traits>
 #endif
 
 namespace zoo {
 
 template<typename Iterator>
 struct LessForIterated {
-    using type = decltype(*std::declval<Iterator>());
+    using type = std::decay_t<decltype(*std::declval<Iterator>())>;
     bool operator()(const type &left, const type &right) {
         return left < right;
     }
@@ -107,7 +108,7 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
                     return base + current;
                 }
                 current = next;
-            } while(e < *(base + current));
+            } while(c(e, *(base + current)));
             // because we are in the higher subtree of i,
             // base[i] == e <= base[current]
             // we just checked not(e < base[current]) therefore
@@ -194,6 +195,24 @@ Base cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<true, false>(b, e, v, c).first;
 }
 
+template<
+    typename Base,
+    typename E, 
+    typename Comparator = LessForIterated<Base>
+>
+Base cfsHigherBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+    return detail::cfsBounds<false, true>(b, e, v, c).second;
+}
+
+template<
+    typename Base,
+    typename E, 
+    typename Comparator = LessForIterated<Base>
+>
+auto cfsEqualRange(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+    return detail::cfsBounds<true, true>(b, e, v, c);
+}
+
 template<typename I>
 bool validHeap(I base, int current, int max) {
     for(;;) {
@@ -202,7 +221,7 @@ bool validHeap(I base, int current, int max) {
             if(max < higherSubtree) { return true; } // current is a leaf
             // max == higherSubtree, there is only the lower subtree
             auto subLeaf = higherSubtree - 1;
-            return *(base + subLeaf) <= *(base + current);
+            return not(*(base + current) < *(base + subLeaf));
         }
         // there are both branches
         auto &element = *(base + current);
