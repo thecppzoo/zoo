@@ -60,60 +60,120 @@ void transformToCFS(Output output, Input base, Input end) {
     }
 }
 
-template<bool Early, typename Base, typename E, typename Comparator>
+namespace detail {
+
+template<bool DoLower, bool DoUpper, typename Base, typename E, typename Comparator>
 // returns iterator to fst. element greater equal to e or end
-Base cfsLowerBound_impl(Base base, Base end, const E &e, Comparator c) {
+auto cfsBounds(Base base, Base end, const E &e, Comparator c)
+-> std::pair<Base, Base>
+{
     auto size = end - base;
-    if(0 == size) { return base; }
+    if(0 == size) { return {base, end}; }
     auto ndx = 0;
-    auto successorOfLeaf = [&]() {
-        while(not(ndx & 1)) {
-            if(0 == ndx) { return end; }
+    auto equivalent = [&](long i) {
+        auto &contained = *(base + i);
+        return not(c(e, contained) || c(contained, e));
+
+    };
+    auto successorOfLeaf = [&](long i) {
+        while(not(i & 1)) { // i is in a higher branch
+            if(0 == i) { return end; }
             // in a higher branch, return successor of parent
-            ndx = (ndx >> 1) - 1;
+            i = (i >> 1) - 1;
         }
-        // 0 < ndx => ndx has parent, ndx is in a lower branch
-        return base + (ndx >> 1);
+        // 0 < i => i has parent, i is in a lower branch
+        return base + (i >> 1);
+    };
+    // called when base[i] is the first seen occurrence of e
+    auto upperBoundOfEquivalentRange = [&](long i) {
+        for(;;) {
+            auto higherSubtree = (i << 1) + 2;
+            if(size <= higherSubtree) {
+                // base[i] == e, i does not have a higher subtree
+                return successorOfLeaf(i);
+            }
+            if(equivalent(higherSubtree)) {
+                i = higherSubtree;
+                continue;
+            }
+            auto current = higherSubtree;
+            do { // e == base[i] < base[current]
+                // the result is past i up to current
+                // dive into the lower subtree of current
+                auto next = (current << 1) + 1;
+                if(size <= next) {
+                    // current is the lower-leaf in the higher
+                    // subtree of i, thus current is the successor
+                    return base + current;
+                }
+                current = next;
+            } while(e < *(base + current));
+            // because we are in the higher subtree of i,
+            // base[i] == e <= base[current]
+            // we just checked not(e < base[current]) therefore
+            // e == base[current]
+            i = current;
+        }
     };
     for(;;) {
         auto displaced = base + ndx;
         auto &cmp = *displaced;
+
         if(c(e, cmp)) {
             auto next = 2*ndx + 1;
-            if(size <= next) { return base + ndx; }
+            if(size <= next) {
+                // no lower branch, not found
+                return {base + ndx, base + ndx};
+            }
             ndx = next;
             continue;
         }
         else if(c(cmp, e)) {
             auto next = 2*ndx + 2;
-            if(size <= next) { return successorOfLeaf(); }
+            if(size <= next) {
+                // no higher branch, not found
+                auto rv = successorOfLeaf(ndx);
+                return {rv, rv};
+            }
             ndx = next;
             continue;
         }
-        // cmp == e
-        if(Early) { return displaced; }
-        do {
+        // base[ndx] is the tallest in the tree occurrence of e
+        // if ndx is a low subtree, base[ndx] == e < base[parent(ndx)]
+        // if ndx is a high subtree, base[parent(ndx)] < e == base[ndx]
+        auto upper = DoUpper ?
+            upperBoundOfEquivalentRange(ndx):
+            base + ndx;
+        if(!DoLower) { return {base + ndx, upper}; }
+        for(;;) { // e == base[ndx]
             auto lowerSubtree = (ndx << 1) + 1;
             if(size <= lowerSubtree) {
-                // got to a leaf.
-                // the element at ndx is the minimum of either
-                // the whole structure, thus the result, or
-                // the minimum of a higher subtree with parent X
-                // however, if base[X] == e the search would have gone to
-                // the lower subtree of X and this code would not have been
-                // reached, thus base[X] < e.  The minimum of a higher subtree
-                // is the successor of the parent of the higher subtree
-                return base + ndx;
+                // there is no earlier appearance of e:
+                // let X be the tallest appearance of X
+                // if X is a high subtree, then parent(X) < e, thus
+                // e can't appear in the low subtree of parent(X).
+                // because ndx is in the low subtree of X, and it does
+                // not have predecessors within X (it is the lowest leaf of X)
+                // then it is the result
+                return {base + ndx, upper};
             }
+            while(*(base + lowerSubtree) < e) {
+                // the earliest occurrence of e is past lowerSubtree up to
+                // and including ndx
+                auto next = (lowerSubtree << 1) + 2;
+                if(size <= next) {
+                    // reached a node below e without higher branch =>
+                    // immediately precedes ndx, or that ndx is the
+                    // beginning of the equal range
+                    return {base + ndx, upper};
+                }
+            }
+            // e == base[lowerSubtree]
             ndx = lowerSubtree;
-        }  while(not(c(*(base + ndx), e) || c(e, *(base + ndx))));
-        // difference found!
-        // search in the lower subtree as if the element
-        // has not been found yet.  If e is in the lower
-        // subtree, the result will be there, if it is not, then
-        // the search will return the immediate successor, which
-        // is ndx, thus ndx would be the first occurrence of e
+        }
     }
+}
+
 }
 
 template<
@@ -122,7 +182,7 @@ template<
     typename Comparator = LessForIterated<Base>
 >
 Base cfsSearch(Base b, Base e, const E &v, Comparator c = Comparator{}) {
-    return cfsLowerBound_impl<true>(b, e, v, c);
+    return detail::cfsBounds<false, false>(b, e, v, c).first;
 }
 
 template<
@@ -131,7 +191,7 @@ template<
     typename Comparator = LessForIterated<Base>
 >
 Base cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
-    return cfsLowerBound_impl<false>(b, e, v, c);
+    return detail::cfsBounds<true, false>(b, e, v, c).first;
 }
 
 template<typename I>
