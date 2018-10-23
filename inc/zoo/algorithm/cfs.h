@@ -1,7 +1,19 @@
 #ifndef ZOO_CFS_CACHE_FRIENDLY_SEARCH
 #define ZOO_CFS_CACHE_FRIENDLY_SEARCH
 
+#ifndef SIMPLIFY_INCLUDES
+#include <utility>
+#endif
+
 namespace zoo {
+
+template<typename Iterator>
+struct LessForIterated {
+    using type = decltype(*std::declval<Iterator>());
+    bool operator()(const type &left, const type &right) {
+        return left < right;
+    }
+};
 
 constexpr unsigned long long log2Floor(unsigned long long arg) {
     return 63 - __builtin_clzll(arg);
@@ -48,9 +60,9 @@ void transformToCFS(Output output, Input base, Input end) {
     }
 }
 
-template<typename Base, typename E>
+template<bool Early, typename Base, typename E, typename Comparator>
 // returns iterator to fst. element greater equal to e or end
-Base cfsLowerBound(Base base, Base end, const E &e) {
+Base cfsLowerBound_impl(Base base, Base end, const E &e, Comparator c) {
     auto size = end - base;
     if(0 == size) { return base; }
     auto ndx = 0;
@@ -63,31 +75,63 @@ Base cfsLowerBound(Base base, Base end, const E &e) {
         // 0 < ndx => ndx has parent, ndx is in a lower branch
         return base + (ndx >> 1);
     };
-    auto predecessorOfLeaf = [&]() {
-        auto original = ndx;
-        for(;;) {
-            if(0 == ndx) { return base + original; }
-            if(not(ndx & 1)) { break; } // ndx is in a high-branch
-            ndx = (ndx >> 1);
-        }
-        // Not in the root, on a higher branch
-        return base + (ndx >> 1) - 1; 
-    };
     for(;;) {
         auto displaced = base + ndx;
         auto &cmp = *displaced;
-        if(e < cmp) {
+        if(c(e, cmp)) {
             auto next = 2*ndx + 1;
             if(size <= next) { return base + ndx; }
             ndx = next;
+            continue;
         }
-        else if(cmp < e) {
+        else if(c(cmp, e)) {
             auto next = 2*ndx + 2;
             if(size <= next) { return successorOfLeaf(); }
             ndx = next;
+            continue;
         }
-        else { return displaced; }
+        // cmp == e
+        if(Early) { return displaced; }
+        do {
+            auto lowerSubtree = (ndx << 1) + 1;
+            if(size <= lowerSubtree) {
+                // got to a leaf.
+                // the element at ndx is the minimum of either
+                // the whole structure, thus the result, or
+                // the minimum of a higher subtree with parent X
+                // however, if base[X] == e the search would have gone to
+                // the lower subtree of X and this code would not have been
+                // reached, thus base[X] < e.  The minimum of a higher subtree
+                // is the successor of the parent of the higher subtree
+                return base + ndx;
+            }
+            ndx = lowerSubtree;
+        }  while(not(c(*(base + ndx), e) || c(e, *(base + ndx))));
+        // difference found!
+        // search in the lower subtree as if the element
+        // has not been found yet.  If e is in the lower
+        // subtree, the result will be there, if it is not, then
+        // the search will return the immediate successor, which
+        // is ndx, thus ndx would be the first occurrence of e
     }
+}
+
+template<
+    typename Base,
+    typename E, 
+    typename Comparator = LessForIterated<Base>
+>
+Base cfsSearch(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+    return cfsLowerBound_impl<true>(b, e, v, c);
+}
+
+template<
+    typename Base,
+    typename E, 
+    typename Comparator = LessForIterated<Base>
+>
+Base cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+    return cfsLowerBound_impl<false>(b, e, v, c);
 }
 
 template<typename I>

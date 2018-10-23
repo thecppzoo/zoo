@@ -239,7 +239,7 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
         }
     }
     SECTION("CFS with repetitions") {
-        std::array hasRepetitions{1, 4, 4, 6, 6, 6, 8};
+        std::array hasRepetitions{1, 4, 4, 6, 8, 8, 10};
                                 /*0  1  2  3  4  5  6
                                   3
                                   1  5
@@ -250,15 +250,22 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
         zoo::transformToCFS(
             back_inserter(cfs), hasRepetitions.begin(), hasRepetitions.end()
         );
-        REQUIRE(std::array{6, 4, 6, 1, 4, 6, 8} == cfs);
+        REQUIRE(std::array{6, 4, 8, 1, 4, 8, 10} == cfs);
+                        /* 6
+                           4  8
+                           14 8 10*/
         auto b{cbegin(cfs)}, e{cend(cfs)};
         REQUIRE(1 == *zoo::cfsLowerBound(b, e, 1));
-        REQUIRE(4 == *zoo::cfsLowerBound(b, e, 4));
-        REQUIRE(6 == *zoo::cfsLowerBound(b, e, 6));
+        auto rootOfSubtreeIndex1{zoo::cfsLowerBound(b, e, 4)};
+        REQUIRE(4 == *rootOfSubtreeIndex1);
+        REQUIRE(&*rootOfSubtreeIndex1 == &*(b + 1));
+        auto lowLeafIndex5 = zoo::cfsLowerBound(b, e, 8);
+        REQUIRE(8 == *lowLeafIndex5);
+        REQUIRE(&*lowLeafIndex5 == &*(b + 5));
         REQUIRE(1 == *zoo::cfsLowerBound(b, e, 0));
-        REQUIRE(4 == *zoo::cfsLowerBound(b, e, 3));
+        REQUIRE(&*zoo::cfsLowerBound(b, e, 3) == &*(b + 1));
         REQUIRE(6 == *zoo::cfsLowerBound(b, e, 5));
-        REQUIRE(8 == *zoo::cfsLowerBound(b, e, 7));
-        REQUIRE(zoo::cfsLowerBound(b, e, 9) == e);
+        REQUIRE(zoo::cfsLowerBound(b, e, 7) == lowLeafIndex5);
+        REQUIRE(zoo::cfsLowerBound(b, e, 11) == e);
     }
 }
