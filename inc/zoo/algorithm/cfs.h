@@ -2,7 +2,9 @@
 #define ZOO_CFS_CACHE_FRIENDLY_SEARCH
 
 #ifndef SIMPLIFY_INCLUDES
+// because of std::declval needed to default comparator
 #include <utility>
+// because of std::decay needed to decay deferenced iterator
 #include <type_traits>
 #endif
 
@@ -63,7 +65,10 @@ void transformToCFS(Output output, Input base, Input end) {
 
 namespace detail {
 
-template<bool DoLower, bool DoUpper, typename Base, typename E, typename Comparator>
+template<
+    bool DoLower, bool DoUpper,
+    typename Base, typename E, typename Comparator
+>
 // returns iterator to fst. element greater equal to e or end
 auto cfsBounds(Base base, Base end, const E &e, Comparator c)
 -> std::pair<Base, Base>
@@ -86,8 +91,8 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
         return base + (i >> 1);
     };
     // called when base[i] is the first seen occurrence of e
-    auto upperBoundOfEquivalentRange = [&](long i) {
-        for(;;) {
+    auto upperBoundOfEquivalentRange = [&](int i) {
+        for(;;) { // invariant e == base[i]
             auto higherSubtree = (i << 1) + 2;
             if(size <= higherSubtree) {
                 // base[i] == e, i does not have a higher subtree
@@ -97,23 +102,55 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
                 i = higherSubtree;
                 continue;
             }
-            auto current = higherSubtree;
-            do { // e == base[i] < base[current]
-                // the result is past i up to current
-                // dive into the lower subtree of current
-                auto next = (current << 1) + 1;
+            auto higherThanE = higherSubtree;
+            do { // e == base[i] < base[higherThanE]
+                // the result is past i up to higherThanE
+                // dive into the lower subtree of higherThanE
+                auto next = (higherThanE << 1) + 1;
                 if(size <= next) {
-                    // current is the lower-leaf in the higher
-                    // subtree of i, thus current is the successor
-                    return base + current;
+                    // higherThanE is the lower-leaf in the higher
+                    // subtree of i, thus higherThanE is the successor
+                    return base + higherThanE;
                 }
-                current = next;
-            } while(c(e, *(base + current)));
+                higherThanE = next;
+            } while(c(e, *(base + higherThanE)));
             // because we are in the higher subtree of i,
-            // base[i] == e <= base[current]
-            // we just checked not(e < base[current]) therefore
-            // e == base[current]
-            i = current;
+            // base[i] == e <= base[higherThanE]
+            // we just checked not(e < base[higherThanE]) therefore
+            // e == base[higherThanE]
+            i = higherThanE;
+        }
+    };
+    // e == base[i], will progress diving into the lower subtree
+    // unless the lower subtree is less than e, where it will
+    // hunt for e into the higher subtree
+    auto lowerBoundOfEquivalentRange = [&](int i) {
+        for(;;) { // e == base[i]
+            auto lowerSubtree = (i << 1) + 1;
+            if(size <= lowerSubtree) {
+                // there is no earlier appearance of e:
+                // let X be the tallest appearance of e, or the first to
+                // be "hit" by the search algorithm.
+                // If X is a high subtree, then parent(X) < e, thus
+                // e can't appear in the low subtree of parent(X).
+                // because i is in the low subtree of X, and it does
+                // not have predecessors within X (it is the lowest leaf of X)
+                // then it is the result
+                return base + i;
+            }
+            while(*(base + lowerSubtree) < e) {
+                // the earliest occurrence of e is past lowerSubtree up to
+                // and including i
+                auto next = (lowerSubtree << 1) + 2;
+                if(size <= next) {
+                    // reached a node below e without higher branch =>
+                    // immediately precedes i, or that i is the
+                    // beginning of the equal range
+                    return base + i;
+                }
+            }
+            // e == base[lowerSubtree]
+            i = lowerSubtree;
         }
     };
     for(;;) {
@@ -146,32 +183,7 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
             upperBoundOfEquivalentRange(ndx):
             base + ndx;
         if(!DoLower) { return {base + ndx, upper}; }
-        for(;;) { // e == base[ndx]
-            auto lowerSubtree = (ndx << 1) + 1;
-            if(size <= lowerSubtree) {
-                // there is no earlier appearance of e:
-                // let X be the tallest appearance of X
-                // if X is a high subtree, then parent(X) < e, thus
-                // e can't appear in the low subtree of parent(X).
-                // because ndx is in the low subtree of X, and it does
-                // not have predecessors within X (it is the lowest leaf of X)
-                // then it is the result
-                return {base + ndx, upper};
-            }
-            while(*(base + lowerSubtree) < e) {
-                // the earliest occurrence of e is past lowerSubtree up to
-                // and including ndx
-                auto next = (lowerSubtree << 1) + 2;
-                if(size <= next) {
-                    // reached a node below e without higher branch =>
-                    // immediately precedes ndx, or that ndx is the
-                    // beginning of the equal range
-                    return {base + ndx, upper};
-                }
-            }
-            // e == base[lowerSubtree]
-            ndx = lowerSubtree;
-        }
+        return { lowerBoundOfEquivalentRange(ndx), upper };
     }
 }
 
