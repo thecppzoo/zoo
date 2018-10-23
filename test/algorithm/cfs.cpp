@@ -267,5 +267,8 @@ TEST_CASE("Cache friendly search lookup", "[cfs][search]") {
         REQUIRE(6 == *zoo::cfsLowerBound(b, e, 5));
         REQUIRE(zoo::cfsLowerBound(b, e, 7) == lowLeafIndex5);
         REQUIRE(zoo::cfsLowerBound(b, e, 11) == e);
+
+        REQUIRE((b + 1) == zoo::cfsSearch(b, e, 4));
+        REQUIRE((b + 2) == zoo::cfsSearch(b, e, 8));
     }
 }
