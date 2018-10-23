@@ -97,7 +97,7 @@ struct UseSTL {
     }
 };
 
-struct UseCFS {
+struct UseCFSLowerBound {
     static auto makeSpace(int q) {
         auto raw = makeRandomVector(q);
         auto b{begin(raw)}, e{end(raw)};
@@ -105,6 +105,9 @@ struct UseCFS {
         std::vector<int> rv;
         rv.reserve(q);
         zoo::transformToCFS(back_inserter(rv), b, e);
+        if(not(zoo::validHeap(rv))) {
+            throw;
+        }
         return rv;
     };
 
@@ -114,8 +117,19 @@ struct UseCFS {
     }
 };
 
-void searchCFS(benchmark::State &s) {
-    search<UseCFS>(s);
+struct UseCFSSearch: UseCFSLowerBound {
+    template<typename I, typename E>
+    static auto search(I b, I e, const E &v) {
+        return zoo::cfsSearch(b, e, v);
+    }
+};
+
+void searchCFSLate(benchmark::State &s) {
+    search<UseCFSLowerBound>(s);
+}
+
+void searchCFSEarly(benchmark::State &s) {
+    search<UseCFSSearch>(s);
 }
 
 void searchSTL(benchmark::State &s) {
@@ -125,7 +139,8 @@ void searchSTL(benchmark::State &s) {
 BENCHMARK(justARandomKey)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
 BENCHMARK(justVisitElement)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
 BENCHMARK(searchSTL)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
-BENCHMARK(searchCFS)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
+BENCHMARK(searchCFSLate)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
+BENCHMARK(searchCFSEarly)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
 BENCHMARK(genLinearVector)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
 BENCHMARK(randomVector)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
 BENCHMARK(sortRandomVector)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
