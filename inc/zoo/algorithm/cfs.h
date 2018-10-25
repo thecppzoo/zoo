@@ -141,8 +141,8 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
             while(*(base + lowerSubtree) < e) {
                 // the earliest occurrence of e is past lowerSubtree up to
                 // and including i
-                auto next = (lowerSubtree << 1) + 2;
-                if(size <= next) {
+                lowerSubtree = (lowerSubtree << 1) + 2;
+                if(size <= lowerSubtree) {
                     // reached a node below e without higher branch =>
                     // immediately precedes i, or that i is the
                     // beginning of the equal range
@@ -225,28 +225,35 @@ auto cfsEqualRange(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<true, true>(b, e, v, c);
 }
 
+struct ValidResult {
+    bool worked_;
+    long failureLocation;
+    operator bool() const { return worked_; }
+};
+
 template<typename I>
-bool validHeap(I base, int current, int max) {
+ValidResult validHeap(I base, int current, int max) {
     for(;;) {
         auto higherSubtree = current*2 + 2;
         if(max <= higherSubtree) {
-            if(max < higherSubtree) { return true; } // current is a leaf
+            if(max < higherSubtree) { return {true, 0} ; } // current is a leaf
             // max == higherSubtree, there is only the lower subtree
             auto subLeaf = higherSubtree - 1;
-            return not(*(base + current) < *(base + subLeaf));
+            return {not(*(base + current) < *(base + subLeaf)), subLeaf};
         }
         // there are both branches
         auto &element = *(base + current);
         auto lowerSubtree = higherSubtree - 1;
-        if(element < *(base + lowerSubtree)) { return false; }
-        if(!validHeap(base, lowerSubtree, max)) { return false; }
-        if(*(base + higherSubtree) < element) { return false; }
+        if(element < *(base + lowerSubtree)) { return {false, lowerSubtree}; }
+        auto recursionResult = validHeap(base, lowerSubtree, max);
+        if(!recursionResult) { return recursionResult; }
+        if(*(base + higherSubtree) < element) { return {false, higherSubtree}; }
         current = higherSubtree;
     }
 }
 
 template<typename I>
-bool validHeap(I begin, I end) {
+auto validHeap(I begin, I end) {
     return validHeap(begin, 0, end - begin);
 }
 

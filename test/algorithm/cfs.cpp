@@ -1,10 +1,8 @@
 #include <zoo/algorithm/cfs.h>
-
+#include <array>
+#include <vector>
 #include <zoo/util/container_insertion.h>
 
-#include <vector>
-static_assert(zoo::is_container_v<std::vector<int>>);
-#include <array>
 #include <zoo/util/range_equivalence.h>
 
 using zoo::operator==;
@@ -251,22 +249,51 @@ TEST_CASE(
                            4   8
                            1 4 8 10*/
         auto b{cbegin(cfs)}, e{cend(cfs)};
-        REQUIRE(1 == *zoo::cfsLowerBound(b, e, 1));
-        auto rootOfSubtreeIndex1{zoo::cfsLowerBound(b, e, 4)};
-        REQUIRE(4 == *rootOfSubtreeIndex1);
-        REQUIRE(&*rootOfSubtreeIndex1 == &*(b + 1));
-        auto lowLeafIndex5 = zoo::cfsLowerBound(b, e, 8);
-        REQUIRE(8 == *lowLeafIndex5);
-        REQUIRE(&*lowLeafIndex5 == &*(b + 5));
-        REQUIRE(1 == *zoo::cfsLowerBound(b, e, 0));
-        REQUIRE(&*zoo::cfsLowerBound(b, e, 3) == &*(b + 1));
-        REQUIRE(6 == *zoo::cfsLowerBound(b, e, 5));
-        REQUIRE(zoo::cfsLowerBound(b, e, 7) == lowLeafIndex5);
-        REQUIRE(zoo::cfsLowerBound(b, e, 11) == e);
-
+        SECTION("Finds the global minimum") {
+            REQUIRE(1 == *zoo::cfsLowerBound(b, e, 1));
+        }
+        SECTION("Finds position in root of lower branch") {
+            auto rootOfSubtreeIndex1{zoo::cfsLowerBound(b, e, 4)};
+            REQUIRE(4 == *rootOfSubtreeIndex1);
+            REQUIRE(rootOfSubtreeIndex1 == b + 1);
+        }
+        SECTION("Goes to low leaf") {
+            auto lowLeafIndex5 = zoo::cfsLowerBound(b, e, 8);
+            REQUIRE(8 == *lowLeafIndex5);
+            REQUIRE(lowLeafIndex5 == b + 5);
+            auto earlyFindIndex2 = zoo::cfsSearch(b, e, 8);
+            REQUIRE(8 == *earlyFindIndex2);
+            REQUIRE(earlyFindIndex2 == b + 2);
+        }
+        SECTION("Search elements not found") {
+            SECTION("Search lower than minimum") {
+                REQUIRE(1 == *zoo::cfsLowerBound(b, e, 0));
+            }
+            SECTION("Search between low leaf and its parent") {
+                REQUIRE(&*zoo::cfsLowerBound(b, e, 3) == &*(b + 1));
+            }
+            SECTION("Search epsilon over high leaf") {
+                REQUIRE(6 == *zoo::cfsLowerBound(b, e, 5));
+            }
+            SECTION("Search epsilon below repetitions") {
+                REQUIRE(zoo::cfsLowerBound(b, e, 7) == b + 5);
+            }
+            SECTION("Search past the end") {
+                REQUIRE(zoo::cfsLowerBound(b, e, 11) == e);
+            }
+        }
+        SECTION("Search element in bend lower to higher") {
+            cfs[0] = 4; cfs[1] = 3;
+            /* 4
+               3   8
+               1 4 8 10*/
+            REQUIRE(zoo::validHeap(cfs));
+            auto elbow = zoo::cfsLowerBound(b, e, 4);
+            REQUIRE(4 == *elbow);
+            REQUIRE(elbow == b + 4);
+        }
         SECTION("Early return") {
             REQUIRE((b + 1) == zoo::cfsSearch(b, e, 4));
-            REQUIRE((b + 2) == zoo::cfsSearch(b, e, 8));
         }
     }
 }

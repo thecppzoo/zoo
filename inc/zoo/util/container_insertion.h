@@ -16,16 +16,15 @@ struct is_insertable_impl<
     )>
 >: std::true_type {};
 
-template<typename T>
-constexpr auto is_insertable_v = is_insertable_impl<T>::value;
-
 }
 
 namespace std {
+
 template<typename C>
 auto operator<<(std::ostream &out, const C &a)
 -> std::enable_if_t<
-    not(zoo::is_insertable_v<C>) && zoo::is_container_v<C>, std::ostream &
+    not(zoo::is_insertable_impl<C>::value) && zoo::is_container_v<C>,
+    std::ostream &
 > {
     out << '(';
     auto current{cbegin(a)}, sentry{cend(a)};
