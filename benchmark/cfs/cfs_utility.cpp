@@ -13,11 +13,10 @@ std::vector<int> linear_vector(int n) {
 
 
 #include <iterator>
-#include <random>
 #include <algorithm>
 
 std::random_device rdevice;
-std::mt19937 gen(rdevice());
+std::mt19937 gen{rdevice()};
 std::uniform_int_distribution<int> dist(0, (1 << 30) - 1); // 16 M
 
 int randomTwo30() {

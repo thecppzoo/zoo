@@ -5,7 +5,7 @@
 
 #include <benchmark/benchmark.h>
 
-void transformation(benchmark::State &s) {
+void transformationToCFS(benchmark::State &s) {
     auto n = s.range(0);
     auto lin = linear_vector(n - 1);
     std::vector<int> converted;
@@ -15,7 +15,7 @@ void transformation(benchmark::State &s) {
         benchmark::DoNotOptimize(converted.data());
         converted.clear();
     }
-    s.SetComplexityN(s.range(0));
+    s.SetComplexityN(n);
 }
 
 void genLinearVector(benchmark::State &s) {
@@ -45,21 +45,37 @@ void sortRandomVector(benchmark::State &s) {
         std::sort(begin(copy), end(copy));
         benchmark::DoNotOptimize(copy.data());
     }
+    s.SetComplexityN(n);
 }
 
-void justARandomKey(benchmark::State &s) {
+void justARandomKeyCallingOpaque(benchmark::State &s) {
     for(auto _: s) {
         randomTwo30();
     }
 }
 
-void justVisitElement(benchmark::State &s) {
+void justARandomKey(benchmark::State &s) {
+    for(auto _: s) {
+        for(int i = 1000; i--; ) {
+            dist(gen);
+        }
+    }
+}
+
+void justTraversingRandomVector(benchmark::State &s) {
     auto n = s.range(0);
     auto spc = makeRandomVector(n);
-    auto z = spc.begin();
+    auto acc = 0;
+    auto ndx = 0;
     for(auto _: s) {
-        benchmark::DoNotOptimize(z++);
+        for(auto i = 1000; i--; ) {
+            acc ^= spc[ndx++];
+            if(ndx == n) { ndx = 0; }
+        }
     }
+    auto cutDependencies = acc;
+    benchmark::DoNotOptimize(cutDependencies);
+    s.SetComplexityN(n);
 }
 
 template<typename F>
@@ -78,11 +94,22 @@ void search(benchmark::State &s) {
         ++searched;
         kNdx &= mask;
         benchmark::DoNotOptimize(r);
-
     }
     s.counters["found"] = found;
     s.counters["searched"] = searched;
+    s.SetComplexityN(n);
 }
+
+struct UseLinear {
+    static auto makeSpace(int q) {
+        return makeRandomVector(q);
+    }
+
+    template<typename I, typename E>
+    static auto search(I b, I e, const E &v) {
+        return std::find(b, e, v);
+    }
+};
 
 struct UseSTL {
     static auto makeSpace(int q) {
@@ -136,15 +163,81 @@ void searchSTL(benchmark::State &s) {
     search<UseSTL>(s);
 }
 
-BENCHMARK(justARandomKey)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
-BENCHMARK(justVisitElement)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
-BENCHMARK(searchSTL)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
-BENCHMARK(searchCFSLate)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
-BENCHMARK(searchCFSEarly)->Range(1 << 15, 1 << 27);//->Unit(benchmark::kMicrosecond);
-BENCHMARK(genLinearVector)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
-BENCHMARK(randomVector)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
-BENCHMARK(sortRandomVector)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
-BENCHMARK(transformation)->Range(1 << 15, 1 << 27)->Unit(benchmark::kMicrosecond);
+void searchLinear(benchmark::State &s) {
+    search<UseLinear>(s);
+}
+
+struct CacheLine {
+    union {
+        alignas(64) int value;
+        char space[64];
+    };
+
+    CacheLine() = default;
+    CacheLine(int v): value{v} {}
+
+    bool operator<(const CacheLine &other) const {
+        return value < other.value;
+    }
+
+    CacheLine &operator=(int v) { value = v; return *this; }
+};
+
+bool operator==(int v, const CacheLine &o) { return v == o.value; }
+
+auto makeSortedCacheLineSpace(int q) {
+    auto values = makeRandomVector(q);
+    std::vector<CacheLine> rv;
+    rv.reserve(q);
+    auto bi{back_inserter(rv)};
+    for(auto v: values) {
+        *bi++ = v;
+    }
+    std::sort(begin(rv), end(rv));
+    return rv;
+}
+
+struct UseCacheLineSTL: UseSTL {
+    static auto makeSpace(int q) { return makeSortedCacheLineSpace(q); }
+};
+
+struct UseCacheLineCFS: UseCFSLowerBound {
+    static auto makeSpace(int q) {
+        auto sorted = makeSortedCacheLineSpace(q);
+        std::vector<CacheLine> rv;
+        rv.reserve(q);
+        zoo::transformToCFS(back_inserter(rv), sorted.cbegin(), sorted.cend());
+        return rv;
+    }
+};
+
+void searchCacheLineSTL(benchmark::State &s) {
+    search<UseCacheLineSTL>(s);
+}
+
+void searchCacheLineCFS(benchmark::State &s) {
+    search<UseCacheLineCFS>(s);
+}
+
+static_assert(64 == sizeof(CacheLine));
+static_assert(64 == alignof(CacheLine));
+
+constexpr auto RangeLow = 1 << 16, RangeHigh = 1 << 28;
+
+BENCHMARK(searchCacheLineSTL)->RangeMultiplier(4)->Range(RangeLow/16, RangeHigh/16)->Complexity();
+BENCHMARK(searchCacheLineCFS)->RangeMultiplier(4)->Range(RangeLow/16, RangeHigh/16)->Complexity();
+
+BENCHMARK(justARandomKey)->Unit(benchmark::kMicrosecond);
+BENCHMARK(justARandomKeyCallingOpaque);
+BENCHMARK(justTraversingRandomVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
+BENCHMARK(searchLinear)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
+BENCHMARK(searchSTL)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
+BENCHMARK(searchCFSLate)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
+BENCHMARK(searchCFSEarly)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
+BENCHMARK(genLinearVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
+BENCHMARK(randomVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
+BENCHMARK(sortRandomVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
+BENCHMARK(transformationToCFS)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
 
 BENCHMARK_MAIN();
 
