@@ -9,6 +9,7 @@ project(ZooBenchmark)
 include_directories(
     ../../benchmark/include
     ../inc
+    ../junkyard/inc
 )
 
 link_directories(

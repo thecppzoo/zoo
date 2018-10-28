@@ -269,9 +269,6 @@ TEST_CASE(
             auto lowLeafIndex5 = zoo::cfsLowerBound(b, e, 8);
             REQUIRE(8 == *lowLeafIndex5);
             REQUIRE(lowLeafIndex5 == b + 5);
-            auto earlyFindIndex2 = zoo::cfsSearch(b, e, 8);
-            REQUIRE(8 == *earlyFindIndex2);
-            REQUIRE(earlyFindIndex2 == b + 2);
         }
         SECTION("Search elements not found") {
             SECTION("Search lower than minimum") {
@@ -299,9 +296,6 @@ TEST_CASE(
             auto elbow = zoo::cfsLowerBound(b, e, 4);
             REQUIRE(4 == *elbow);
             REQUIRE(elbow == b + 4);
-        }
-        SECTION("Early return") {
-            REQUIRE((b + 1) == zoo::cfsSearch(b, e, 4));
         }
     }
 }
