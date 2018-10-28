@@ -2,6 +2,7 @@
 
 #include <zoo/algorithm/cfs.h>
 #include <algorithm>
+#include <unordered_map>
 
 #include <benchmark/benchmark.h>
 
@@ -78,25 +79,55 @@ void justTraversingRandomVector(benchmark::State &s) {
     s.SetComplexityN(n);
 }
 
+struct CacheLine {
+    union {
+        alignas(64) int value;
+        char space[64];
+    };
+
+    CacheLine() = default;
+    CacheLine(int v): value{v} {}
+
+    bool operator<(const CacheLine &other) const {
+        return value < other.value;
+    }
+
+    CacheLine &operator=(int v) { value = v; return *this; }
+};
+
+int asInt(int v) { return v; }
+int asInt(CacheLine cl) { return cl.value; }
+
 template<typename F>
 void search(benchmark::State &s) {
     auto n = s.range(0);
-    auto space = F::makeSpace(n);
+
+    using SpaceType = decltype(F::makeSpace(n));
+
+    static std::unordered_map<int, SpaceType> spaces;
+    auto where = spaces.find(n);
+    if(spaces.end() == where) {
+        where = spaces.insert({n, F::makeSpace(n)}).first;
+    }
+    auto &space = where->second;
     auto b{cbegin(space)}, e{cend(space)};
     constexpr auto mask = (1 << 20) - 1;
-    auto keys = makeRandomVector(mask + 1);
+    auto keys = makeRandomVector(mask + 1, 2*n);
     auto kNdx = 0;
-    auto found = 0, searched = 0;
+    auto ultimate = 0, found = 0, searched = 0;
     for(auto _: s) {
         auto k = keys[kNdx++];
-        auto r = F::search(b, e, k);
-        if(e != r && k == *r) { ++found; }
         ++searched;
-        kNdx &= mask;
+        auto r = F::search(b, e, k);
+        if(e != r && k == *r) {
+            ++found;
+            ultimate ^= asInt(*r);
+        }
         benchmark::DoNotOptimize(r);
+        kNdx &= mask;
     }
-    s.counters["found"] = found;
-    s.counters["searched"] = searched;
+    s.counters["ultimate"] = ultimate;
+    s.counters["ratio"] = searched/double(found);
     s.SetComplexityN(n);
 }
 
@@ -151,12 +182,23 @@ struct UseCFSSearch: UseCFSLowerBound {
     }
 };
 
-void searchCFSLate(benchmark::State &s) {
+struct UseCFSLBOld: UseCFSLowerBound {
+    template<typename I, typename E>
+    static auto search(I b, I e, const E &v) {
+        return zoo::cfsLowerBoundOld(b, e, v);
+    }
+};
+
+void searchCFSLowerBound(benchmark::State &s) {
     search<UseCFSLowerBound>(s);
 }
 
 void searchCFSEarly(benchmark::State &s) {
     search<UseCFSSearch>(s);
+}
+
+void searchCFSLateOld(benchmark::State &s) {
+    search<UseCFSLBOld>(s);
 }
 
 void searchSTL(benchmark::State &s) {
@@ -166,22 +208,6 @@ void searchSTL(benchmark::State &s) {
 void searchLinear(benchmark::State &s) {
     search<UseLinear>(s);
 }
-
-struct CacheLine {
-    union {
-        alignas(64) int value;
-        char space[64];
-    };
-
-    CacheLine() = default;
-    CacheLine(int v): value{v} {}
-
-    bool operator<(const CacheLine &other) const {
-        return value < other.value;
-    }
-
-    CacheLine &operator=(int v) { value = v; return *this; }
-};
 
 bool operator==(int v, const CacheLine &o) { return v == o.value; }
 
@@ -207,6 +233,11 @@ struct UseCacheLineCFS: UseCFSLowerBound {
         std::vector<CacheLine> rv;
         rv.reserve(q);
         zoo::transformToCFS(back_inserter(rv), sorted.cbegin(), sorted.cend());
+        if(!zoo::validHeap(rv)) {
+            throw 0;
+        }
+        auto l = reinterpret_cast<long>(rv.data());
+        if(l % 64) { throw; }
         return rv;
     }
 };
@@ -222,22 +253,25 @@ void searchCacheLineCFS(benchmark::State &s) {
 static_assert(64 == sizeof(CacheLine));
 static_assert(64 == alignof(CacheLine));
 
-constexpr auto RangeLow = 1 << 16, RangeHigh = 1 << 28;
+constexpr auto RangeLow = 10000;
+constexpr auto RangeHigh = RangeLow * 10000;
 
-BENCHMARK(searchCacheLineSTL)->RangeMultiplier(4)->Range(RangeLow/16, RangeHigh/16)->Complexity();
-BENCHMARK(searchCacheLineCFS)->RangeMultiplier(4)->Range(RangeLow/16, RangeHigh/16)->Complexity();
+//BENCHMARK(searchCacheLineCFS)->Arg(RangeHigh);//->Complexity();
+BENCHMARK(searchCacheLineSTL)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);
+BENCHMARK(searchCacheLineCFS)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);
 
 BENCHMARK(justARandomKey)->Unit(benchmark::kMicrosecond);
 BENCHMARK(justARandomKeyCallingOpaque);
-BENCHMARK(justTraversingRandomVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
-BENCHMARK(searchLinear)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
-BENCHMARK(searchSTL)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
-BENCHMARK(searchCFSLate)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
-BENCHMARK(searchCFSEarly)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Complexity();
-BENCHMARK(genLinearVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
-BENCHMARK(randomVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
-BENCHMARK(sortRandomVector)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
-BENCHMARK(transformationToCFS)->RangeMultiplier(4)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond)->Complexity();
+BENCHMARK(justTraversingRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
+BENCHMARK(searchLinear)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
+BENCHMARK(searchSTL)->RangeMultiplier(3)->Range(1, RangeHigh);//->Complexity();
+BENCHMARK(searchCFSLowerBound)->RangeMultiplier(3)->Range(1, RangeHigh);//->Complexity();
+BENCHMARK(searchCFSLateOld)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
+BENCHMARK(searchCFSEarly)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
+BENCHMARK(genLinearVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
+BENCHMARK(randomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
+BENCHMARK(sortRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
+BENCHMARK(transformationToCFS)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 
 BENCHMARK_MAIN();
 

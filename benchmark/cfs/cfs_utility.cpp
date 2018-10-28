@@ -23,11 +23,13 @@ int randomTwo30() {
     return dist(gen);
 }
 
-std::vector<int> makeRandomVector(int size) {
+std::vector<int> makeRandomVector(int size, int range) {
     std::vector<int> v;
     v.reserve(size);
+    if(0 == range) { range = size; }
+    std::uniform_int_distribution<int> toDoubleSize(0, range - 1);
     for(auto i = size; i--; ) {
-        v.push_back(dist(gen));
+        v.push_back(toDoubleSize(gen));
     }
     return v;
 }

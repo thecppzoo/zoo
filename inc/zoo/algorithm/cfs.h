@@ -187,6 +187,61 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
     }
 }
 
+enum SearchPolicy {
+    ONLY_LOWER_BOUND,
+    ONLY_UPPER_BOUND,
+    RANGE
+};
+
+template<
+    SearchPolicy Policy, typename Base, typename E, typename Comparator
+>
+auto cfsBound(
+    Base base,
+    Base supremum,
+    std::size_t size, std::size_t ndx,
+    const E &e, Comparator c
+) -> std::pair<Base, Base> {
+    // infimum: largest position *before* e
+    auto infimum = supremum;
+    while(ndx < size) {
+        auto current = base + ndx;
+        auto &cmp = *current;
+        if(ONLY_UPPER_BOUND == Policy ? not c(e, cmp) : c(cmp, e)) {
+            ndx = (ndx << 1) + 2;
+            continue;
+        }
+        infimum = current;
+        ndx = (ndx << 1) + 1;
+    }
+    if(RANGE != Policy) { return {infimum, infimum}; }
+    ndx = infimum - base;
+    // Assumes streaks of equivalent elements are short
+    //
+    // Looking for the end of the streak of equivalent elements to e.
+    // In the case ndx is a left subtree, we have
+    // e <= base[ndx] <= base[parent(ndx)]
+    // if e < base[parent(ndx)] the upper bound is in
+    // [successor(ndx), parent(ndx)]
+    while(1 & ndx) {
+        auto parent = ndx >> 1;
+        auto current = base + parent;
+        auto &cmp = *current;        
+        if(c(e, cmp)) {
+            supremum = base + parent;
+            break;
+        }
+        ndx = parent;
+    }
+    // Either there is no parent, or the parent is an upper bound, the supremum
+    // can only be in the higher subtree of ndx
+    auto upper =
+        cfsBound<ONLY_UPPER_BOUND>(
+            base, supremum, size, (ndx << 1) + 2, e, c
+        ).first;
+    return {infimum, upper};
+}
+
 }
 
 template<
@@ -203,7 +258,7 @@ template<
     typename E, 
     typename Comparator = LessForIterated<Base>
 >
-Base cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+Base cfsLowerBoundOld(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<true, false>(b, e, v, c).first;
 }
 
@@ -212,7 +267,17 @@ template<
     typename E, 
     typename Comparator = LessForIterated<Base>
 >
-Base cfsHigherBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+Base cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+    return
+        detail::cfsBound<detail::ONLY_LOWER_BOUND>(b, e, e - b, 0, v, c).first;
+}
+
+template<
+    typename Base,
+    typename E, 
+    typename Comparator = LessForIterated<Base>
+>
+Base cfsHigherBoundOld(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<false, true>(b, e, v, c).second;
 }
 
@@ -221,8 +286,18 @@ template<
     typename E, 
     typename Comparator = LessForIterated<Base>
 >
+Base cfsHigherBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
+    return
+        detail::cfsBound<detail::ONLY_UPPER_BOUND>(b, e, e - b, 0, v, c).first;
+}
+
+template<
+    typename Base,
+    typename E, 
+    typename Comparator = LessForIterated<Base>
+>
 auto cfsEqualRange(Base b, Base e, const E &v, Comparator c = Comparator{}) {
-    return detail::cfsBounds<true, true>(b, e, v, c);
+    return detail::cfsBound<detail::RANGE>(b, e, e - b, 0, v, c);
 }
 
 struct ValidResult {

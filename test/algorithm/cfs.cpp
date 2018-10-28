@@ -223,6 +223,14 @@ TEST_CASE(
         }};
         std::vector<Equivalence> cfs;
         zoo::transformToCFS(back_inserter(cfs), cbegin(raw), cend(raw));
+        /* 6a
+           0
+           4c       8b
+           1        2
+           4a    4d 8a 8c
+           3     4  5  6
+           1a 4b
+           7  8 */
         REQUIRE(zoo::validHeap(cfs));
         auto b{cfs.begin()}, e{cfs.end()};
         auto fours = zoo::cfsEqualRange(b, e, Equivalence{4, 'x'});

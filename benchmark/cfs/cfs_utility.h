@@ -11,6 +11,6 @@ std::vector<int> linear_vector(int n);
 
 int randomTwo30();
 
-std::vector<int> makeRandomVector(int size);
+std::vector<int> makeRandomVector(int size, int range = 0);
 
 #endif
