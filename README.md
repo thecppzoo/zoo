@@ -26,7 +26,7 @@ Adheres to the principles described in ["doctrine"](https://github.com/thecppzoo
 
 #### Cache Friendly Search
 
-Inspired by work made by Joaquín M López Muñoz at his blog post ["Cache friendly binary search"](http://bannalia.blogspot.com/2015/06/cache-friendly-binary-search.html), the library provides a [suite of functions](https://github.com/thecppzoo/zoo/blob/master/inc/zoo/algorithm/cfs.h) to convert a random access iterator sorted range to a heap suitable for cache friendly search and the binary search on it.  This component is fully tested and benchmarked.
+Inspired by work made by Joaquín M López Muñoz at his blog post ["Cache friendly binary search"](http://bannalia.blogspot.com/2015/06/cache-friendly-binary-search.html), and the [presentation by Gor Nishanov on nano coroutines at CPPCon 2018](https://youtu.be/j9tlJAqMV7U?t=607), which includes a section in which binary search over large sorted arrays are important (especially starting at minute 10), the library provides a [suite of functions](https://github.com/thecppzoo/zoo/blob/master/inc/zoo/algorithm/cfs.h) to convert a random access iterator sorted range to a heap suitable for cache friendly search and the binary search on it.  This component is fully tested and benchmarked.
 
 #### Bidirectional-iterator quicksort
 
