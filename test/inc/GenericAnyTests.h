@@ -1,14 +1,8 @@
 #pragma once
 
-#include "util/ExtendedAny.h"
+#include <zoo/ExtendedAny.h>
 
-#ifdef TESTS
-    #define CATCH_CONFIG_MAIN
-#else
-    #define CATCH_CONFIG_RUNNER
-#endif
-
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 
 struct Destructor {
     int *ptr;

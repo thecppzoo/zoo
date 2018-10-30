@@ -2,7 +2,7 @@
 
 #include "meta/NotBasedOn.h"
 
-#ifdef MODERN_COMPILER
+#ifndef OLD_COMPILER
 #include <utility>
 #else
 namespace std {

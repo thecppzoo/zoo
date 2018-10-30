@@ -13,8 +13,10 @@ configure_file (
 
 include_directories(
     "${PROJECT_BINARY_DIR}"
-    ../../Catch2/single_include
+    ./inc
     ../inc
+    ../../metatools/inc
+    ../../Catch2/single_include
 )
 
-add_executable(zooTest catch_main.cpp algorithm/cfs.cpp)
+add_executable(zooTest catch_main.cpp algorithm/cfs.cpp any.cpp)
