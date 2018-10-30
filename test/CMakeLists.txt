@@ -19,4 +19,4 @@ include_directories(
     ../../Catch2/single_include
 )
 
-add_executable(zooTest catch_main.cpp algorithm/cfs.cpp any.cpp)
+add_executable(zooTest AnyCallable.cpp algorithm/cfs.cpp any.cpp catch_main.cpp)
