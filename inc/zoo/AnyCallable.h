@@ -48,8 +48,10 @@ struct AnyCallable<R(Args...)> {
         }
     {}
 
-    R operator()(Args &&... args) {
-        return compress_(std::forward<Args>(args)..., typeErasedTarget_);
+    template<typename... RealArguments>
+    R operator()(RealArguments &&... args) {
+        return
+            compress_(std::forward<RealArguments>(args)..., typeErasedTarget_);
     }
 };
 
