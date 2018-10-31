@@ -2,8 +2,10 @@
 
 #include "meta/NotBasedOn.h"
 
-#ifdef MODERN_COMPILER
+#ifndef OLD_COMPILER
+#ifndef SIMPLIFY_PREPROCESSING
 #include <utility>
+#endif
 #else
 namespace std {
 
@@ -17,7 +19,7 @@ in_place_type_t<T> in_place_type;
 #endif
 #include "meta/InplaceType.h"
 
-#ifndef NO_STANDARD_INCLUDES
+#ifndef SIMPLIFY_PREPROCESSING
 #include <new>
 #include <initializer_list>
 #include <typeinfo>

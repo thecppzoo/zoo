@@ -67,7 +67,7 @@ void canonicalOnlyTests() {
     }
     SECTION("any_cast") {
         zoo::Any empty;
-        REQUIRE_THROWS_AS(zoo::any_cast<int>(empty), std::bad_cast &);
+        REQUIRE_THROWS_AS(zoo::any_cast<int>(empty), std::bad_cast);
         REQUIRE_THROWS_AS(zoo::any_cast<int>(empty), zoo::bad_any_cast);
         REQUIRE(nullptr == zoo::any_cast<int>(&empty));
         const zoo::Any *constAny = nullptr;

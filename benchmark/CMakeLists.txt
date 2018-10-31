@@ -13,7 +13,7 @@ include_directories(
 )
 
 link_directories(
-    /Users/ed/git/benchmarkbuild/src
+    ./dependencies
 )
 
 add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp)
