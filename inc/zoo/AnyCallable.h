@@ -5,9 +5,10 @@
 #error Experimental code needs to define ZOO_USE_EXPERIMENTAL
 #endif
 
-#include <zoo/any.h>
+#include <meta/NotBasedOn.h>
 
 #ifndef SIMPLIFY_PREPROCESSING
+#include <type_traits>
 #include <functional>
 #endif
 
@@ -17,17 +18,29 @@ namespace zoo {
 ///
 /// The unrestricted template is not useful
 /// use through the function signature specializaton
-template<typename>
+template<typename, typename>
 struct AnyCallable;
 
-template<typename R, typename... Args>
-struct AnyCallable<R(Args...)> {
-    Any typeErasedTarget_;
-    R (*compress_)(Args..., Any &);
+
+/// \tparam TypeErasureProvider Must implement a \c state template instance
+/// function that returns a pointer to the held object
+///
+/// Why inheritance: Client code should be able to enquire the target
+/// as they would any type erased value
+template<typename TypeErasureProvider, typename R, typename... Args>
+struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
+    template<typename T>
+    static R invokeTarget(Args... as, TypeErasureProvider &obj) {
+        return (*obj.template state<T>())(as...);
+    }
+
+    R (*targetInvoker_)(Args..., TypeErasureProvider &);
 
     AnyCallable():
-        compress_{
-            [](Args..., Any &) -> R { throw std::bad_function_call{}; }
+        targetInvoker_{
+            [](Args..., TypeErasureProvider &) -> R {
+                throw std::bad_function_call{};
+            }
         }
     {}
 
@@ -40,18 +53,17 @@ struct AnyCallable<R(Args...)> {
             >
     >
     AnyCallable(Callable &&target):
-        typeErasedTarget_{std::forward<Callable>(target)},
-        compress_{
-            [](Args... arguments, Any &erased) {
-                return (*erased.state<Decayed>())(arguments...);
-            }
-        }
+        TypeErasureProvider{std::forward<Callable>(target)},
+        targetInvoker_{invokeTarget<Decayed>}
     {}
 
     template<typename... RealArguments>
-    R operator()(RealArguments &&... args) {
+    R operator()(RealArguments &&... args) const {
         return
-            compress_(std::forward<RealArguments>(args)..., typeErasedTarget_);
+            targetInvoker_(
+                std::forward<RealArguments>(args)...,
+                const_cast<AnyCallable &>(*this)
+            );
     }
 };
 
