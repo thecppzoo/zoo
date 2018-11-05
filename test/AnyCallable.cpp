@@ -117,5 +117,11 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             CHECK(!(acNonEmpty == nullptr));
             CHECK(!(nullptr == acNonEmpty));
         }
+        SECTION("empty()") {
+            zoo::function<long(int)> acEmpty;
+            zoo::function<long(int)> acNonEmpty { myCallable };
+            CHECK(acEmpty.empty());
+            CHECK(!acNonEmpty.empty());
+        }
     }
 }
