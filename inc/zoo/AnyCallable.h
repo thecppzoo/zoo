@@ -67,7 +67,7 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
             );
     }
 
-    void swap(AnyCallable& other) {
+    void swap(AnyCallable& other) noexcept {
         TypeErasureProvider::swap(other);
         std::swap(targetInvoker_, other.targetInvoker_);
     }
