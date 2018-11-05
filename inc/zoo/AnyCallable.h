@@ -1,10 +1,6 @@
 #ifndef ZOO_ANY_CALLABLE
 #define ZOO_ANY_CALLABLE
 
-#ifndef ZOO_USE_EXPERIMENTAL
-#error Experimental code needs to define ZOO_USE_EXPERIMENTAL
-#endif
-
 #include <meta/NotBasedOn.h>
 
 #ifndef SIMPLIFY_PREPROCESSING
