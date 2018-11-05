@@ -27,9 +27,6 @@ in_place_type_t<T> in_place_type;
 
 namespace zoo {
 
-template<typename T>
-using uncvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
-
 template<int Size, int Alignment>
 struct IAnyContainer {
     virtual void destroy() {}
@@ -309,12 +306,17 @@ public:
     }
 
     template<typename ValueType>
-    ValueType *state() noexcept {
+    auto *state() noexcept {
         using Decayed = std::decay_t<ValueType>;
         using Implementation = typename Policy::template Builder<Decayed>;
-        return reinterpret_cast<ValueType *>(
-            static_cast<Implementation *>(container())->Implementation::value()
-        );
+        return
+            static_cast<Decayed *>(
+                static_cast<Implementation *>(
+                    container()
+                )->Implementation::value()
+                    // the full qualification of \c value is used to disable
+                    // runtime polymorphism
+            );
     }
 
     template<typename ValueType>
@@ -352,7 +354,7 @@ struct bad_any_cast: std::bad_cast {
 
 template<class ValueType>
 ValueType any_cast(const Any &operand) {
-    using U = uncvr_t<ValueType>;
+    using U = std::decay_t<ValueType>;
     static_assert(std::is_constructible<ValueType, const U &>::value, "");
     if(typeid(U) != operand.type()) { throw bad_any_cast{}; }
     return *anyContainerCast<U>(&operand);
@@ -360,7 +362,7 @@ ValueType any_cast(const Any &operand) {
 
 template<class ValueType>
 ValueType any_cast(Any &operand) {
-    using U = uncvr_t<ValueType>;
+    using U = std::decay_t<ValueType>;
     static_assert(std::is_constructible<ValueType, U &>::value, "");
     if(typeid(U) != operand.type()) { throw bad_any_cast{}; }
     return *anyContainerCast<U>(&operand);
@@ -368,7 +370,7 @@ ValueType any_cast(Any &operand) {
 
 template<class ValueType>
 ValueType any_cast(Any &&operand) {
-    using U = uncvr_t<ValueType>;
+    using U = std::decay_t<ValueType>;
     static_assert(std::is_constructible<ValueType, U>::value, "");
     if(typeid(U) != operand.type()) { throw bad_any_cast{}; }
     return std::move(*anyContainerCast<U>(&operand));
@@ -377,7 +379,7 @@ ValueType any_cast(Any &&operand) {
 template<class ValueType>
 ValueType *any_cast(Any *operand) {
     if(!operand) { return nullptr; }
-    using U = uncvr_t<ValueType>;
+    using U = std::decay_t<ValueType>;
     if(typeid(U) != operand->type()) { return nullptr; }
     return anyContainerCast<U>(operand);
 }

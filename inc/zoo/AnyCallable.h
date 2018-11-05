@@ -68,23 +68,24 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
         return emptyInvoker == targetInvoker_;
     }
 
+    /// \note \c target should not be used, it is a consequence of what we
+    /// believe is the design mistake in the standard library of not basing
+    /// std::function on a user-available type erasure component,
+    /// the correct way to reach the held object is through \c state
+    /// and choose between safe access and unsafe
     template<typename T>
     T *target() noexcept {
-        using uncvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
-        if (!empty() && target_type() == typeid(uncvr_t))
-            return this->template state<T>();
-
-        return nullptr;
+        using Decayed = std::decay_t<T>;
+        if(typeid(Decayed) != this->type()) { return nullptr; }
+        return this->template state<T>();
     }
     
-    template< class T >
-    T const* target() const noexcept {
+    template<typename T>
+    T const *target() const noexcept {
         return const_cast<AnyCallable*>(this)->target<T>();
     }
 
-    bool operator==(std::nullptr_t) const noexcept {
-        return empty();
-    }
+    bool operator==(std::nullptr_t) const noexcept { return empty(); }
 
     bool operator!=(std::nullptr_t) const noexcept {
         return not(*this == nullptr);
