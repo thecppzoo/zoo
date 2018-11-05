@@ -69,9 +69,7 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
 
     void swap(AnyCallable& other) {
         TypeErasureProvider::swap(other);
-        auto thisTargetInvoker = targetInvoker_;
-        targetInvoker_ = other.targetInvoker_;
-        other.targetInvoker_ = thisTargetInvoker;
+        std::swap(targetInvoker_, other.targetInvoker_);
     }
 
     explicit operator bool() const noexcept {
@@ -99,6 +97,29 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     }
 };
 
+// nullptr comparison
+template<typename TypeErasureProvider, typename R, typename... Args>
+bool operator==(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nullptr_t) {
+    return !static_cast<bool>(ac);
 }
+
+template<typename TypeErasureProvider, typename R, typename... Args>
+bool operator==(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
+    return !static_cast<bool>(ac);
+
+}
+
+template<typename TypeErasureProvider, typename R, typename... Args>
+bool operator!=(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nullptr_t) {
+    return static_cast<bool>(ac);
+}
+
+template<typename TypeErasureProvider, typename R, typename... Args>
+bool operator!=(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
+    return static_cast<bool>(ac);
+
+}
+
+} // namespace zoo
 
 #endif

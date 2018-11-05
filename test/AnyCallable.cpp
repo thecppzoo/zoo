@@ -79,6 +79,10 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             CHECK(static_cast<bool>(ac1));
             CHECK(!static_cast<bool>(ac2));
             CHECK(25 == ac1(5));
+            std::swap(ac1, ac2);
+            CHECK(25 == ac2(5));
+            CHECK(!static_cast<bool>(ac1));
+            CHECK(static_cast<bool>(ac2));
         }
         SECTION("target_type()") {
             zoo::function<long(int)> ac;
@@ -98,6 +102,20 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             const zoo::function<long(int)> ac { myCallable };
             CHECK(ac.target<int>() == nullptr);
             CHECK(ac.target<MyCallable>() != nullptr);
+        }
+        SECTION("comparison to nullptr") {
+            zoo::function<long(int)> acEmpty;
+            zoo::function<long(int)> acNonEmpty { myCallable };
+
+            CHECK(acEmpty == nullptr);
+            CHECK(nullptr == acEmpty);
+            CHECK(!(acEmpty != nullptr));
+            CHECK(!(nullptr != acEmpty));
+
+            CHECK(acNonEmpty != nullptr);
+            CHECK(nullptr != acNonEmpty);
+            CHECK(!(acNonEmpty == nullptr));
+            CHECK(!(nullptr == acNonEmpty));
         }
     }
 }
