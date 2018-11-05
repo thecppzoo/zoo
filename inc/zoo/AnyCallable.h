@@ -106,7 +106,6 @@ bool operator==(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nul
 template<typename TypeErasureProvider, typename R, typename... Args>
 bool operator==(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
     return !static_cast<bool>(ac);
-
 }
 
 template<typename TypeErasureProvider, typename R, typename... Args>
@@ -117,7 +116,6 @@ bool operator!=(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nul
 template<typename TypeErasureProvider, typename R, typename... Args>
 bool operator!=(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
     return static_cast<bool>(ac);
-
 }
 
 } // namespace zoo
