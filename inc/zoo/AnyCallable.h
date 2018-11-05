@@ -25,21 +25,7 @@ struct AnyCallable;
 /// as they would any type erased value
 template<typename TypeErasureProvider, typename R, typename... Args>
 struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
-    static constexpr auto emptyInvoker_ =
-        [](Args..., TypeErasureProvider &) -> R {
-            throw std::bad_function_call{};
-        };
-
-    template<typename T>
-    static R invokeTarget(Args... as, TypeErasureProvider &obj) {
-        return (*obj.template state<T>())(as...);
-    }
-
-    R (*targetInvoker_)(Args..., TypeErasureProvider &);
-
-    AnyCallable():
-        targetInvoker_{ emptyInvoker_ }
-    {}
+    AnyCallable(): targetInvoker_{emptyInvoker} {}
 
     template<
         typename Callable,
@@ -63,8 +49,10 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
             );
     }
 
-    void swap(AnyCallable& other) noexcept {
-        TypeErasureProvider::swap(other);
+    void swap(AnyCallable &other) noexcept(
+        noexcept(swapBase(*this, other))
+    ) {
+        swapBase(*this, other);
         std::swap(targetInvoker_, other.targetInvoker_);
     }
 
@@ -72,16 +60,16 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
         return !empty();
     }
 
-    const std::type_info& target_type() const noexcept {
+    const std::type_info &target_type() const noexcept {
         return empty() ? typeid(void) : this->type();
     }
 
     bool empty() const noexcept {
-        return targetInvoker_ == emptyInvoker_;
+        return emptyInvoker == targetInvoker_;
     }
 
-    template< class T >
-    T* target() noexcept {
+    template<typename T>
+    T *target() noexcept {
         using uncvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
         if (!empty() && target_type() == typeid(uncvr_t))
             return this->template state<T>();
@@ -93,27 +81,48 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     T const* target() const noexcept {
         return const_cast<AnyCallable*>(this)->target<T>();
     }
+
+    bool operator==(std::nullptr_t) const noexcept {
+        return empty();
+    }
+
+    bool operator!=(std::nullptr_t) const noexcept {
+        return not(*this == nullptr);
+    }
+
+private:
+    R (*targetInvoker_)(Args..., TypeErasureProvider &);
+
+    static R emptyInvoker(Args..., TypeErasureProvider &) {
+        throw std::bad_function_call{};
+    }
+
+    template<typename T>
+    static R invokeTarget(Args... as, TypeErasureProvider &obj) {
+        return (*obj.template state<T>())(as...);
+    }
+
+    /// Used to perform casting and the implicit checks of std::swap in
+    /// C++ 17 with regards to swappability and move constructibility
+    void swapBase(TypeErasureProvider &thy, TypeErasureProvider &other)
+        noexcept(noexcept(std::swap(thy, other)))
+    {
+        std::swap(thy, other);
+    }
 };
 
-// nullptr comparison
 template<typename TypeErasureProvider, typename R, typename... Args>
-bool operator==(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nullptr_t) {
-    return ac.empty();
+bool operator==(
+    std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const &ac
+) noexcept {
+    return ac == nullptr;
 }
 
 template<typename TypeErasureProvider, typename R, typename... Args>
-bool operator==(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
-    return ac.empty();
-}
-
-template<typename TypeErasureProvider, typename R, typename... Args>
-bool operator!=(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nullptr_t) {
-    return !ac.empty();
-}
-
-template<typename TypeErasureProvider, typename R, typename... Args>
-bool operator!=(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
-    return !ac.empty();
+bool operator!=(
+    std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const &ac
+) noexcept {
+    return ac != nullptr;
 }
 
 } // namespace zoo
