@@ -55,4 +55,73 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             CHECK(heldObject.moved_);
         }
     }
+    SECTION("std::function compatibility") {
+        struct MyCallable
+         {
+            auto operator()(int i) {
+                return long(i)*i;
+            }
+        };
+        MyCallable myCallable;
+        SECTION("operator bool()") {
+            zoo::function<long(int)> ac;
+            CHECK(!static_cast<bool>(ac));
+            ac = myCallable;
+            CHECK(static_cast<bool>(ac));
+        }
+        SECTION("swap()") {
+            zoo::function<long(int)> ac1, ac2;
+            ac2 = myCallable;
+            CHECK(25 == ac2(5));
+            CHECK(!static_cast<bool>(ac1));
+            CHECK(static_cast<bool>(ac2));
+            ac1.swap(ac2);
+            CHECK(static_cast<bool>(ac1));
+            CHECK(!static_cast<bool>(ac2));
+            CHECK(25 == ac1(5));
+            std::swap(ac1, ac2);
+            CHECK(25 == ac2(5));
+            CHECK(!static_cast<bool>(ac1));
+            CHECK(static_cast<bool>(ac2));
+        }
+        SECTION("target_type()") {
+            zoo::function<long(int)> ac;
+            CHECK(ac.target_type() == typeid(void));
+            ac = myCallable;
+            CHECK(ac.target_type() == typeid(MyCallable));
+        }
+        SECTION("target() non-const") {
+            zoo::function<long(int)> ac;
+            CHECK(ac.target<int>() == nullptr);
+            CHECK(ac.target<MyCallable>() == nullptr);
+            ac = myCallable;
+            CHECK(ac.target<int>() == nullptr);
+            CHECK(ac.target<MyCallable>() != nullptr);
+        }
+        SECTION("target() const") {
+            const zoo::function<long(int)> ac { myCallable };
+            CHECK(ac.target<int>() == nullptr);
+            CHECK(ac.target<MyCallable>() != nullptr);
+        }
+        SECTION("comparison to nullptr") {
+            zoo::function<long(int)> acEmpty;
+            zoo::function<long(int)> acNonEmpty { myCallable };
+
+            CHECK(acEmpty == nullptr);
+            CHECK(nullptr == acEmpty);
+            CHECK(!(acEmpty != nullptr));
+            CHECK(!(nullptr != acEmpty));
+
+            CHECK(acNonEmpty != nullptr);
+            CHECK(nullptr != acNonEmpty);
+            CHECK(!(acNonEmpty == nullptr));
+            CHECK(!(nullptr == acNonEmpty));
+        }
+        SECTION("empty()") {
+            zoo::function<long(int)> acEmpty;
+            zoo::function<long(int)> acNonEmpty { myCallable };
+            CHECK(acEmpty.empty());
+            CHECK(!acNonEmpty.empty());
+        }
+    }
 }
