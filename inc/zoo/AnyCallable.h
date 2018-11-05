@@ -102,22 +102,22 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
 // nullptr comparison
 template<typename TypeErasureProvider, typename R, typename... Args>
 bool operator==(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nullptr_t) {
-    return !static_cast<bool>(ac);
+    return ac.empty();
 }
 
 template<typename TypeErasureProvider, typename R, typename... Args>
 bool operator==(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
-    return !static_cast<bool>(ac);
+    return ac.empty();
 }
 
 template<typename TypeErasureProvider, typename R, typename... Args>
 bool operator!=(AnyCallable<TypeErasureProvider, R(Args...)> const& ac, std::nullptr_t) {
-    return static_cast<bool>(ac);
+    return !ac.empty();
 }
 
 template<typename TypeErasureProvider, typename R, typename... Args>
 bool operator!=(std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const& ac) {
-    return static_cast<bool>(ac);
+    return !ac.empty();
 }
 
 } // namespace zoo
