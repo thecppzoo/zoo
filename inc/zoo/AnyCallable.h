@@ -29,6 +29,11 @@ struct AnyCallable;
 /// as they would any type erased value
 template<typename TypeErasureProvider, typename R, typename... Args>
 struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
+    static constexpr auto emptyInvoker_ =
+        [](Args..., TypeErasureProvider &) -> R {
+            throw std::bad_function_call{};
+        };
+
     template<typename T>
     static R invokeTarget(Args... as, TypeErasureProvider &obj) {
         return (*obj.template state<T>())(as...);
@@ -37,11 +42,7 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     R (*targetInvoker_)(Args..., TypeErasureProvider &);
 
     AnyCallable():
-        targetInvoker_{
-            [](Args..., TypeErasureProvider &) -> R {
-                throw std::bad_function_call{};
-            }
-        }
+        targetInvoker_{ emptyInvoker_ }
     {}
 
     template<
@@ -65,6 +66,37 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
                 const_cast<AnyCallable &>(*this)
             );
     }
+
+    void swap(AnyCallable& other) {
+        TypeErasureProvider::swap(other);
+        auto thisTargetInvoker = targetInvoker_;
+        targetInvoker_ = other.targetInvoker_;
+        other.targetInvoker_ = thisTargetInvoker;
+    }
+
+    explicit operator bool() const noexcept {
+        return targetInvoker_ != emptyInvoker_;
+    }
+
+	const std::type_info& target_type() const noexcept {
+		return targetInvoker_ != emptyInvoker_ ?
+			this->type() : typeid(void);
+	}
+
+	template< class T >
+    T* target() noexcept {
+        using uncvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
+		return targetInvoker_ != emptyInvoker_ ?
+            target_type() == typeid(uncvr_t) ?
+			    this->template state<T>() :
+                nullptr:
+            nullptr;
+	}
+	
+	template< class T >
+    T const* target() const noexcept {
+        return const_cast<AnyCallable*>(this)->target<T>();
+	}
 };
 
 }
