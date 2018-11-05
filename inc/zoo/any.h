@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zoo/utility.h>
 #include "meta/NotBasedOn.h"
 
 #ifndef OLD_COMPILER
@@ -293,10 +294,17 @@ public:
         new(this) AnyContainer;
     }
 
-    void swap(AnyContainer &other) noexcept {
-        AnyContainer auxiliar{std::move(other)};
-        other = std::move(*this);
-        *this = std::move(auxiliar);
+    inline void swap(AnyContainer &other) noexcept {
+        auto oc = other.container();
+
+        alignas(alignof(Container))
+        char tmp[sizeof(Container)];
+
+        auto tc = reinterpret_cast<Container *>(tmp);
+        oc->move(tc);
+        auto myself = container();
+        myself->move(oc);
+        tc->move(myself);
     }
 
     bool has_value() const noexcept { return container()->nonEmpty(); }
@@ -311,11 +319,10 @@ public:
         using Implementation = typename Policy::template Builder<Decayed>;
         return
             static_cast<Decayed *>(
-                static_cast<Implementation *>(
-                    container()
-                )->Implementation::value()
+                static_cast<Implementation *>(container())->
+                    Implementation::value()
                     // the full qualification of \c value is used to disable
-                    // runtime polymorphism
+                    // runtime polymorphism in case it is a virtual override
             );
     }
 
@@ -330,12 +337,14 @@ public:
 };
 
 template<typename Policy>
-inline void anyContainerSwap(
-    AnyContainer<Policy> &a1, AnyContainer<Policy> &a2
-) noexcept { a1.swap(a2); }
+inline
+void swap(AnyContainer<Policy> &a1, AnyContainer<Policy> &a2) {
+    a1.swap(a2);
+}
 
 template<typename T, typename Policy>
-inline T *anyContainerCast(const AnyContainer<Policy> *ptr) noexcept {
+inline
+T *anyContainerCast(const AnyContainer<Policy> *ptr) noexcept {
     return const_cast<T *>(ptr->template state<T>());
 }
 
@@ -388,8 +397,6 @@ template<typename ValueType>
 const ValueType *any_cast(const Any *ptr) {
     return any_cast<ValueType>(const_cast<Any *>(ptr));
 }
-
-inline void swap(Any &a1, Any &a2) noexcept { anyContainerSwap(a1, a2); }
 
 template<typename T, typename... Args>
 Any make_any(Args &&... args) {

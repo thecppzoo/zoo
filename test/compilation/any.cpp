@@ -1,15 +1,36 @@
-#include "util/any.h"
+struct SwapMayThrow {};
+void swap(SwapMayThrow &, SwapMayThrow &) noexcept(false);
+
+#include "valid_expression.h"
+
+#include <zoo/any.h>
+
+using std::declval;
 
 struct alignas(32) aligned_to_32 {};
 
-static_assert(alignof(zoo::detail::AlignedStorage<1, 32>) == 32, "");
-
-zoo::Any makeAny(int &val) { return zoo::Any{val}; }
+static_assert(alignof(zoo::IAnyContainer<1, 32>) == 32, "");
 
 struct NotCopyConstructible {
 	NotCopyConstructible(const NotCopyConstructible &) = delete;
 };
 
-#ifdef MALFORMED_ON_BUILDING_ANY_ON_NOT_COPY_CONSTRUCTIBLE_VALUE
-zoo::Any makeAny(NotCopyConstructible &ncc) { return zoo::Any{ncc}; }
-#endif
+VALID_EXPRESSION(ConstructsCopy, T, zoo::Any{declval<T &>()});
+
+static_assert(ConstructsCopy<int>::value, "Checks CopyConstructible");
+static_assert(
+    !ConstructsCopy<NotCopyConstructible>::value,
+    "Any is copying NotCopyConstructible"
+);
+
+
+template<typename T>
+using MayThrowOnSwap =
+    std::conditional_t<
+        noexcept(swap(declval<T &>(), declval<T &>())),
+        std::false_type,
+        std::true_type
+    >;
+
+static_assert(!MayThrowOnSwap<zoo::Any>::value, "");
+static_assert(MayThrowOnSwap<SwapMayThrow>::value, "");

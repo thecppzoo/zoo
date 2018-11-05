@@ -1,6 +1,4 @@
-#define ZOO_USE_EXPERIMENTAL
-
-#include <zoo/function.h>
+#include "AnyCallable.h"
 
 #include <catch2/catch.hpp>
 
@@ -71,18 +69,20 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
         }
         SECTION("swap()") {
             zoo::function<long(int)> ac1, ac2;
-            ac2 = myCallable;
-            CHECK(25 == ac2(5));
-            CHECK(!static_cast<bool>(ac1));
-            CHECK(static_cast<bool>(ac2));
-            ac1.swap(ac2);
-            CHECK(static_cast<bool>(ac1));
-            CHECK(!static_cast<bool>(ac2));
-            CHECK(25 == ac1(5));
-            std::swap(ac1, ac2);
-            CHECK(25 == ac2(5));
-            CHECK(!static_cast<bool>(ac1));
-            CHECK(static_cast<bool>(ac2));
+            SECTION("Synopsis") {
+                ac2 = myCallable;
+                CHECK(25 == ac2(5));
+                CHECK(!static_cast<bool>(ac1));
+                CHECK(static_cast<bool>(ac2));
+                ac1.swap(ac2);
+                CHECK(static_cast<bool>(ac1));
+                CHECK(!static_cast<bool>(ac2));
+                CHECK(25 == ac1(5));
+                std::swap(ac1, ac2);
+                CHECK(25 == ac2(5));
+                CHECK(!static_cast<bool>(ac1));
+                CHECK(static_cast<bool>(ac2));
+            }
         }
         SECTION("target_type()") {
             zoo::function<long(int)> ac;
@@ -122,6 +122,74 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             zoo::function<long(int)> acNonEmpty { myCallable };
             CHECK(acEmpty.empty());
             CHECK(!acNonEmpty.empty());
+        }
+    }
+}
+
+TEST_CASE(
+    "Non zoo::function tests",
+    "[any][type-erasure][functional][zoo-enhancements]"
+) {
+    int copies = 0, moves = 0, destruction = 0;
+    Traces t{copies, moves, destruction};
+
+    SECTION("Uses type erasure optimized swap") {
+        SECTION("Uses instance function") {
+            SECTION("Erasure type defined before AnyCallable") {
+                zoo::AnyCallable<BeforeAnyCallableEraserADL, void(int)>
+                    lt1 = t,
+                    lt2 = std::move(t);
+                SECTION("Expected initialization") {
+                    CHECK(1 == copies);
+                    CHECK(1 == moves);
+                    CHECK(0 == destruction);
+                }
+                SECTION("Swap using instance function") {
+                    lt1.swap(lt2);
+                    CHECK(4 == moves);
+                    CHECK(1 == copies);
+                    CHECK(0 == destruction);
+                }
+            }
+            SECTION("Erasure type defined after AnyCallable, works") {
+                zoo::AnyCallable<AfterAnyCallableEraser, void(int)>
+                    eac1{t}, eac2{std::move(t)};
+                eac1.swap(eac2);
+                CHECK(0 == destruction);
+            }
+        }
+        SECTION("Uses zoo::swap global") {
+            SECTION("Uses ADL and upcasting to invoke erasure swap") {
+                zoo::AnyCallable<BeforeAnyCallableEraserADL, void(int)>
+                    lt1 = t,
+                    lt2 = std::move(t);
+                swap(lt1, lt2);
+                CHECK(0 == destruction);
+            }
+            SECTION("Uses overload on template policy to invoke erasure swap") {
+                zoo::AnyCallable<BeforeAnyCallableEraserP, void(int)>
+                    lt1 = t,
+                    lt2 = std::move(t);
+                swap(lt1, lt2);
+                CHECK(0 == destruction);
+            }
+            SECTION("Erasure type defined after AnyCallable") {
+                zoo::AnyCallable<AfterAnyCallableEraser, void(int)>
+                    lt1 = t,
+                    lt2 = std::move(t);
+                swap(lt1, lt2);
+                CHECK(0 == destruction); // overload not available
+            }
+        }
+    }
+
+    SECTION("Optimized type-erasure swap *Not* available") {
+        SECTION("Uses template on type overload") {
+            zoo::AnyCallable<BeforeAnyCallableEraserT, void(int)>
+                lt1 = t,
+                lt2 = std::move(t);
+            swap(lt1, lt2);
+            CHECK(1 == destruction);
         }
     }
 }

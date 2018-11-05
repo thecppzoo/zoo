@@ -17,6 +17,9 @@ namespace zoo {
 template<typename, typename>
 struct AnyCallable;
 
+template<typename E, typename S>
+inline
+void swap(AnyCallable<E, S> &ac1, AnyCallable<E, S> &ac2) noexcept;
 
 /// \tparam TypeErasureProvider Must implement a \c state template instance
 /// function that returns a pointer to the held object
@@ -49,11 +52,11 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
             );
     }
 
-    void swap(AnyCallable &other) noexcept(
-        noexcept(swapBase(*this, other))
-    ) {
-        swapBase(*this, other);
-        std::swap(targetInvoker_, other.targetInvoker_);
+    void swap(AnyCallable &other) noexcept {
+        auto &upcasted = static_cast<TypeErasureProvider &>(*this);
+        static_assert(noexcept(upcasted.swap(other)), "");
+        upcasted.swap(other);
+        zoo::swap(targetInvoker_, other.targetInvoker_);
     }
 
     explicit operator bool() const noexcept {
@@ -92,6 +95,10 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     }
 
 private:
+    template<typename E, typename S>
+    friend inline
+    void swap(AnyCallable<E, S> &, AnyCallable<E, S> &) noexcept;
+
     R (*targetInvoker_)(Args..., TypeErasureProvider &);
 
     static R emptyInvoker(Args..., TypeErasureProvider &) {
@@ -102,28 +109,34 @@ private:
     static R invokeTarget(Args... as, TypeErasureProvider &obj) {
         return (*obj.template state<T>())(as...);
     }
-
-    /// Used to perform casting and the implicit checks of std::swap in
-    /// C++ 17 with regards to swappability and move constructibility
-    void swapBase(TypeErasureProvider &thy, TypeErasureProvider &other)
-        noexcept(noexcept(std::swap(thy, other)))
-    {
-        std::swap(thy, other);
-    }
 };
 
-template<typename TypeErasureProvider, typename R, typename... Args>
+template<typename TypeErasureProvider, typename Signature>
+inline
 bool operator==(
-    std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const &ac
+    std::nullptr_t, AnyCallable<TypeErasureProvider, Signature> const &ac
 ) noexcept {
     return ac == nullptr;
 }
 
-template<typename TypeErasureProvider, typename R, typename... Args>
+template<typename TypeErasureProvider, typename Signature>
+inline
 bool operator!=(
-    std::nullptr_t, AnyCallable<TypeErasureProvider, R(Args...)> const &ac
+    std::nullptr_t, AnyCallable<TypeErasureProvider, Signature> const &ac
 ) noexcept {
     return ac != nullptr;
+}
+
+template<typename E, typename S>
+inline
+void swap(AnyCallable<E, S> &c1, AnyCallable<E, S> &c2) noexcept {
+    auto &upcasted = static_cast<E &>(c1);
+    static_assert(
+        noexcept(swap(upcasted, c2)),
+        "Requires swap of type eraser to be noexcept"
+    );
+    swap(upcasted, c2);
+    swap(c1.targetInvoker_, c2.targetInvoker_);
 }
 
 } // namespace zoo
