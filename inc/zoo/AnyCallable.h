@@ -73,22 +73,24 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     }
 
     explicit operator bool() const noexcept {
-        return targetInvoker_ != emptyInvoker_;
+        return !empty();
     }
 
     const std::type_info& target_type() const noexcept {
-        return targetInvoker_ != emptyInvoker_ ?
-            this->type() : typeid(void);
+        return empty() ? typeid(void) : this->type();
+    }
+
+    bool empty() const noexcept {
+        return targetInvoker_ == emptyInvoker_;
     }
 
     template< class T >
     T* target() noexcept {
         using uncvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
-        return targetInvoker_ != emptyInvoker_ ?
-            target_type() == typeid(uncvr_t) ?
-                this->template state<T>() :
-                nullptr:
-            nullptr;
+        if (!empty() && target_type() == typeid(uncvr_t))
+            return this->template state<T>();
+
+        return nullptr;
     }
     
     template< class T >
