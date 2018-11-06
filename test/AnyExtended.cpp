@@ -43,6 +43,26 @@ TEST_CASE("Extended AnyContainer tests") {
                 zoo::AnyContainer<LargePolicy>
                     a1{AOD{d1}},
                     a2{AOD{d2}};
+                REQUIRE(zoo::isRuntimeValue<AOD>(a1));
+                a1.state<AOD>()->ptr_->state_ = 1;
+                a2.state<AOD>()->ptr_->state_ = 2;
+                REQUIRE(0 == d1);
+                REQUIRE(0 == d2);
+                swap(a1, a2);
+                REQUIRE(2 == a1.state<AOD>()->ptr_->state_);
+                REQUIRE(1 == a2.state<AOD>()->ptr_->state_);
+                REQUIRE(0 == d1);
+                REQUIRE(0 == d2);
+            }
+            CHECK(1 == d1);
+            CHECK(1 == d2);
+        }
+        SECTION("Count destructions through shared pointer, referential") {
+            {
+                zoo::Any
+                    a1{AOD{d1}},
+                    a2{AOD{d2}};
+                REQUIRE(zoo::isRuntimeReference<AOD>(a1));
                 a1.state<AOD>()->ptr_->state_ = 1;
                 a2.state<AOD>()->ptr_->state_ = 2;
                 REQUIRE(0 == d1);
