@@ -176,26 +176,13 @@ void testAnyImplementation() {
         REQUIRE(typeid(Big) == empty.type());
     }
     SECTION("swap") {
-        ExtAny other{5};
-        swap(empty, other);
-        REQUIRE(typeid(int) == empty.type());
-        REQUIRE(typeid(void) == other.type());
-        auto valuePointerAtEmpty = zoo::anyContainerCast<int>(&empty);
-        REQUIRE(5 == *valuePointerAtEmpty);
-    }
-    SECTION("swap optimization: no destructor is called") {
-        int v = 0;
-        Destructor d{&v};
-        ExtAny a1{d};
-        ExtAny a2{d};
-        CHECK(0 == v);
-        SECTION("As instance function") {
-            a1.swap(a2);
-            CHECK(0 == v);
-        }
-        SECTION("Using standalone overload") {
-            swap(a1, a2);
-            CHECK(0 == v);
+        SECTION("synopsis") {
+            ExtAny other{5};
+            swap(empty, other);
+            REQUIRE(typeid(int) == empty.type());
+            REQUIRE(typeid(void) == other.type());
+            auto valuePointerAtEmpty = zoo::anyContainerCast<int>(&empty);
+            REQUIRE(5 == *valuePointerAtEmpty);
         }
     }
     SECTION("inplace") {

@@ -166,6 +166,11 @@ struct ConverterContainer {
         driver()->move(to->driver(), to->m_space, m_space);
     }
 
+    void moveAndDestroy(ConverterContainer *to) noexcept {
+        move(to);
+        destroy();
+    }
+
     void *value() noexcept { return driver()->value(m_space); }
 
     bool nonEmpty() const noexcept { return const_cast<ConverterContainer *>(this)->value(); }

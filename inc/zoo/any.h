@@ -33,6 +33,9 @@ struct IAnyContainer {
     virtual void destroy() {}
     virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
     virtual void move(IAnyContainer *to) noexcept { new(to) IAnyContainer; }
+    virtual void moveAndDestroy(IAnyContainer *to) noexcept {
+        new(to) IAnyContainer;
+    }
     virtual void *value() noexcept { return nullptr; }
     virtual bool nonEmpty() const noexcept { return false; }
     virtual const std::type_info &type() const noexcept { return typeid(void); }
@@ -70,6 +73,13 @@ struct ValueContainer: BaseContainer<Size, Alignment> {
         new(to) ValueContainer{std::move(*thy())};
     }
 
+    void moveAndDestroy(IAC *to) noexcept override {
+        ValueContainer::move(to);
+        ValueContainer::destroy();
+            // note: the full qualification prevents the penalty of dynamic
+            // dispatch
+    }
+
     void *value() noexcept override { return thy(); }
 
     const std::type_info &type() const noexcept override {
@@ -103,6 +113,11 @@ struct ReferentialContainer: BaseContainer<Size, Alignment> {
     void move(IAC *to) noexcept override {
         new(to) ReferentialContainer{IAC::None, thy()};
         new(this) IAnyContainer<Size, Alignment>;
+    }
+
+    void moveAndDestroy(IAC *to) noexcept override {
+        ReferentialContainer::move(to);
+        *pThy() = nullptr;
     }
 
     void *value() noexcept override { return thy(); }
@@ -301,11 +316,11 @@ public:
         char tmp[sizeof(Container)];
 
         auto tc = reinterpret_cast<Container *>(tmp);
-        oc->move(tc); // note: invalidates pointer tc
+        oc->moveAndDestroy(tc); // note: invalidates pointer tc
         auto myself = container();
-        myself->move(oc);
+        myself->moveAndDestroy(oc);
         tc = reinterpret_cast<Container *>(tmp); // because it was invalidated
-        tc->move(myself);
+        tc->moveAndDestroy(myself);
     }
 
     bool has_value() const noexcept { return container()->nonEmpty(); }
