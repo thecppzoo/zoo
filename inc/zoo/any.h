@@ -301,9 +301,10 @@ public:
         char tmp[sizeof(Container)];
 
         auto tc = reinterpret_cast<Container *>(tmp);
-        oc->move(tc);
+        oc->move(tc); // note: invalidates pointer tc
         auto myself = container();
         myself->move(oc);
+        tc = reinterpret_cast<Container *>(tmp); // because it was invalidated
         tc->move(myself);
     }
 
