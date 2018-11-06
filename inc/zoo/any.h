@@ -294,7 +294,7 @@ public:
         new(this) AnyContainer;
     }
 
-    inline void swap(AnyContainer &other) noexcept {
+    void swap(AnyContainer &other) noexcept {
         auto oc = other.container();
 
         alignas(alignof(Container))
