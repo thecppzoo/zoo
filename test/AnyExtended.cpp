@@ -38,7 +38,7 @@ TEST_CASE("Extended AnyContainer tests") {
             CHECK(3 == d1);
             CHECK(4 == d2);
         }
-        SECTION("Count destructions") {
+        SECTION("Count destructions through shared pointer") {
             {
                 zoo::AnyContainer<LargePolicy>
                     a1{AOD{d1}},
