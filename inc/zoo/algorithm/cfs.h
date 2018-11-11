@@ -1,6 +1,8 @@
 #ifndef ZOO_CFS_CACHE_FRIENDLY_SEARCH
 #define ZOO_CFS_CACHE_FRIENDLY_SEARCH
 
+#include <zoo/algorithm/less.h>
+
 #ifndef SIMPLIFY_INCLUDES
 // because of std::declval needed to default comparator
 #include <utility>
@@ -9,14 +11,6 @@
 #endif
 
 namespace zoo {
-
-template<typename Iterator>
-struct LessForIterated {
-    using type = std::decay_t<decltype(*std::declval<Iterator>())>;
-    bool operator()(const type &left, const type &right) {
-        return left < right;
-    }
-};
 
 constexpr unsigned long long log2Floor(unsigned long long arg) {
     return 63 - __builtin_clzll(arg);
@@ -78,7 +72,8 @@ auto cfsBound(
     Base base,
     Base supremum,
     std::size_t size, std::size_t ndx,
-    const E &e, Comparator c
+    const E &e,
+    Comparator c
 ) -> std::pair<Base, Base> {
     if(0 == size) { return {supremum, supremum}; }
     auto
@@ -138,7 +133,7 @@ auto cfsBound(
 template<
     typename Base,
     typename E, 
-    typename Comparator = LessForIterated<Base>
+    typename Comparator = Less
 >
 auto cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return
@@ -148,7 +143,7 @@ auto cfsLowerBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
 template<
     typename Base,
     typename E, 
-    typename Comparator = LessForIterated<Base>
+    typename Comparator = Less
 >
 auto cfsHigherBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return
@@ -158,7 +153,7 @@ auto cfsHigherBound(Base b, Base e, const E &v, Comparator c = Comparator{}) {
 template<
     typename Base,
     typename E, 
-    typename Comparator = LessForIterated<Base>
+    typename Comparator = Less
 >
 auto cfsEqualRange(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBound<detail::RANGE>(b, e, e - b, 0, v, c);
@@ -170,36 +165,39 @@ struct ValidResult {
     operator bool() const { return worked_; }
 };
 
-template<typename I>
-ValidResult validHeap(I base, int current, int max) {
+template<typename I, typename Comparator = Less>
+auto validHeap(
+    I base, int current, int max, Comparator c = Comparator{}
+) -> ValidResult {
     for(;;) {
         auto higherSubtree = current*2 + 2;
         if(max <= higherSubtree) {
             if(max < higherSubtree) { return {true, 0} ; } // current is a leaf
             // max == higherSubtree, there is only the lower subtree
             auto subLeaf = higherSubtree - 1;
-            return {not(*(base + current) < *(base + subLeaf)), subLeaf};
+            return {not c(*(base + current), *(base + subLeaf)), subLeaf};
         }
         // there are both branches
         auto &element = *(base + current);
         auto lowerSubtree = higherSubtree - 1;
-        if(element < *(base + lowerSubtree)) { return {false, lowerSubtree}; }
+        if(c(element, *(base + lowerSubtree))) { return {false, lowerSubtree}; }
         auto recursionResult = validHeap(base, lowerSubtree, max);
         if(!recursionResult) { return recursionResult; }
-        if(*(base + higherSubtree) < element) { return {false, higherSubtree}; }
+        if(c(*(base + higherSubtree), element)) {
+            return {false, higherSubtree};
+        }
         current = higherSubtree;
     }
 }
 
-template<typename I>
-auto validHeap(I begin, I end) {
-    return validHeap(begin, 0, end - begin);
+template<typename I, typename Comparator = Less>
+auto validHeap(I begin, I end, Comparator c = Comparator{}) {
+    return validHeap(begin, 0, end - begin, c);
 }
 
-template<typename R>
-bool validHeap(const R &range) {
-    //std::cout << range << std::endl;
-    return validHeap(range.begin(), range.end());
+template<typename R, typename Comparator = Less>
+bool validHeap(const R &range, Comparator c = Comparator{}) {
+    return validHeap(range.begin(), range.end(), c);
 }
 
 }
