@@ -133,7 +133,7 @@ auto cfsBounds(Base base, Base end, const E &e, Comparator c)
 template<
     typename Base,
     typename E, 
-    typename Comparator = LessForIterated<Base>
+    typename Comparator = Less
 >
 Base cfsSearch(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<false, false>(b, e, v, c).first;
@@ -142,7 +142,7 @@ Base cfsSearch(Base b, Base e, const E &v, Comparator c = Comparator{}) {
 template<
     typename Base,
     typename E, 
-    typename Comparator = LessForIterated<Base>
+    typename Comparator = Less
 >
 Base cfsLowerBoundOld(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<true, false>(b, e, v, c).first;
@@ -151,7 +151,7 @@ Base cfsLowerBoundOld(Base b, Base e, const E &v, Comparator c = Comparator{}) {
 template<
     typename Base,
     typename E, 
-    typename Comparator = LessForIterated<Base>
+    typename Comparator = Less
 >
 Base cfsHigherBoundOld(Base b, Base e, const E &v, Comparator c = Comparator{}) {
     return detail::cfsBounds<false, true>(b, e, v, c).second;

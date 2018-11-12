@@ -16,6 +16,6 @@ link_directories(
     ./dependencies
 )
 
-add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp)
+add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp sort.cpp)
 
 target_link_libraries(zooBenchmark benchmark)

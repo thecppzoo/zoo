@@ -1,6 +1,8 @@
 #include "cfs/cfs_utility.h"
 
 #include <junk/algorithm/cfs.h>
+#include <zoo/algorithm/quicksort.h>
+
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
@@ -38,13 +40,25 @@ void randomVector(benchmark::State &s) {
     s.SetComplexityN(n);
 }
 
-void sortRandomVector(benchmark::State &s) {
+void sortSTLRandomVector(benchmark::State &s) {
     auto n = s.range(0);
     auto v = makeRandomVector(n);
     for(auto _: s) {
         benchmark::DoNotOptimize(v.data());
         auto copy = v;
         std::sort(begin(copy), end(copy));
+        benchmark::DoNotOptimize(copy.data());
+    }
+    s.SetComplexityN(n);
+}
+
+void sortQuicksortRandomVector(benchmark::State &s) {
+    auto n = s.range(0);
+    auto v = makeRandomVector(n);
+    for(auto _: s) {
+        benchmark::DoNotOptimize(v.data());
+        auto copy = v;
+        zoo::quicksort(begin(copy), end(copy));
         benchmark::DoNotOptimize(copy.data());
     }
     s.SetComplexityN(n);
@@ -96,8 +110,24 @@ struct CacheLine {
     CacheLine &operator=(int v) { value = v; return *this; }
 };
 
+inline bool operator<(int v, const CacheLine &cl) {
+    return v < cl.value;
+}
+
 int asInt(int v) { return v; }
 int asInt(CacheLine cl) { return cl.value; }
+
+template<typename Policy>
+struct PolicyWrapper {
+    template<typename Spc, typename I, typename E>
+    static auto search(I b, I e, const E &v, const Spc &s) {
+        return Policy::search(b, e, v);
+    }
+};
+
+struct UseUnordered;
+template<>
+struct PolicyWrapper<UseUnordered>;
 
 template<typename F>
 void search(benchmark::State &s) {
@@ -119,7 +149,7 @@ void search(benchmark::State &s) {
     for(auto _: s) {
         auto k = keys[kNdx++];
         ++searched;
-        auto r = F::search(b, e, k);
+        auto r = PolicyWrapper<F>::search(b, e, k, space);
         if(e != r && k == *r) {
             ++found;
             ultimate ^= asInt(*r);
@@ -251,6 +281,28 @@ void searchCacheLineCFS(benchmark::State &s) {
     search<UseCacheLineCFS>(s);
 }
 
+struct UseOnordered {
+    static auto makeSpace(int q) {
+        std::vector<int> raw{makeRandomVector(q)};
+        std::unordered_set<int> rv;
+        for(auto e: raw) {
+            rv.insert(e);
+        }
+        return rv;
+    }
+};
+template<>
+struct PolicyWrapper<UseOnordered> {
+    template<typename I>
+    static auto search(I b, I e, int v, const std::unordered_set<int> &s) {
+        return s.find(v);
+    }
+};
+
+void searchUnordered(benchmark::State &s) {
+    search<UseOnordered>(s);
+}
+
 static_assert(64 == sizeof(CacheLine));
 static_assert(64 == alignof(CacheLine));
 
@@ -267,11 +319,13 @@ BENCHMARK(justTraversingRandomVector)->RangeMultiplier(10)->Range(RangeLow, Rang
 BENCHMARK(searchLinear)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
 BENCHMARK(searchSTL)->RangeMultiplier(3)->Range(1, RangeHigh);//->Complexity();
 BENCHMARK(searchCFSLowerBound)->RangeMultiplier(3)->Range(1, RangeHigh);//->Complexity();
+BENCHMARK(searchUnordered)->RangeMultiplier(3)->Range(1, RangeHigh);//->Complexity();
 BENCHMARK(searchCFSLateOld)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
 BENCHMARK(searchCFSEarly)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->Complexity();
 BENCHMARK(genLinearVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(randomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
-BENCHMARK(sortRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
+BENCHMARK(sortSTLRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
+BENCHMARK(sortQuicksortRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(transformationToCFS)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 
 BENCHMARK_MAIN();
