@@ -1,95 +1,79 @@
-#ifndef ZOO_GENERALIZED_QUICKSORT
-#define ZOO_GENERALIZED_QUICKSORT
+#ifndef ZOO_QUICKSORT
+#define ZOO_QUICKSORT
 
-void swap(int &l, int &r) {
-    auto tmp = l;
-    l = r;
-    r = tmp;
-}
+#include <zoo/algorithm/moveRotation.h> // for moveRotate
 
-#include <array>
+#include <zoo/algorithm/less.h>
 
-template<typename I>
-I partition_noRandomAccess(I pivot, I b, I e) {
+#include <array> // for temporary storage
+
+namespace zoo {
+
+/// \tparam FI is a forward iterator
+/// \pre b != e
+template<typename FI, typename Comparison>
+FI implicitPivotPartition(FI b, FI e, Comparison cmp) {
+    auto pivot = b++;
     while(b != e) {
-        // ..., P == *pivot, G0, G1, ..., Gn, L == *b
-        if(*b < *pivot) {
-            // target: ..., L, P == *pivot, G1, ...., G0 == *b
-            swap(*pivot, *b);
-            // ..., L == *pivot, G0, G1, ..., Gn, P == *b
-            swap(*++pivot, *b);
+        // invariant: ..., L0, P == *pivot, G0, G1, ... Gn, *b
+        // where Lx means lower-than-pivot and Gx higher-equal-to-pivot
+        if(cmp(*b, *pivot)) {
+            // ..., L1, P == *pivot, G0, G1, ..., Gn, L0 == *b, X0, ...
+            // The pivot is greater than the element:
+            // insert *b into the lower partition:
+            //  1. *b goes into the pivot position
+            //  2. the pivot increases by one
+            //  3. the element at pivot + 1, the new pivot, must be greater
+            // than or equal to any Lx, the value of *pivot satisfies this
+            // property.
+            // These requirements can be satisfied by rotating the elements
+            // at positions (pivot, b, pivot + 1)
+            // ..., L1, L0, L == *pivot, G0, G1, ..., P == *b, X0, ...
+            auto oldPivot = pivot++;
+            if(b == pivot) {
+                moveRotation(*oldPivot, *pivot);
+            } else {
+                moveRotation(*oldPivot, *b, *pivot);
+            }
         }
         ++b;
     }
     return pivot;
 }
 
-template<typename I>
-I partition_noRandomAccessRotate(I pivot, I b, I e) {
-    while(b != e) {
-        if(*b < *pivot) {
-            // pivot <- b, b <- (pivot + 1), (pivot + 1) <- pivot
-            auto tmp = *pivot;
-            *pivot = *b;
-            *b = *++pivot;
-            *pivot = tmp;
-        }
-        ++b;
-    }
-    return pivot;    
-}
+template<typename I, typename Comparison = Less>
+void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
+    if(begin == end) { return; }
 
-template<typename I, typename ParFun>
-void quicksortNoRandomAccess_impl(I begin, I end, ParFun pf) {
-    auto bPtr = &*begin;
+    constexpr static const auto FrameCount = 100;
     struct Frame {
         I b, e;
     };
-    std::array<Frame, 50> frames;
-    int index = 0;
-    frames[0].b = begin;
-    frames[0].e = end;
-    for(;;) {
-        auto &frame = frames[index];
-        auto b = frame.b;
-        auto e = frame.e;
-
-        auto oldB = b;
-        auto oldBPtr = &*oldB;
-        if(b != e) {
-            auto pivot = b++;
-            if(b != e) {
-                //pivot = partition_noRandomAccess(pivot, b, e);
-                pivot = pf(pivot, b, e);
-                ++index;
-                if(50 <= index) { throw std::runtime_error("Exhausted"); }
-                frames[index].b = oldB;
-                frames[index].e = pivot;
-                ++pivot;
-                frame.b = pivot;
-                continue;
+    std::array<Frame, FrameCount> stack;
+    auto index = 0;
+    for(;;) { // outer loop for doing a frame
+        for(;;) { // to do recursion in the lower partition
+            auto pivot = implicitPivotPartition(begin, end, cmp);
+            auto successor = pivot;
+            ++successor;
+            stack[index] = { successor, end };
+            end = pivot;
+            if(begin == end) { break; }
+            if(FrameCount <= ++index) {
+                throw std::runtime_error("quicksort stack exhausted");
             }
         }
-        if(!index--) { break; }
+
+        for(;;) { // to unwind recursion in the higher partition
+            auto &frame = stack[index];
+            begin = frame.b;
+            end = frame.e;
+            if(begin != end) { break; }
+            if(!index--) { return; }
+        }
     }
 }
 
-
-template<typename I>
-void quicksortNoRandomAccess(I begin, I end) {
-    quicksortNoRandomAccess_impl(begin, end, partition_noRandomAccess<I>);
-}
-
-template<typename I>
-void quicksort(I b, I e) {
-    auto oldB = b;
-    if(b == e) { return; }
-    auto pivot = b++;
-    if(b == e) { return; }
-    pivot = partition_noRandomAccess(pivot, b, e);
-    quicksort(oldB, pivot);
-    ++pivot;
-    quicksort(pivot, e);
 }
 
 #endif
