@@ -33,6 +33,8 @@ struct IAnyContainer {
     virtual void destroy() {}
     virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
     virtual void move(IAnyContainer *to) noexcept { new(to) IAnyContainer; }
+
+    /// Note: it is a fatal error to call the destructor after moveAndDestroy
     virtual void moveAndDestroy(IAnyContainer *to) noexcept {
         new(to) IAnyContainer;
     }
@@ -110,14 +112,17 @@ struct ReferentialContainer: BaseContainer<Size, Alignment> {
 
     void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
 
+    void transferPointer(IAC *to) {
+        new(to) ReferentialContainer{IAC::None, thy()};
+    }
+
     void move(IAC *to) noexcept override {
         new(to) ReferentialContainer{IAC::None, thy()};
         new(this) IAnyContainer<Size, Alignment>;
     }
 
     void moveAndDestroy(IAC *to) noexcept override {
-        ReferentialContainer::move(to);
-        *pThy() = nullptr;
+        transferPointer(to);
     }
 
     void *value() noexcept override { return thy(); }
