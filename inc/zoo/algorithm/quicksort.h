@@ -53,32 +53,33 @@ void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     };
     std::array<Frame, FrameCount> stack;
     auto index = 0;
-    for(;;) { // outer loop for doing a frame
-        for(;;) { // to do recursion in the lower partition
-            auto pivot = implicitPivotPartition(begin, end, cmp);
-            auto higherBegin = next(pivot);
-            if(higherBegin == end) { // no higher-recursion needed
-                if(begin == pivot) { // neither lower-recursion
-                    if(!index--) { return; }
-                    break;
-                }
-                end = pivot; // lower-recursion
-                continue;
+
+    for(;;) { // to do recursion in the lower partition
+        auto pivot = implicitPivotPartition(begin, end, cmp);
+        auto higherBegin = next(pivot);
+        if(higherBegin == end) { // no higher-recursion needed
+            if(begin != pivot) {
+                end = pivot; // then just do lower recursion
+                continue; // without leaving a frame
             }
-            // higher recursion needed
-            if(begin == pivot) { // no lower recursion needed
-                begin = higherBegin;
-                continue; 
-            }
-            stack[index] = { higherBegin, end };
-            end = pivot;
-            if(FrameCount <= ++index) {
-                throw std::runtime_error("quicksort stack exhausted");
-            }
+            // there is no lower-recursion
+            if(!index--) { return; }
+            auto &frame = stack[index];
+            begin = frame.b;
+            end = frame.e;
+            continue;
         }
-        auto &frame = stack[index];
-        begin = frame.b;
-        end = frame.e;
+        // higher recursion needed
+        if(begin == pivot) { // no lower recursion needed
+            begin = higherBegin;
+            continue; 
+        }
+        // both lower and higher recursions needed, make frame for higher
+        stack[index] = { higherBegin, end };
+        end = pivot;
+        if(FrameCount <= ++index) {
+            throw std::runtime_error("quicksort stack exhausted");
+        }
     }
 }
 
