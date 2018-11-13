@@ -39,6 +39,18 @@ struct TracesMoves {
     }
 };
 
+template<typename T, std::size_t... Ints>
+void initialize(T &what, std::index_sequence<Ints...>) {
+    what = T{Ints...};
+}
+
+struct Greater {
+    template<typename T1, typename T2>
+    bool operator()(const T1 &t1, const T2 &t2) const {
+        return t2 < t1;
+    }
+};
+
 TEST_CASE("quicksort") {
     using VInt = std::vector<int>;
     SECTION("Edge cases") {
@@ -86,6 +98,19 @@ TEST_CASE("quicksort") {
             zoo::quicksort(begin(large), end(large));
             CHECK(large == expected);
         }
+    }
+    SECTION("Stack overflow") {
+        VInt twoHundred;
+        initialize(twoHundred, std::make_index_sequence<200>{});
+        REQUIRE(200 == twoHundred.size());
+        REQUIRE(zoo::is_sorted(cbegin(twoHundred), cend(twoHundred)));
+        zoo::quicksort(begin(twoHundred), end(twoHundred), Greater{});
+        REQUIRE(not zoo::is_sorted(cbegin(twoHundred), cend(twoHundred)));
+        REQUIRE(zoo::is_sorted(cbegin(twoHundred), cend(twoHundred), Greater{}));
+        for(int i = 0; i < 200; i += 2) {
+            std::swap(twoHundred[i], twoHundred[i + 1]);
+        }
+        zoo::quicksort(begin(twoHundred), end(twoHundred));
     }
     SECTION("Regressions") {
         SECTION("Does not move already moved") {

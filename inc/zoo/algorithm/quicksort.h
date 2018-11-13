@@ -9,16 +9,36 @@
 
 namespace zoo {
 
+template<typename FI>
+struct ImplicitPivotResult {
+    FI pivot_;
+    long bias_;
+};
+
 /// \tparam FI is a forward iterator
 /// \pre b != e
 template<typename FI, typename Comparison>
-FI implicitPivotPartition(FI b, FI e, Comparison cmp) {
+auto implicitPivotPartition(FI b, FI e, Comparison cmp) ->
+    ImplicitPivotResult<FI> 
+{
+    auto bias = 0;
     auto pivot = b++;
+    /*if(e == b) { return pivot; }
+    if(cmp(*b, *pivot)) {
+        auto third = next(b);
+        if(third == e) {
+            moveRotation(*pivot, *b);
+            return pivot;
+        }
+    }*/
     for(; b != e; ++b) {
         // invariant: ..., L0, P == *pivot, G0, G1, ... Gn, *b
         // where Lx means lower-than-pivot and Gx higher-equal-to-pivot
-        if(!cmp(*b, *pivot)) { continue; }
-
+        if(!cmp(*b, *pivot)) {
+            ++bias;
+            continue;
+        }
+        --bias;
         // ..., L1, P == *pivot, G0, G1, ..., Gn, L0 == *b, X0, ...
         // The pivot is greater than the element:
         // insert *b into the lower partition:
@@ -40,14 +60,14 @@ FI implicitPivotPartition(FI b, FI e, Comparison cmp) {
         /*moveRotation(*oldPivot, *b);
         moveRotation(*b, *pivot);*/
     }
-    return pivot;
+    return {pivot, bias};
 }
 
 template<typename I, typename Comparison = Less>
 void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     if(begin == end) { return; }
 
-    constexpr static const auto FrameCount = 100;
+    constexpr static const auto FrameCount = 64;
     struct Frame {
         I b, e;
     };
@@ -55,32 +75,53 @@ void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     auto index = 0;
 
     for(;;) { // to do recursion in the lower partition
-        auto pivot = implicitPivotPartition(begin, end, cmp);
+        auto result = implicitPivotPartition(begin, end, cmp);
+        auto pivot = result.pivot_;
+        auto bias = result.bias_;
         auto higherBegin = next(pivot);
         if(higherBegin == end) { // no higher-recursion needed
             if(begin != pivot) {
                 end = pivot; // then just do lower recursion
                 continue; // without leaving a frame
             }
-            // there is no lower-recursion
-            if(!index--) { return; }
-            auto &frame = stack[index];
+            // there is no lower-recursion either
+            if(!index) { return; }
+            auto &frame = stack[--index];
             begin = frame.b;
             end = frame.e;
             continue;
         }
         // higher recursion needed
         if(begin == pivot) { // no lower recursion needed
-            begin = higherBegin;
-            continue; 
+            begin = higherBegin; // becomes the higher recursion
+            continue;
         }
-        // both lower and higher recursions needed, make frame for higher
-        stack[index] = { higherBegin, end };
-        end = pivot;
+        // both lower and higher recursions needed, make frame for the larger
+        // partition:
+        // The smaller partition is less than or equal to half the elements:
+        // size(smaller) <= size/2 => depth of recursion <= log2(N)
+        if(0 < bias) { // lower partition is smaller
+            stack[index] = { higherBegin, end };
+            end = pivot;            
+        } else { // higher partition is smaller
+            stack[index] = { begin, pivot };
+            begin = higherBegin;
+        }
         if(FrameCount <= ++index) {
             throw std::runtime_error("quicksort stack exhausted");
         }
     }
+}
+
+template<typename FI, typename Comparison = Less>
+bool is_sorted(FI begin, FI end, Comparison cmp = Comparison{}) {
+    if(begin == end) { return true; }
+    auto old = begin++;
+    while(begin != end) {
+        if(not cmp(*old, *begin)) { return false; }
+        old = begin++;
+    }
+    return true;
 }
 
 }
