@@ -29,13 +29,16 @@ FI implicitPivotPartition(FI b, FI e, Comparison cmp) {
         // property.
         // These requirements can be satisfied by rotating the elements
         // at positions (pivot, b, pivot + 1)
-        // ..., L1, L0, L == *pivot, G0, G1, ..., P == *b, X0, ...
+        // ..., L1, L0, P == *pivot, G1, ..., Gn, G0 == *b, X0, ...
         auto oldPivot = pivot++;
         if(b == pivot) {
             moveRotation(*oldPivot, *pivot);
         } else {
             moveRotation(*oldPivot, *b, *pivot);
         }
+        // tmp = *b, *b = *1, *1 = *0, *0 = tmp
+        /*moveRotation(*oldPivot, *b);
+        moveRotation(*b, *pivot);*/
     }
     return pivot;
 }
@@ -53,25 +56,29 @@ void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     for(;;) { // outer loop for doing a frame
         for(;;) { // to do recursion in the lower partition
             auto pivot = implicitPivotPartition(begin, end, cmp);
-            if(pivot == end) { // partition sorted
-                if(!index--) { return; }
-                break;
+            auto higherBegin = next(pivot);
+            if(higherBegin == end) { // no higher-recursion needed
+                if(begin == pivot) { // neither lower-recursion
+                    if(!index--) { return; }
+                    break;
+                }
+                end = pivot; // lower-recursion
+                continue;
             }
-            stack[index] = { next(pivot), end };
+            // higher recursion needed
+            if(begin == pivot) { // no lower recursion needed
+                begin = higherBegin;
+                continue; 
+            }
+            stack[index] = { higherBegin, end };
             end = pivot;
-            if(begin == end) { break; }
             if(FrameCount <= ++index) {
                 throw std::runtime_error("quicksort stack exhausted");
             }
         }
-
-        for(;;) { // to unwind recursion in the higher partition
-            auto &frame = stack[index];
-            begin = frame.b;
-            end = frame.e;
-            if(begin != end) { break; }
-            if(!index--) { return; }
-        }
+        auto &frame = stack[index];
+        begin = frame.b;
+        end = frame.e;
     }
 }
 
