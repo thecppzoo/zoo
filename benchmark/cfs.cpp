@@ -52,18 +52,6 @@ void sortSTLRandomVector(benchmark::State &s) {
     s.SetComplexityN(n);
 }
 
-void sortQuicksortRandomVector(benchmark::State &s) {
-    auto n = s.range(0);
-    auto v = makeRandomVector(n);
-    for(auto _: s) {
-        benchmark::DoNotOptimize(v.data());
-        auto copy = v;
-        zoo::quicksort(begin(copy), end(copy));
-        benchmark::DoNotOptimize(copy.data());
-    }
-    s.SetComplexityN(n);
-}
-
 void justARandomKeyCallingOpaque(benchmark::State &s) {
     for(auto _: s) {
         randomTwo30();
@@ -306,9 +294,6 @@ void searchUnordered(benchmark::State &s) {
 static_assert(64 == sizeof(CacheLine));
 static_assert(64 == alignof(CacheLine));
 
-constexpr auto RangeLow = 10000;
-constexpr auto RangeHigh = RangeLow * 10000;
-
 //BENCHMARK(searchCacheLineCFS)->Arg(RangeHigh);//->Complexity();
 BENCHMARK(searchCacheLineSTL)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);
 BENCHMARK(searchCacheLineCFS)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);
@@ -325,7 +310,6 @@ BENCHMARK(searchCFSEarly)->RangeMultiplier(10)->Range(RangeLow, RangeHigh);//->C
 BENCHMARK(genLinearVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(randomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(sortSTLRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
-BENCHMARK(sortQuicksortRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(transformationToCFS)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 
 BENCHMARK_MAIN();

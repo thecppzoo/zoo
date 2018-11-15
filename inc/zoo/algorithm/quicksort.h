@@ -74,7 +74,7 @@ void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     std::array<Frame, FrameCount> stack;
     auto index = 0;
 
-    for(;;) { // to do recursion in the lower partition
+    for(;;) {
         auto result = implicitPivotPartition(begin, end, cmp);
         auto pivot = result.pivot_;
         auto bias = result.bias_;

@@ -13,4 +13,7 @@ int randomTwo30();
 
 std::vector<int> makeRandomVector(int size, int range = 0);
 
+constexpr auto RangeLow = 10000;
+constexpr auto RangeHigh = RangeLow * 10000;
+
 #endif
