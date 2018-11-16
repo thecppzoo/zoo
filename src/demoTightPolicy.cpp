@@ -1,9 +1,11 @@
+#include <catch2/catch.hpp>
+
 #define STRING7_TESTS
 
-#include "util/movedString.h"
+
 #include "TightPolicy.h"
 
-#include "GenericAnyTests.h"
+#include <GenericAnyTests.h>
 
 String7::ConstructorOverload lastOverload;
 void String7::c(ConstructorOverload o) { lastOverload = o; }
@@ -11,26 +13,29 @@ void String7::c(ConstructorOverload o) { lastOverload = o; }
 static_assert(!is_stringy_type<int>::value, "");
 static_assert(is_stringy_type<std::string>::value, "");
 
-struct has_chars {
-    char spc[8];
-};
-
-static_assert(is_stringy_type<decltype(has_chars::spc)>::value, "");
-
-#ifdef TESTS
-    #define CATCH_CONFIG_MAIN
-#else
-    #define CATCH_CONFIG_RUNNER
-#endif
-#include "catch.hpp"
 
 #include <memory>
+
+namespace zoo {
+
+using BeforeMovingType = const char *;
+
+BeforeMovingType beforeMoving(const std::string &s) {
+    return s.data();
+}
+
+auto bufferWasMoved(const std::string &to, BeforeMovingType b) {
+    return to.data() == b;
+}
+
+}
+
 
 TEST_CASE("Encodings", "[TightPolicy]") {
     Tight t;
     auto &e = t.code.empty;
     SECTION("Empty") {
-        bool emptiness = !e.isInteger && e.notPointer && !e.isString;
+        bool emptiness = !e.isInteger && !e.isPointer && e.isNotString;
         REQUIRE(emptiness);
     }
     SECTION("Int63 - does not preserve negatives") {
@@ -57,7 +62,7 @@ TEST_CASE("Encodings", "[TightPolicy]") {
         std::unique_ptr<int> forget{new int{8}};
         auto ptr = forget.get();
         t.code.pointer = ptr;
-        auto pointerness = !e.isInteger && !e.notPointer;
+        auto pointerness = t.isPointer();
         REQUIRE(pointerness);
         REQUIRE(ptr == t.code.pointer);
     }
@@ -66,12 +71,12 @@ TEST_CASE("Encodings", "[TightPolicy]") {
         static_assert(std::is_same<char[6], decltype(noNull)>::value, "");
         t.code.string = noNull;
         SECTION("Correct encoding") {
-            bool stringness = !e.isInteger && e.notPointer && e.isString;
+            bool stringness = t.isString();
             REQUIRE(stringness);
             CHECK(String7::ARRAY == lastOverload);
         }
         SECTION("Correct count from char[]") {
-            REQUIRE(6 == t.code.string.count);
+            REQUIRE(6 == t.code.string.count());
         }
         std::string asString = "hi!";
         SECTION("Conversion to std::string") {
@@ -156,12 +161,12 @@ template<>
 struct RuntimeReferenceOrValueDiscriminator<TightPolicy> {
     template<typename>
     static bool runtimeValue(Tight *e) {
-        return e->code.empty.isInteger || e->code.empty.notPointer;
+        return e->isInteger() || e->isString();
     }
 
     template<typename>
     static bool runtimeReference(Tight *e) {
-        return !e->code.empty.isInteger && !e->code.empty.notPointer;
+        return e->isPointer();
     }
 };
 
@@ -298,7 +303,7 @@ TEST_CASE("TightAny", "[TightAny][contract]") {
     }
     SECTION("swap") {
         ExtAny other{5};
-        anyContainerSwap(empty, other);
+        swap(empty, other);
         REQUIRE(typeid(long) == empty.type());
         REQUIRE(typeid(void) == other.type());
         auto valuePointerAtEmpty = tightCast<int>(empty);

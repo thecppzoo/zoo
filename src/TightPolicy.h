@@ -6,7 +6,7 @@
 #include <algorithm>
 #endif
 
-#include "util/ConverterAny.h"
+#include <zoo/ConverterAny.h>
 
 constexpr auto VoidPtrSize = sizeof(void *);
 constexpr auto VoidPtrAlignment = alignof(void *);
@@ -18,25 +18,24 @@ using Fallback =
     >>;
 
 struct Empty {
-    bool isInteger:1;
-    bool notPointer:1;
-    bool isString:1;
-        // xx 1: Int63
-        // x0 0: Pointer
-        // 0 10: Empty
-        // 1 10: String7
     long dontcare:61;
+        // 000: string
+        // 001: empty
+    bool isNotString:1;
+        // 01x
+    bool isPointer:1;
+        // 1xx
+    bool isInteger:1;
 
-    Empty(): isInteger{false}, notPointer{true}, isString{false} {}
+    Empty(): isNotString{true}, isPointer{false}, isInteger{false} {}
 
     using type = void;
 };
 
 struct Int63 {
-    bool outcode:1;
     long integer:63;
+    bool outcode:1;
 
-    Int63(): outcode(1) {}
     Int63(long v): outcode(1), integer(v) {}
 
     operator long() const { return integer; }
@@ -45,13 +44,10 @@ struct Int63 {
 };
 
 struct Pointer62 {
+    intptr_t pointer:62;
     unsigned outcode:2;
-    uintptr_t pointer:62;
 
-    Pointer62(): outcode{0} {}
-    Pointer62(void *ptr):
-        outcode(0), pointer(reinterpret_cast<uintptr_t>(ptr) >> 2)
-    {}
+    Pointer62(void *ptr): outcode{1}, pointer{std::intptr_t(ptr) >> 2} {}
 
     operator void *() const {
         return reinterpret_cast<void *>(pointer << 2);
@@ -61,12 +57,12 @@ struct Pointer62 {
 };
 
 struct String7 {
+    char bytes[7];
     struct {
         uint8_t
-            outcode:3,
-            count: 5;
+            remaining:5,
+            outcode:3;
     };
-    char bytes[7];
 
     enum ConstructorOverload {
         POINTER_COUNT,
@@ -81,12 +77,16 @@ struct String7 {
     {}
     #endif
 
-    String7(const char *ptr, std::size_t size): outcode(6), count(size) {
-        std::copy(ptr, count + ptr, bytes);
+//private:
+    String7(const char *ptr, std::size_t size):
+        outcode{0}, remaining{static_cast<uint8_t>(7 - size)}
+    {
+        std::copy(ptr, size + ptr, bytes);
+        bytes[size] = '\0'; // technically UB if 7 == size
         c(POINTER_COUNT);
     }
-    String7(): String7(nullptr, 0) { c(DEFAULT); }
 
+public:
     template<int L, std::enable_if_t<L < 8, int> = 0>
     String7(const char (&array)[L]): String7(array, L) { c(ARRAY); }
 
@@ -95,8 +95,10 @@ struct String7 {
     { c(STRING); }
 
     operator std::string() const {
-        return { bytes, bytes + count };
+        return { bytes, bytes + 7 - remaining };
     }
+
+    std::size_t count() const noexcept { return 7 - remaining; }
 
     using type = std::string;
 };
@@ -113,10 +115,10 @@ struct Tight { // Why can't you inherit from unions?
 
     bool isInteger() const noexcept { return code.empty.isInteger; }
     bool isPointer() const noexcept {
-        return !isInteger() && !code.empty.notPointer;
+        return !isInteger() && code.empty.isPointer;
     }
     bool isString() const noexcept {
-        return !isInteger() && code.empty.isString;
+        return !isPointer() && !code.empty.isNotString;
     }
 
     static_assert(sizeof(code) == VoidPtrSize, "");
@@ -126,9 +128,11 @@ struct Tight { // Why can't you inherit from unions?
     inline void destroy();
     void copy(Tight *to) const;
     void move(Tight *to) noexcept;
+    void moveAndDestroy(Tight *to) noexcept {
+        move(to);
+    }
     bool nonEmpty() const noexcept {
-        auto e = code.empty;
-        return e.isInteger || !e.notPointer || e.isString;
+        return isInteger() || isPointer() || isString();
     }
     void *value();
     const std::type_info &type() const noexcept;
@@ -163,10 +167,11 @@ void *Tight::value() {
     if(!isPointer()) { throw zoo::bad_any_cast{}; }
     return fallback(code.pointer)->container()->value();
 }
+
 const std::type_info &Tight::type() const noexcept {
-    if(code.empty.isInteger) { return typeid(long); }
-    if(!code.empty.notPointer) { return fallback(code.pointer)->type(); }
-    if(code.empty.isString) { return typeid(String7); }
+    if(isInteger()) { return typeid(long); }
+    if(isPointer()) { return fallback(code.pointer)->type(); }
+    if(isString()) { return typeid(String7); }
     return typeid(void);
 }
 
@@ -204,7 +209,8 @@ struct is_stringy_impl<char[L]>: std::true_type {
 };
 
 template<typename T>
-using is_stringy_type = is_stringy_impl<zoo::uncvr_t<T>>;
+using is_stringy_type =
+    typename is_stringy_impl<std::remove_cv_t<std::remove_reference_t<T>>>::type;
 
 template<typename T, typename Void>
 template<typename... Args>
@@ -290,13 +296,16 @@ std::enable_if_t<
     !is_stringy_type<T>::value && !std::is_integral<T>::value,
     std::decay_t<T> &
 > tightCast(TightAny &ta) {
-    return *zoo::anyContainerCast<std::decay_t<T>>(fallback(ta.container()->code.pointer));
+    return
+        *zoo::anyContainerCast<std::decay_t<T>>(
+            fallback(ta.container()->code.pointer)
+        );
 }
 
 template<typename T>
 std::enable_if_t<is_stringy_type<T>::value, std::string>
 tightCast(TightAny &ta) {
-    if(ta.container()->code.empty.notPointer) {
+    if(ta.container()->isString()) {
         return ta.container()->code.string;
     }
     return *zoo::anyContainerCast<std::string>(fallback(ta.container()->code.pointer));
