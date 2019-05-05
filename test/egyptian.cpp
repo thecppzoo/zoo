@@ -17,9 +17,11 @@ struct ModuloN {
 
 int ModuloN::N = 0;
 
-bool operator!=(ModuloN x, ModuloN y) {
-    return x._value != y._value;
+bool operator==(ModuloN x, ModuloN y) noexcept {
+    return x._value == y._value;
 }
+
+bool operator!=(ModuloN x, ModuloN y) noexcept { return !(x == y); }
 
 template<typename E>
 E egyptianExponentiation(E x, E y) {
@@ -30,7 +32,7 @@ E egyptianExponentiation(E x, E y) {
 
 #include <catch2/catch.hpp>
 
-TEST_CASE("Dummy", "[egyptian]") {
+TEST_CASE("Egyptian multiplication algorithm", "[egyptian]") {
     SECTION("Normal integer exponentiation") {
         CHECK(243 == egyptianExponentiation(3, 5));
     }

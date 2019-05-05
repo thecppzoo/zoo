@@ -24,18 +24,19 @@ A OperatorTraits<Exponentiation>::operate(A x, A y) {
 
 template<typename Operation, typename Argument>
 Argument egyptian(Argument x, Argument y, Operation) {
-    Argument
-        delta = x,
-        result = OperatorTraits<Operation>::initializer;
-    while(0 != y) { // the argument must be comparable to 0
-        if(isOdd(y)) {
-            auto newResult = OperatorTraits<Operation>::operate(result, delta);
-            result = newResult;
-        }
-        delta = OperatorTraits<Operation>::operate(delta, delta);
+    if(0 == y) { return 0; }
+    while(!isOdd(y)) {
+        x = OperatorTraits<Operation>::operate(x, x);
         y = half(y);
     }
-    return result;
+    auto result = x;
+    for(;;) {
+        y = half(y);
+        x = OperatorTraits<Operation>::operate(x, x);
+        if(isOdd(y)) {
+            result = OperatorTraits<Operation>::operate(result, x);
+        } else { if(0 == y) { return result; } }
+    }
 }
 
 }

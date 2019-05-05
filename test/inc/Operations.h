@@ -21,8 +21,6 @@ template<> struct OperatorTraits<Multiplication> {
     static inline A operate(A x, A y);
 
     using Inverse = Substraction;
-
-    static const auto initializer = 0;
 };
 
 template<> struct OperatorTraits<Exponentiation> {
@@ -30,8 +28,6 @@ template<> struct OperatorTraits<Exponentiation> {
     static A inline operate(A x, A y);
 
     using Inverse = Division;
-
-    static const auto initializer = 1;
 };
 
 
