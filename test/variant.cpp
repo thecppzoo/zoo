@@ -21,15 +21,15 @@ struct MoveThrows {
 
 TEST_CASE("Variant", "[variant]") {
     int value = 4;
+    using V2 = zoo::Variant<int, char>;
+    static_assert(std::is_nothrow_move_constructible_v<V2>, "");
+    using V3 = zoo::Variant<int, MoveThrows, char>;
+    static_assert(!std::is_nothrow_move_constructible_v<V3>, "");
     static_assert(
-        std::is_nothrow_move_constructible<zoo::Variant<int, char>>::value,
-        ""
+        noexcept(std::swap(std::declval<V2 &>(), std::declval<V2 &>())), ""
     );
     static_assert(
-        !std::is_nothrow_move_constructible<
-            zoo::Variant<int, MoveThrows, char>
-        >::value,
-        ""
+        !noexcept(std::swap(std::declval<V3 &>(), std::declval<V3 &>())), ""
     );
     using V = zoo::Variant<int, HasDestructor>;
     SECTION("Proper construction") {

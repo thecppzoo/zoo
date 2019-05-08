@@ -7,13 +7,6 @@
 
 namespace zoo {
 
-template<typename T>
-void swap(T &t1, T &t2) {
-    T temporary{std::move(t1)};
-    t1 = std::move(t2);
-    t2 = std::move(temporary);
-}
-
 struct Maxer {
     int v_;
     constexpr Maxer(int v): v_{v} {}
@@ -53,7 +46,7 @@ struct Variant {
     alignas(Alignment) char space_[Size];
     int typeSwitch_ = Count;
 
-    Variant() {}
+    Variant() = default;
 
     Variant(const Variant &v): typeSwitch_{v.typeSwitch_} {
         visit<void>(
@@ -84,13 +77,14 @@ struct Variant {
 
     Variant &operator=(const Variant &model) {
         Variant copy{model};
-        swap(*this, copy);
+        std::swap(*this, copy);
         return *this;
     }
 
     Variant &operator=(Variant &&other) noexcept(NTMC) {
+        Variant temporary{std::move(other)};
         destroy();
-        new(this) Variant{std::move(other)};
+        new(this) Variant{std::move(temporary)};
         return *this;
     }
 
