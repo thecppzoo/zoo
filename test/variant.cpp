@@ -19,6 +19,14 @@ struct MoveThrows {
     MoveThrows(MoveThrows &&) noexcept(false);
 };
 
+struct CountsConstructionDestruction {
+    static int counter_;
+    CountsConstructionDestruction() { ++counter_; }
+    ~CountsConstructionDestruction() { --counter_; }
+};
+
+int CountsConstructionDestruction::counter_ = 0;
+
 TEST_CASE("Variant", "[variant]") {
     int value = 4;
     using V2 = zoo::Variant<int, char>;
@@ -63,5 +71,14 @@ TEST_CASE("Variant", "[variant]") {
         REQUIRE(0 == zoo::GCC_visit<int>(IntReturns1{}, instance));
         instance = V{std::in_place_index_t<0>{}, 99};
         REQUIRE(1 == zoo::GCC_visit<int>(IntReturns1{}, instance));
+    }
+    SECTION("Array support") {
+        using VArr = zoo::Variant<int, CountsConstructionDestruction[4]>;
+        CountsConstructionDestruction::counter_ = 0;
+        {
+            VArr v{std::in_place_index_t<1>{}};
+            CHECK(4 == CountsConstructionDestruction::counter_);
+        }
+        CHECK(0 == CountsConstructionDestruction::counter_);
     }
 }

@@ -4,6 +4,7 @@
     // provides std::tuple_element to be able to index a pack of types,
     // indirectly includes type traits and utility
 #include <new>
+#include <zoo/meta/destroy.h>
 
 namespace zoo {
 
@@ -105,10 +106,7 @@ struct Variant {
 private:
     void destroy() {
         visit<void>(
-            [](auto &who) {
-                using Type = std::decay_t<decltype(who)>;
-                (&who)->~Type();
-            },
+            [](auto &who) { meta::destroy(who); },
             *this
         );
     }
