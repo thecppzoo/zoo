@@ -31,7 +31,7 @@ message(STATUS "Additional sources:" ${ADDITIONAL_SOURCES})
 
 add_executable(
     zooTest${CMAKE_BUILD_TYPE}
-    catch_main.cpp AnyCallable.cpp AnyExtended.cpp any.cpp
+    catch_main.cpp variant.cpp AnyCallable.cpp AnyExtended.cpp any.cpp
     algorithm/cfs.cpp algorithm/quicksort.cpp egyptian.cpp
     ${ADDITIONAL_SOURCES}
 )
