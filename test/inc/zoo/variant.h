@@ -82,9 +82,8 @@ struct Variant {
     }
 
     Variant &operator=(Variant &&other) noexcept(NTMC) {
-        Variant temporary{std::move(other)};
         destroy();
-        new(this) Variant{std::move(temporary)};
+        new(this) Variant{std::move(other)};
         return *this;
     }
 
