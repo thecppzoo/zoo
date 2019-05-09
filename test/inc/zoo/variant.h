@@ -5,6 +5,7 @@
     // indirectly includes type traits and utility
 #include <new>
 #include <zoo/meta/destroy.h>
+#include <zoo/meta/TypeModel.h>
 
 namespace zoo {
 
@@ -27,14 +28,52 @@ constexpr auto LargestAlignment = Largest<alignof(Ts)...>;
 static_assert(sizeof(void *) == LargestSize<int, float, char, void *>, "");
 static_assert(alignof(short) == LargestAlignment<short, char, char[4]>, "");
 
-struct BadVariant {};
-
 template<int Index, typename... Ts>
 using TypeAtIndex =
-    typename std::tuple_element<Index, std::tuple<Ts..., BadVariant>>::type;
+    typename std::tuple_element<Index, std::tuple<Ts...>>::type;
 
-template<typename R, typename Visitor, typename Var>
-R visit(Visitor &&visitor, Var &&value);
+template<typename... Ts>
+struct Variant;
+
+struct BadVariant {};
+
+template<int, typename>
+struct AlternativeType;
+
+template<int Ndx, typename... Ts>
+struct AlternativeType<Ndx, Variant<Ts...>> {
+    using type = TypeAtIndex<Ndx, Ts..., BadVariant>;
+};
+
+template<int Ndx, typename V>
+using AlternativeType_t =
+    typename AlternativeType<Ndx, std::decay_t<V>>::type;
+
+template<typename T>
+struct IsVariant: std::false_type {};
+
+template<typename... Ts>
+struct IsVariant<Variant<Ts...>>: std::true_type {};
+
+template<typename T>
+constexpr auto IsVariant_v = IsVariant<std::decay_t<T>>::value;
+
+template<typename> struct Q;
+
+template<int Index, typename V>
+auto get(V &&v) ->
+    std::enable_if_t<
+        IsVariant_v<V>,
+        meta::TypeModel_t<AlternativeType_t<Index, V>, V &&>
+    >
+{
+    using R = meta::TypeModel_t<AlternativeType_t<Index, V>, V &&>;
+    return static_cast<R>(*v.template as<AlternativeType_t<Index, V>>());
+}
+
+template<typename Visitor, typename Var>
+auto visit(Visitor &&visitor, Var &&var) ->
+    decltype(visitor(get<0>(std::forward<Var>(var))));
 
 template<typename... Ts>
 struct Variant {
@@ -50,7 +89,7 @@ struct Variant {
     Variant() = default;
 
     Variant(const Variant &v): typeSwitch_{v.typeSwitch_} {
-        visit<void>(
+        visit(
             [&](const auto &c) {
                 using Source = std::decay_t<decltype(c)>;
                 new(as<Source>()) Source{c};
@@ -60,7 +99,7 @@ struct Variant {
     }
 
     Variant(Variant &&v) noexcept(NTMC): typeSwitch_{v.typeSwitch_} {
-        visit<void>(
+        visit(
             [&](auto &&m) {
                 using Source = std::decay_t<decltype(m)>;
                 new(as<Source>()) Source{std::move(m)};
@@ -105,7 +144,7 @@ struct Variant {
 
 private:
     void destroy() {
-        visit<void>(
+        visit(
             [](auto &who) { meta::destroy(who); },
             *this
         );
@@ -113,56 +152,40 @@ private:
 
 };
 
-template<int Index, typename... Ts>
-auto get(Variant<Ts...> &v) ->
-    TypeAtIndex<Index, std::tuple<Ts..., BadVariant>> &
-{
-    return v.as<TypeAtIndex<Index, std::tuple<Ts..., BadVariant>>();
-}
-
-template<
-    typename R, typename Visitor, typename V,
-    int Current, typename Head, typename... Tail
->
-struct Visit_impl {
-    static R execute(Visitor &&visitor, V &&v, int typeSwitch) {
-        switch(typeSwitch) {
-            case Current: return visitor(*v.template as<Head>());
+template<typename Visitor, typename Var, int Current, int Top>
+struct Visit {
+    static decltype(auto) execute(Visitor &&vi, Var &&va) {
+        switch(va.typeSwitch_) {
+            case Current: return vi(get<Current>(std::forward<Var>(va)));
             default:
                 return
-                    Visit_impl<
-                        R, Visitor, V, Current + 1, Tail...
-                    >::execute(
-                        std::forward<Visitor>(visitor),
-                        std::forward<V>(v),
-                        typeSwitch
+                    Visit<Visitor, Var, Current + 1, Top>::execute(
+                        std::forward<Visitor>(vi),
+                        std::forward<Var>(va)
                     );
         }
     }
 };
 
-template<typename R, typename Visitor, typename V, int Current>
-struct Visit_impl<R, Visitor, V, Current, BadVariant> {
-    static R execute(Visitor &&visitor, V &&v, int) {
-        return visitor(*v.template as<BadVariant>());
+template<typename Visitor, typename Var, int Top>
+struct Visit<Visitor, Var, Top, Top> {
+    static decltype(auto) execute(Visitor &&vi, Var &&va) {
+        return vi(get<Top>(std::forward<Var>(va)));
     }
 };
 
-template<typename R, typename Visitor, typename Var, typename... Types>
-R visit_injected(Visitor &&visitor, Var &&v, const Variant<Types...> *) {
-    return Visit_impl<R, Visitor, Var, 0, Types..., BadVariant>::execute(
+template<typename Visitor, typename Var>
+auto visit(Visitor &&visitor, Var &&var) ->
+    decltype(visitor(get<0>(std::forward<Var>(var))))
+{
+    using V = std::remove_reference_t<Var>;
+    return Visit<Visitor, Var, 0, V::Count>::execute(
         std::forward<Visitor>(visitor),
-        std::forward<Var>(v),
-        v.typeSwitch_
+        std::forward<Var>(var)
     );
 }
 
-template<typename R, typename Visitor, typename Var>
-R visit(Visitor &&visitor, Var &&value) {
-    return visit_injected<R>(
-        std::forward<Visitor>(visitor), std::forward<Var>(value), &value
-    );
-}
+/// \bug Value category not preserved
 
 template<typename R, typename Visitor, typename Var, typename... Ts>
 R GCC_visit_injected(Visitor &&visitor, Var &&value, const Variant<Ts...> *) {
@@ -178,8 +201,11 @@ R GCC_visit_injected(Visitor &&visitor, Var &&value, const Variant<Ts...> *) {
         );
 }
 
-template<typename R, typename Visitor, typename Var>
-R GCC_visit(Visitor &&visitor, Var &&value) {
+template<typename Visitor, typename Var>
+auto GCC_visit(Visitor &&visitor, Var &&value) ->
+    decltype(visitor(get<0>(value)))
+{
+    using R = decltype(visitor(get<0>(value)));
     return
         GCC_visit_injected<R>(
             std::forward<Visitor>(visitor),

@@ -27,6 +27,8 @@ struct CountsConstructionDestruction {
 
 int CountsConstructionDestruction::counter_ = 0;
 
+template<typename> struct Trick;
+
 TEST_CASE("Variant", "[variant]") {
     int value = 4;
     using V2 = zoo::Variant<int, char>;
@@ -53,24 +55,45 @@ TEST_CASE("Variant", "[variant]") {
     }
     SECTION("visit") {
         V instance;
-        auto result = zoo::visit<int>(IntReturns1{}, instance);
+        auto result = visit(IntReturns1{}, instance);
         REQUIRE(0 == result);
         instance = V{std::in_place_index_t<1>{}, &value};
-        result = zoo::visit<int>(IntReturns1{}, instance);
+        result = visit(IntReturns1{}, instance);
         REQUIRE(0 == result);
         value = 5;
         instance = V{std::in_place_index_t<0>{}, 77};
         SECTION("Internally held object is destroyed on move assignment") {
             REQUIRE(0 == value);
         }
-        result = zoo::visit<int>(IntReturns1{}, instance);
+        result = visit(IntReturns1{}, instance);
         REQUIRE(1 == result);
+
+        SECTION("Value category and constness preserved") {
+            // get preserves the value category
+            static_assert(
+                std::is_same_v<HasDestructor &&, decltype(zoo::get<1>(V{}))>
+            );
+
+            auto usedAnRValueReference = visit(
+                [](auto &&arg) {
+                    return std::is_rvalue_reference_v<decltype(arg)>;
+                },
+                V{}
+            );
+            CHECK(usedAnRValueReference);
+
+            auto constnessDetector = [](auto &arg) {
+                return std::is_const_v<std::remove_reference_t<decltype(arg)>>;
+            };
+            const V constant{};
+            CHECK(visit(constnessDetector, constant));
+        }
     }
     SECTION("GCC Visit") {
         V instance;
-        REQUIRE(0 == zoo::GCC_visit<int>(IntReturns1{}, instance));
+        REQUIRE(0 == GCC_visit(IntReturns1{}, instance));
         instance = V{std::in_place_index_t<0>{}, 99};
-        REQUIRE(1 == zoo::GCC_visit<int>(IntReturns1{}, instance));
+        REQUIRE(1 == GCC_visit(IntReturns1{}, instance));
     }
     SECTION("Array support") {
         using VArr = zoo::Variant<int, CountsConstructionDestruction[4]>;
