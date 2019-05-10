@@ -22,6 +22,7 @@ struct MoveThrows {
 struct CountsConstructionDestruction {
     static int counter_;
     CountsConstructionDestruction() { ++counter_; }
+    CountsConstructionDestruction(const CountsConstructionDestruction &) { ++counter_; }
     ~CountsConstructionDestruction() { --counter_; }
 };
 
@@ -101,6 +102,8 @@ TEST_CASE("Variant", "[variant]") {
         {
             VArr v{std::in_place_index_t<1>{}};
             CHECK(4 == CountsConstructionDestruction::counter_);
+            VArr copy{v};
+            CHECK(8 == CountsConstructionDestruction::counter_);
         }
         CHECK(0 == CountsConstructionDestruction::counter_);
     }

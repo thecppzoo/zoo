@@ -4,8 +4,8 @@
     // provides std::tuple_element to be able to index a pack of types,
     // indirectly includes type traits and utility
 #include <new>
-#include <zoo/meta/destroy.h>
-#include <zoo/meta/TypeModel.h>
+#include <zoo/meta/in_place_operations.h>
+#include <zoo/meta/traits.h>
 
 namespace zoo {
 
@@ -47,7 +47,7 @@ struct AlternativeType<Ndx, Variant<Ts...>> {
 
 template<int Ndx, typename V>
 using AlternativeType_t =
-    typename AlternativeType<Ndx, std::decay_t<V>>::type;
+    typename AlternativeType<Ndx, meta::remove_cr_t<V>>::type;
 
 template<typename T>
 struct IsVariant: std::false_type {};
@@ -56,18 +56,16 @@ template<typename... Ts>
 struct IsVariant<Variant<Ts...>>: std::true_type {};
 
 template<typename T>
-constexpr auto IsVariant_v = IsVariant<std::decay_t<T>>::value;
-
-template<typename> struct Q;
+constexpr auto IsVariant_v = IsVariant<meta::remove_cr_t<T>>::value;
 
 template<int Index, typename V>
 auto get(V &&v) ->
     std::enable_if_t<
         IsVariant_v<V>,
-        meta::TypeModel_t<AlternativeType_t<Index, V>, V &&>
+        meta::copy_cr_t<AlternativeType_t<Index, V>, V &&>
     >
 {
-    using R = meta::TypeModel_t<AlternativeType_t<Index, V>, V &&>;
+    using R = meta::copy_cr_t<AlternativeType_t<Index, V>, V &&>;
     return static_cast<R>(*v.template as<AlternativeType_t<Index, V>>());
 }
 
@@ -91,8 +89,8 @@ struct Variant {
     Variant(const Variant &v): typeSwitch_{v.typeSwitch_} {
         visit(
             [&](const auto &c) {
-                using Source = std::decay_t<decltype(c)>;
-                new(as<Source>()) Source{c};
+                using Source = meta::remove_cr_t<decltype(c)>;
+                meta::copy_in_place(as<Source>(), c);
             },
             v
         );
@@ -101,8 +99,8 @@ struct Variant {
     Variant(Variant &&v) noexcept(NTMC): typeSwitch_{v.typeSwitch_} {
         visit(
             [&](auto &&m) {
-                using Source = std::decay_t<decltype(m)>;
-                new(as<Source>()) Source{std::move(m)};
+                using Source = meta::remove_cr_t<decltype(m)>;
+                meta::move_in_place(as<Source>(), std::move(m));
             },
             v
         );
@@ -145,7 +143,7 @@ struct Variant {
 private:
     void destroy() {
         visit(
-            [](auto &who) { meta::destroy(who); },
+            [](auto &who) { meta::destroy_in_place(who); },
             *this
         );
     }
