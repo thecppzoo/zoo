@@ -28,8 +28,6 @@ struct CountsConstructionDestruction {
 
 int CountsConstructionDestruction::counter_ = 0;
 
-template<typename> struct Trick;
-
 TEST_CASE("Variant", "[variant]") {
     int value = 4;
     using V2 = zoo::Variant<int, char>;
@@ -106,5 +104,27 @@ TEST_CASE("Variant", "[variant]") {
             CHECK(8 == CountsConstructionDestruction::counter_);
         }
         CHECK(0 == CountsConstructionDestruction::counter_);
+    }
+    SECTION("Match") {
+        using V = zoo::Variant<int, double>;
+        V vid;
+        auto doMatch = [](auto &&v) {
+            return match(
+                std::forward<decltype(v)>(v),
+                [](int i) { return 2.0*i; },
+                [](double d) { return d; },
+                [](zoo::BadVariant &&) {
+                    return -1.0;
+                },
+                [](const zoo::BadVariant &) {
+                    return -2.0;
+                }
+            );
+        };
+        CHECK(-2.0 == doMatch(vid));
+        CHECK(-1.0 == doMatch(V{}));
+        vid = V{std::in_place_index_t<0>{}, 3};
+        CHECK(6.0 == doMatch(vid));
+        CHECK(3.14 == doMatch(V{std::in_place_index_t<1>{}, 3.14}));
     }
 }

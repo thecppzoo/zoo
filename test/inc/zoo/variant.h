@@ -212,6 +212,19 @@ auto GCC_visit(Visitor &&visitor, Var &&value) ->
         );
 }
 
+
+template<typename... Ts> struct Overloads : Ts... { using Ts::operator()...; };
+template<typename... Ts> Overloads(Ts...) -> Overloads<Ts...>;
+
+template<typename V, typename... Visitors>
+auto match(V &&var, Visitors &&... vis) {
+    return
+        visit(
+            Overloads{std::forward<Visitors>(vis)...},
+            std::forward<V>(var)
+        );
+}
+
 }
 
 #endif
