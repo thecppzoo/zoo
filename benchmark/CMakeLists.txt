@@ -12,9 +12,11 @@ include_directories(
     ../junkyard/inc
 )
 
-link_directories(
-    ./dependencies
-)
+# build google benchmark (target: benchmark)
+# do not build tests of benchmarking lib
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Suppressing benchmark's tests" FORCE)
+
+add_subdirectory(dependencies/google_benchmark)
 
 add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp sort.cpp)
 
