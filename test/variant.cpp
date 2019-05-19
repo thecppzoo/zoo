@@ -32,6 +32,7 @@ TEST_CASE("Variant", "[variant]") {
     int value = 4;
     using V2 = zoo::Variant<int, char>;
     static_assert(std::is_nothrow_move_constructible_v<V2>, "");
+    static_assert(std::is_trivially_destructible_v<V2>);
     using V3 = zoo::Variant<int, MoveThrows, char>;
     static_assert(!std::is_nothrow_move_constructible_v<V3>, "");
     static_assert(
@@ -41,6 +42,7 @@ TEST_CASE("Variant", "[variant]") {
         !noexcept(std::swap(std::declval<V3 &>(), std::declval<V3 &>())), ""
     );
     using V = zoo::Variant<int, HasDestructor>;
+    static_assert(!std::is_trivially_destructible_v<V>);
     SECTION("Proper construction") {
         V var{std::in_place_index_t<0>{}, 77};
         REQUIRE(77 == *var.as<int>());

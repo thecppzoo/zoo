@@ -1,11 +1,31 @@
 #ifndef VARIANT_H
 
+#include <type_traits>
 #include <tuple>
     // provides std::tuple_element to be able to index a pack of types,
     // indirectly includes type traits and utility
 #include <new>
 #include <zoo/meta/in_place_operations.h>
 #include <zoo/meta/traits.h>
+
+namespace zoo {
+
+template<typename... Ts>
+struct Variant;
+
+} // namespace zoo
+
+namespace std {
+
+template<typename... Ts>
+struct is_trivially_destructible<zoo::Variant<Ts...>> :
+    integral_constant<
+        bool,
+        (is_trivially_destructible_v<Ts> && ...)
+    >
+{};
+
+}
 
 namespace zoo {
 
@@ -31,9 +51,6 @@ static_assert(alignof(short) == LargestAlignment<short, char, char[4]>, "");
 template<int Index, typename... Ts>
 using TypeAtIndex =
     typename std::tuple_element<Index, std::tuple<Ts...>>::type;
-
-template<typename... Ts>
-struct Variant;
 
 struct BadVariant {};
 
@@ -73,8 +90,24 @@ template<typename Visitor, typename Var>
 auto visit(Visitor &&visitor, Var &&var) ->
     decltype(visitor(get<0>(std::forward<Var>(var))));
 
+namespace detail {
+
+    template<typename T, typename Enable = void>
+    struct DestroyInvoker {
+    };
+
+    template<template<typename...> class Var, typename... Ts>
+    struct DestroyInvoker<Var<Ts...>,
+            std::enable_if_t<!(std::is_trivially_destructible_v<Ts> && ...)>> {
+        ~DestroyInvoker() {
+            static_cast<Var<Ts...>*>(this)->destroy();
+        }
+    };
+
+} // namespace detail
+
 template<typename... Ts>
-struct Variant {
+struct Variant : detail::DestroyInvoker<Variant<Ts...>> {
     constexpr static auto Count = sizeof...(Ts);
     constexpr static auto Size = LargestSize<Ts...>;
     constexpr static auto Alignment = LargestAlignment<Ts...>;
@@ -120,15 +153,15 @@ struct Variant {
     }
 
     Variant &operator=(Variant &&other) noexcept(NTMC) {
-        destroy();
+        if constexpr (!std::is_trivially_destructible_v<Variant>)
+            destroy();
         new(this) Variant{std::move(other)};
         return *this;
     }
 
-    ~Variant() { destroy(); }
-
     void reset() {
-        destroy();
+        if constexpr (!std::is_trivially_destructible_v<Variant>)
+            destroy();
         typeSwitch_ = Count;
     }
 
@@ -141,6 +174,7 @@ struct Variant {
     }
 
 private:
+    friend struct detail::DestroyInvoker<Variant>;
     void destroy() {
         visit(
             [](auto &who) { meta::destroy_in_place(who); },
