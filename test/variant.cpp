@@ -31,6 +31,8 @@ int CountsConstructionDestruction::counter_ = 0;
 TEST_CASE("Variant", "[variant]") {
     int value = 4;
     using V2 = zoo::Variant<int, char>;
+    struct Der : V2 {};
+    static_assert(std::is_trivially_destructible_v<Der>);
     static_assert(std::is_nothrow_move_constructible_v<V2>, "");
     static_assert(std::is_trivially_destructible_v<V2>);
     using V3 = zoo::Variant<int, MoveThrows, char>;
