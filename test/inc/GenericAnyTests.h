@@ -41,7 +41,7 @@ struct TakesInitializerList {
     int s;
     double v;
     TakesInitializerList(std::initializer_list<int> il, double val):
-        s(il.size()), v(val)
+        s(int(il.size())), v(val)
     {}
 };
 
