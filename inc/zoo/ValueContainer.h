@@ -15,7 +15,6 @@ namespace zoo {
 
 template<typename Derived, typename IAC, typename ValueType>
 struct ValueContainerCRT {
-protected:
     Derived *d() noexcept { return static_cast<Derived *>(this); }
     const Derived *d() const noexcept {
         return const_cast<ValueContainerCRT *>(this)->d();
@@ -30,12 +29,12 @@ protected:
         new(d()->m_space) ValueType{std::forward<Args>(args)...};
     }
     
-    void destroy() { thy()->~ValueType(); }
+    void destroy() noexcept { thy()->~ValueType(); }
     
-    void copy(IAC *to) { new(to) ValueContainerCRT{*thy()}; }
+    void copy(IAC *to) { new(to) Derived{*thy()}; }
     
     void move(IAC *to) {
-        new(to) ValueContainerCRT{std::move(*thy())};
+        new(to) Derived{std::move(*thy())};
     }
     
     void moveAndDestroy(IAC *to) noexcept {
@@ -52,7 +51,6 @@ protected:
 
 template<typename Derived, typename IAC, typename ValueType>
 struct ReferentialContainerCRT {
-protected:
     Derived *d() noexcept { return static_cast<Derived *>(this); }
     const Derived *d() const noexcept {
         return const_cast<ReferentialContainerCRT *>(this)->d();
@@ -77,7 +75,7 @@ protected:
     
     void destroy() { delete thy(); }
     
-    void copy(IAC *to) { new(to) ReferentialContainerCRT{*thy()}; }
+    void copy(IAC *to) { new(to) Derived{*thy()}; }
     
     void transferPointer(IAC *to) {
         new(to) ReferentialContainerCRT{IAC::None, thy()};
@@ -85,7 +83,7 @@ protected:
     
     void move(IAC *to) noexcept {
         new(to) ReferentialContainerCRT{IAC::None, thy()};
-        new(this) IAC;
+        new(d()) IAC;
     }
     
     void moveAndDestroy(IAC *to) noexcept {

@@ -14,7 +14,8 @@ namespace zoo {
 
 template<int Size, int Alignment>
 struct IAnyContainer {
-    virtual void destroy() {}
+    const void *vtable() const noexcept { return *reinterpret_cast<const void *const *>(this); }
+    virtual void destroy() noexcept {}
     virtual void copy(IAnyContainer *to) { new(to) IAnyContainer; }
     virtual void move(IAnyContainer *to) noexcept { new(to) IAnyContainer; }
     
@@ -39,35 +40,35 @@ struct BaseContainer: IAnyContainer<Size, Alignment> {
 };
 
 template<int Size, int Alignment, typename ValueType>
-struct ValueContainer: BaseContainer<Size, Alignment> {
+struct ValueContainer:
+    BaseContainer<Size, Alignment>,
+    ValueContainerCRT<
+        ValueContainer<Size, Alignment, ValueType>,
+        IAnyContainer<Size, Alignment>,
+        ValueType
+    >
+{
     using IAC = IAnyContainer<Size, Alignment>;
+    using Base = ValueContainerCRT<
+        ValueContainer<Size, Alignment, ValueType>,
+        IAC,
+        ValueType
+    >;
+
+    using Base::Base;
+
+    void destroy() noexcept override { Base::destroy(); }
     
-    ValueType *thy() { return reinterpret_cast<ValueType *>(this->m_space); }
+    void copy(IAC *to) override { Base::copy(to); }
     
-    ValueContainer(typename IAC::NONE) {}
-    
-    template<typename... Args>
-    ValueContainer(Args &&... args) {
-        new(this->m_space) ValueType{std::forward<Args>(args)...};
-    }
-    
-    void destroy() override { thy()->~ValueType(); }
-    
-    void copy(IAC *to) override { new(to) ValueContainer{*thy()}; }
-    
-    void move(IAC *to) noexcept override {
-        new(to) ValueContainer{std::move(*thy())};
-    }
+    void move(IAC *to) noexcept override { Base::move(to); }
     
     void moveAndDestroy(IAC *to) noexcept override {
-        ValueContainer::move(to);
-        ValueContainer::destroy();
-        // note: the full qualification prevents the penalty of dynamic
-        // dispatch
+        Base::moveAndDestroy(to);
     }
-    
-    void *value() noexcept override { return thy(); }
-    
+
+    void *value() noexcept override { return Base::value(); }
+
     const std::type_info &type() const noexcept override {
         return typeid(ValueType);
     }
@@ -92,7 +93,7 @@ struct ReferentialContainer: BaseContainer<Size, Alignment> {
     
     ReferentialContainer(typename IAC::NONE, ValueType *ptr) { *pThy() = ptr; }
     
-    void destroy() override { delete thy(); }
+    void destroy() noexcept override { delete thy(); }
     
     void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
     
