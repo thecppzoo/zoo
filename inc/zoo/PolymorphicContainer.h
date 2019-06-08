@@ -75,45 +75,36 @@ struct ValueContainer:
 };
 
 template<int Size, int Alignment, typename ValueType>
-struct ReferentialContainer: BaseContainer<Size, Alignment> {
+struct ReferentialContainer:
+    BaseContainer<Size, Alignment>,
+    ReferentialContainerCRT<
+        ReferentialContainer<Size, Alignment, ValueType>,
+        IAnyContainer<Size, Alignment>,
+        ValueType
+    >
+{
     using IAC = IAnyContainer<Size, Alignment>;
+    using Base =
+        ReferentialContainerCRT<
+            ReferentialContainer<Size, Alignment, ValueType>,
+            IAnyContainer<Size, Alignment>,
+            ValueType
+        >;
+
+    using Base::Base;
+
+    void destroy() noexcept override { Base::destroy(); }
     
-    ValueType **pThy() {
-        return reinterpret_cast<ValueType **>(this->m_space);
-    }
+    void copy(IAC *to) override { Base::copy(to); }
     
-    ValueType *thy() { return *pThy(); }
+    void move(IAC *to) noexcept override { Base::move(to); }
     
-    ReferentialContainer(typename IAC::NONE) {}
+    void moveAndDestroy(IAC *to) noexcept override { Base::moveAndDestroy(to); }
     
-    template<typename... Values>
-    ReferentialContainer(Values &&... values) {
-        *pThy() = new ValueType{std::forward<Values>(values)...};
-    }
-    
-    ReferentialContainer(typename IAC::NONE, ValueType *ptr) { *pThy() = ptr; }
-    
-    void destroy() noexcept override { delete thy(); }
-    
-    void copy(IAC *to) override { new(to) ReferentialContainer{*thy()}; }
-    
-    void transferPointer(IAC *to) {
-        new(to) ReferentialContainer{IAC::None, thy()};
-    }
-    
-    void move(IAC *to) noexcept override {
-        new(to) ReferentialContainer{IAC::None, thy()};
-        new(this) IAnyContainer<Size, Alignment>;
-    }
-    
-    void moveAndDestroy(IAC *to) noexcept override {
-        transferPointer(to);
-    }
-    
-    void *value() noexcept override { return thy(); }
+    void *value() noexcept override { return Base::value(); }
     
     const std::type_info &type() const noexcept override {
-        return typeid(ValueType);
+        return Base::type();
     }
 };
 

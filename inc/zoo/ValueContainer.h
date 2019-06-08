@@ -73,16 +73,16 @@ struct ReferentialContainerCRT {
         *pThy() = ptr;
     }
     
-    void destroy() { delete thy(); }
+    void destroy() noexcept { delete thy(); }
     
     void copy(IAC *to) { new(to) Derived{*thy()}; }
     
     void transferPointer(IAC *to) {
-        new(to) ReferentialContainerCRT{IAC::None, thy()};
+        new(to) Derived{IAC::None, thy()};
     }
     
     void move(IAC *to) noexcept {
-        new(to) ReferentialContainerCRT{IAC::None, thy()};
+        new(to) Derived{IAC::None, thy()};
         new(d()) IAC;
     }
     
