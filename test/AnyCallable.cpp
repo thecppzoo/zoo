@@ -2,14 +2,23 @@
 
 #include <catch2/catch.hpp>
 
-TEST_CASE("function", "[any][type-erasure][functional]") {
+template<typename ErasureProvider>
+struct CallableTests {
+    template<typename Signature>
+    using ZFunction = zoo::function<Signature>;
+
+    static void execute();
+};
+
+template<typename ErasureProvider>
+void CallableTests<ErasureProvider>::execute() {
     SECTION("Default throws bad_function_call") {
-        zoo::function<void()> defaultConstructed;
+        ZFunction<void()> defaultConstructed;
         REQUIRE_THROWS_AS(defaultConstructed(), std::bad_function_call);
     }
     SECTION("Accepts function pointers") {
         auto nonCapturingLambda = [](int i) { return long(i)*i; };
-        zoo::function<long(int)> ac{nonCapturingLambda};
+        ZFunction<long(int)> ac{nonCapturingLambda};
         REQUIRE(9 == ac(3));
     }
     SECTION("Accepts function objects") {
@@ -18,7 +27,7 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             state = arg;
             return 2*arg;
         };
-        zoo::function<int(int)> ac{capturingLambda};
+        ZFunction<int(int)> ac{capturingLambda};
         REQUIRE(2 == ac(1));
         REQUIRE(1 == state);
         SECTION("Copy construction") {
@@ -43,7 +52,7 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             }
             void operator()() {}
         };
-        zoo::function<void()>
+        ZFunction<void()>
             ac{MovableCallable{}},
             empty;
         SECTION("Move assignment") {
@@ -62,13 +71,13 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
         };
         MyCallable myCallable;
         SECTION("operator bool()") {
-            zoo::function<long(int)> ac;
+            ZFunction<long(int)> ac;
             CHECK(!static_cast<bool>(ac));
             ac = myCallable;
             CHECK(static_cast<bool>(ac));
         }
         SECTION("swap()") {
-            zoo::function<long(int)> ac1, ac2;
+            ZFunction<long(int)> ac1, ac2;
             SECTION("Synopsis") {
                 ac2 = myCallable;
                 CHECK(25 == ac2(5));
@@ -85,13 +94,13 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             }
         }
         SECTION("target_type()") {
-            zoo::function<long(int)> ac;
+            ZFunction<long(int)> ac;
             CHECK(ac.target_type() == typeid(void));
             ac = myCallable;
             CHECK(ac.target_type() == typeid(MyCallable));
         }
         SECTION("target() non-const") {
-            zoo::function<long(int)> ac;
+            ZFunction<long(int)> ac;
             CHECK(ac.target<int>() == nullptr);
             CHECK(ac.target<MyCallable>() == nullptr);
             ac = myCallable;
@@ -99,13 +108,13 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             CHECK(ac.target<MyCallable>() != nullptr);
         }
         SECTION("target() const") {
-            const zoo::function<long(int)> ac { myCallable };
+            const ZFunction<long(int)> ac { myCallable };
             CHECK(ac.target<int>() == nullptr);
             CHECK(ac.target<MyCallable>() != nullptr);
         }
         SECTION("comparison to nullptr") {
-            zoo::function<long(int)> acEmpty;
-            zoo::function<long(int)> acNonEmpty { myCallable };
+            ZFunction<long(int)> acEmpty;
+            ZFunction<long(int)> acNonEmpty { myCallable };
 
             CHECK(acEmpty == nullptr);
             CHECK(nullptr == acEmpty);
@@ -118,10 +127,14 @@ TEST_CASE("function", "[any][type-erasure][functional]") {
             CHECK(!(nullptr == acNonEmpty));
         }
         SECTION("empty()") {
-            zoo::function<long(int)> acEmpty;
-            zoo::function<long(int)> acNonEmpty { myCallable };
+            ZFunction<long(int)> acEmpty;
+            ZFunction<long(int)> acNonEmpty { myCallable };
             CHECK(acEmpty.empty());
             CHECK(!acNonEmpty.empty());
         }
     }
+}
+
+TEST_CASE("function", "[any][type-erasure][functional]") {
+    CallableTests<zoo::AnyContainer<zoo::CanonicalPolicy>>::execute();
 }
