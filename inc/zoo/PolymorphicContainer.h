@@ -72,6 +72,8 @@ struct ValueContainer:
     const std::type_info &type() const noexcept override {
         return typeid(ValueType);
     }
+
+    constexpr static auto IsReference = false;
 };
 
 template<int Size, int Alignment, typename ValueType>
@@ -106,6 +108,8 @@ struct ReferentialContainer:
     const std::type_info &type() const noexcept override {
         return Base::type();
     }
+
+    constexpr static auto IsReference = true;
 };
 
 template<int Size, int Alignment, typename ValueType, bool Value>

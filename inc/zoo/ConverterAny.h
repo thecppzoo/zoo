@@ -205,6 +205,8 @@ struct TypedConverterContainer: ConverterContainer<S, A> {
             this->driver(), this->m_space, *(void **)this->m_space
         )
     }
+
+    constexpr static auto IsReference = !ValueSemantics;
 };
 
 template<int Size, int Alignment>
