@@ -7,7 +7,7 @@ struct CallableTests {
     template<typename Signature>
     using ZFunction = zoo::function<Signature>;
 
-    static void execute();
+    inline static void execute();
 };
 
 template<typename ErasureProvider>

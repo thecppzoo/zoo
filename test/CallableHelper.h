@@ -6,20 +6,20 @@ using LargeTypeEraser = zoo::AnyContainer<LargePolicy>;
 
 /// Uses Argument Dependent Lookup
 struct BeforeAnyCallableEraserADL: LargeTypeEraser {};
-void swap(BeforeAnyCallableEraserADL &e1, BeforeAnyCallableEraserADL &e2) noexcept {
+inline void swap(BeforeAnyCallableEraserADL &e1, BeforeAnyCallableEraserADL &e2) noexcept {
     auto &upcasted = static_cast<LargeTypeEraser &>(e1);
     swap(upcasted, e2);
 }
 
 /// Uses the template with the policy as argument, works
 struct BeforeAnyCallableEraserP: LargeTypeEraser {};
-void swap(BeforeAnyCallableEraserP &e1, BeforeAnyCallableEraserP &e2) noexcept {
+inline void swap(BeforeAnyCallableEraserP &e1, BeforeAnyCallableEraserP &e2) noexcept {
     zoo::swap<LargePolicy>(e1, e2);
 }
 
 /// Uses the template on the eraser as argument, won't use optimized overload
 struct BeforeAnyCallableEraserT: LargeTypeEraser {};
-void swap(BeforeAnyCallableEraserT &e1, BeforeAnyCallableEraserT &e2) noexcept {
+inline void swap(BeforeAnyCallableEraserT &e1, BeforeAnyCallableEraserT &e2) noexcept {
     zoo::swap<LargeTypeEraser>(e1, e2);
 }
 
@@ -27,7 +27,7 @@ struct AfterAnyCallableEraser: LargeTypeEraser {};
 
 #include <zoo/function.h>
 
-void swap(AfterAnyCallableEraser &e1, AfterAnyCallableEraser &e2) noexcept {
+inline void swap(AfterAnyCallableEraser &e1, AfterAnyCallableEraser &e2) noexcept {
     zoo::swap<LargePolicy>(e1, e2);
 }
 
