@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zoo/ConverterAny.h>
+#include <zoo/any.h>
 
 #include <catch2/catch.hpp>
 
@@ -74,21 +74,6 @@ struct TwoArgumentConstructor {
     TwoArgumentConstructor(void *p, int q): boolean(p), value(q) {};
 };
 
-template<typename>
-void movedFromTest(zoo::Any &a) {
-    auto ac = a.container();
-        // strange warning
-        // warning: expression with side effects
-        // will be evaluated despite being used as an operand to 'typeid'
-        // [-Wpotentially-evaluated-expression]
-    CHECK(typeid(*ac) == typeid(zoo::Any::Container));
-}
-
-template<typename W, int S, int A>
-void movedFromTest(zoo::AnyContainer<zoo::ConverterPolicy<S, A>> &a) {
-    CHECK(nullptr == zoo::anyContainerCast<W>(&a));
-}
-
 template<typename ExtAny>
 void testAnyImplementation() {
     SECTION("Value Destruction") {
@@ -141,7 +126,6 @@ void testAnyImplementation() {
         auto afterMove = zoo::anyContainerCast<Big>(&movingTo);
         CHECK(!movingFrom.has_value());
         REQUIRE(original == afterMove);
-        movedFromTest<Moves>(movingFrom);
     }
     SECTION("Initializer constructor -- copying") {
         Moves value;

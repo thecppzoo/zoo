@@ -1,5 +1,7 @@
 #include "GenericAnyTests.h"
 
+#include <zoo/ConverterAny.h>
+
 TEST_CASE("IAnyContainer") {
     using namespace zoo;
     using Container = IAnyContainer<sizeof(void *), alignof(void *)>;
