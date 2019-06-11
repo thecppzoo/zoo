@@ -5,7 +5,7 @@
 template<typename ErasureProvider>
 struct CallableTests {
     template<typename Signature>
-    using ZFunction = zoo::function<Signature>;
+    using ZFunction = zoo::AnyCallable<ErasureProvider, Signature>;
 
     inline static void execute();
 };
@@ -46,7 +46,7 @@ void CallableTests<ErasureProvider>::execute() {
         struct MovableCallable {
             bool moved_ = false;
             MovableCallable() = default;
-            MovableCallable(const MovableCallable &) = default;
+            MovableCallable(const MovableCallable &) {};
             MovableCallable(MovableCallable &&other) noexcept {
                 other.moved_ = true;
             }
@@ -56,7 +56,7 @@ void CallableTests<ErasureProvider>::execute() {
             ac{MovableCallable{}},
             empty;
         SECTION("Move assignment") {
-            auto &heldObject = *ac.state<MovableCallable>();
+            auto &heldObject = *ac.template state<MovableCallable>();
             REQUIRE_FALSE(heldObject.moved_);
             empty = std::move(ac);
             CHECK(heldObject.moved_);
@@ -101,16 +101,16 @@ void CallableTests<ErasureProvider>::execute() {
         }
         SECTION("target() non-const") {
             ZFunction<long(int)> ac;
-            CHECK(ac.target<int>() == nullptr);
-            CHECK(ac.target<MyCallable>() == nullptr);
+            CHECK(ac.template target<int>() == nullptr);
+            CHECK(ac.template target<MyCallable>() == nullptr);
             ac = myCallable;
-            CHECK(ac.target<int>() == nullptr);
-            CHECK(ac.target<MyCallable>() != nullptr);
+            CHECK(ac.template target<int>() == nullptr);
+            CHECK(ac.template target<MyCallable>() != nullptr);
         }
         SECTION("target() const") {
             const ZFunction<long(int)> ac { myCallable };
-            CHECK(ac.target<int>() == nullptr);
-            CHECK(ac.target<MyCallable>() != nullptr);
+            CHECK(ac.template target<int>() == nullptr);
+            CHECK(ac.template target<MyCallable>() != nullptr);
         }
         SECTION("comparison to nullptr") {
             ZFunction<long(int)> acEmpty;
