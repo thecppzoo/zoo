@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZOO_ANY
+#define ZOO_ANY
 
 #include <zoo/PolymorphicContainer.h>
 #include <zoo/utility.h>
@@ -296,4 +297,5 @@ typename Policy::Visit *visits(const AnyContainer<Policy> &a) {
 
 }
 
-/// \todo guarantee alignment new, tests
+#endif
+
