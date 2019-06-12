@@ -10,6 +10,11 @@ struct CallableTests {
     inline static void execute();
 };
 
+struct NoCopy {
+    NoCopy() = default;
+    NoCopy(const NoCopy &) = delete;
+};
+
 template<typename ErasureProvider>
 void CallableTests<ErasureProvider>::execute() {
     SECTION("Default throws bad_function_call") {
@@ -41,6 +46,10 @@ void CallableTests<ErasureProvider>::execute() {
                 );
             }
         }
+    }
+    SECTION("Preserves value cathegory") {
+        ZFunction<void(NoCopy &&)> zf;
+        CHECK_THROWS_AS(zf(NoCopy{}), std::bad_function_call);
     }
     SECTION("Assignment") {
         struct MovableCallable {
