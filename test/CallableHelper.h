@@ -1,8 +1,7 @@
-#include <zoo/any.h>
+#ifndef TEST_CALLABLE_HELPER
+#define TEST_CALLABLE_HELPER
 
-static constexpr auto BigSize = 32;
-using LargePolicy = zoo::RuntimePolymorphicAnyPolicy<BigSize, 8>;
-using LargeTypeEraser = zoo::AnyContainer<LargePolicy>;
+#include "any.h"
 
 /// Uses Argument Dependent Lookup
 struct BeforeAnyCallableEraserADL: LargeTypeEraser {};
@@ -51,3 +50,6 @@ struct Traces: TracesBase {
 };
 
 static_assert(zoo::canUseValueSemantics<Traces>(BigSize, 8), "");
+
+#endif
+

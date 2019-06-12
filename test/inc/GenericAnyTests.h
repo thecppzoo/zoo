@@ -1,30 +1,8 @@
 #pragma once
 
-#include <zoo/any.h>
+#include "any.h"
 
 #include <catch2/catch.hpp>
-
-namespace zoo {
-
-template<typename T, typename Policy>
-bool isRuntimeReference(const AnyContainer<Policy> &a) {
-    if(typeid(T) != a.type()) {
-        throw std::runtime_error("Not the same type of value");
-    }
-    using C = typename Policy::template Builder<T>;
-    return C::IsReference;
-}
-
-template<typename T, typename Policy>
-bool isRuntimeValue(const AnyContainer<Policy> &a) {
-    if(typeid(T) != a.type()) {
-        throw std::runtime_error("Not the same type of value");
-    }
-    using C = typename Policy::template Builder<T>;
-    return !C::IsReference;
-}
-
-}
 
 struct Destructor {
     int *ptr;
