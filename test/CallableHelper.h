@@ -24,7 +24,7 @@ inline void swap(BeforeAnyCallableEraserT &e1, BeforeAnyCallableEraserT &e2) noe
 
 struct AfterAnyCallableEraser: LargeTypeEraser {};
 
-#include <zoo/function.h>
+#include "zoo/function.h"
 
 inline void swap(AfterAnyCallableEraser &e1, AfterAnyCallableEraser &e2) noexcept {
     zoo::swap<LargePolicy>(e1, e2);
@@ -34,7 +34,6 @@ struct TracesBase {
     int &copies_, &moves_, &destruction_;
     long state_ = 0;
 
-    TracesBase() = default;
     TracesBase(int &c, int &m, int &d):
         copies_{c}, moves_{m}, destruction_{d}
     {}

@@ -15,6 +15,14 @@ struct NoCopy {
     NoCopy(const NoCopy &) = delete;
 };
 
+inline int copies, moves;
+
+struct CountsCopiesAndMoves {
+    CountsCopiesAndMoves() = default;
+    CountsCopiesAndMoves(const CountsCopiesAndMoves &) { ++copies; }
+    CountsCopiesAndMoves(CountsCopiesAndMoves &&) { ++moves; }
+};
+
 template<typename ErasureProvider>
 void CallableTests<ErasureProvider>::execute() {
     SECTION("Default throws bad_function_call") {
@@ -47,7 +55,7 @@ void CallableTests<ErasureProvider>::execute() {
             }
         }
     }
-    SECTION("Preserves value cathegory") {
+    SECTION("Preserves value category") {
         ZFunction<void(NoCopy &&)> zf;
         CHECK_THROWS_AS(zf(NoCopy{}), std::bad_function_call);
     }
@@ -70,6 +78,19 @@ void CallableTests<ErasureProvider>::execute() {
             empty = std::move(ac);
             CHECK(heldObject.moved_);
         }
+    }
+    SECTION("Reuses arguments at trampoline release") {
+        CountsCopiesAndMoves ccnm;
+        copies = moves = 0;
+        ZFunction<void(CountsCopiesAndMoves)> zf{
+            [](CountsCopiesAndMoves) {
+                CHECK(0 == copies);
+                CHECK(2 == moves);
+                    // trampoline compression
+                    // trampoline release
+            }
+        };
+        zf(std::move(ccnm));
     }
     SECTION("std::function compatibility") {
         struct MyCallable

@@ -107,7 +107,7 @@ private:
 
     template<typename T>
     static R invokeTarget(Args... as, TypeErasureProvider &obj) {
-        return (*obj.template state<T>())(as...);
+        return (*obj.template state<T>())(std::forward<Args>(as)...);
     }
 };
 
