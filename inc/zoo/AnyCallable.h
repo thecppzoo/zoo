@@ -30,13 +30,16 @@ template<typename TypeErasureProvider, typename R, typename... Args>
 struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     AnyCallable(): targetInvoker_{emptyInvoker} {}
 
+    AnyCallable(std::nullptr_t): AnyCallable() {}
+
     template<
         typename Callable,
         typename Decayed =
             std::enable_if_t<
                 meta::NotBasedOn<Callable, AnyCallable>(),
                 std::decay_t<Callable>
-            >
+            >,
+        typename = decltype(std::declval<Decayed>()(std::declval<Args>()...))
     >
     AnyCallable(Callable &&target):
         TypeErasureProvider{std::forward<Callable>(target)},
