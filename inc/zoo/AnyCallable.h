@@ -46,6 +46,15 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
         targetInvoker_{invokeTarget<Decayed>}
     {}
 
+    template<typename Argument>
+    AnyCallable &operator=(Argument &&a) noexcept(
+        noexcept(std::decay_t<Argument>(std::forward<Argument>(a)))
+    ) {
+        this->container()->destroy();
+        new(this) AnyCallable(std::forward<Argument>(a));
+        return *this;
+    }
+
     template<typename... RealArguments>
     R operator()(RealArguments &&... args) const {
         return

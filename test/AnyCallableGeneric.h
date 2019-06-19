@@ -20,7 +20,7 @@ inline int copies, moves;
 struct CountsCopiesAndMoves {
     CountsCopiesAndMoves() = default;
     CountsCopiesAndMoves(const CountsCopiesAndMoves &) { ++copies; }
-    CountsCopiesAndMoves(CountsCopiesAndMoves &&) { ++moves; }
+    CountsCopiesAndMoves(CountsCopiesAndMoves &&) noexcept { ++moves; }
 };
 
 template<typename ErasureProvider>
@@ -91,6 +91,21 @@ void CallableTests<ErasureProvider>::execute() {
             }
         };
         zf(std::move(ccnm));
+    }
+    SECTION("Assignment does not require unnecessary copies or moves") {
+        struct CallableCCNM: CountsCopiesAndMoves {
+            void operator()() {}
+        };
+        CallableCCNM ccnm;
+        copies = moves = 0;
+        ZFunction<void()> zf;
+        zf = std::move(ccnm);
+        REQUIRE(zoo::isRuntimeValue<CallableCCNM>(zf));
+        CHECK(0 == copies);
+        CHECK(1 == moves);
+        zf = ccnm;
+        CHECK(1 == copies);
+        CHECK(1 == moves);
     }
     SECTION("std::function compatibility") {
         struct MyCallable
