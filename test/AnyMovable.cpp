@@ -5,8 +5,6 @@
 //  Copyright © 2019 Eduardo Madrid. All rights reserved.
 //
 
-
-#include "zoo/AnyMovable.h"
 #include "zoo/Any/VTable.h"
 #include "zoo/any.h"
 
@@ -63,13 +61,18 @@ static_assert(
     >, ""
 );
 
+using MoveOnlyPolicy = zoo::VTablePolicy<8, 8>;
 
 static_assert(!zoo::detail::RequireMoveOnly_v<zoo::CanonicalPolicy>, "");
-static_assert(zoo::detail::RequireMoveOnly_v<zoo::VTablePolicy<8, 8>>, "");
+static_assert(zoo::detail::RequireMoveOnly_v<MoveOnlyPolicy>, "");
 struct RequireMoveOnlyFalse {
     constexpr static auto RequireMoveOnly = false;
 };
 static_assert(!zoo::detail::RequireMoveOnly_v<RequireMoveOnlyFalse>, "");
+static_assert(std::is_same_v<
+    zoo::AnyContainer<MoveOnlyPolicy>,
+    zoo::AnyMovable<MoveOnlyPolicy>
+>, "");
 
 TEST_CASE("AnyMovable", "[any][type-erasure][contract]") {
     SECTION("May construct with single argument l-value in_place_type") {
