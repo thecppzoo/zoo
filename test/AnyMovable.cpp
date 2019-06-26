@@ -1,12 +1,13 @@
 //
 //  AnyMovable.cpp
-//  Zoo wrap
 //
 //  Created by Eduardo Madrid on 6/24/19.
 //  Copyright © 2019 Eduardo Madrid. All rights reserved.
 //
 
+
 #include "zoo/AnyMovable.h"
+#include "zoo/Any/VTable.h"
 
 #include "catch2/catch.hpp"
 
@@ -38,6 +39,12 @@ using CP = zoo::CanonicalPolicy;
 
 static_assert(zoo::Movable<int>, "");
 static_assert(!zoo::MoveOnly<int>, "");
+static_assert(zoo::Movable<zoo::detail::AnyContainerBase<CP>>);
+
+using ACP = zoo::AnyContainer<CP>;
+static_assert(std::is_default_constructible_v<ACP>);
+static_assert(std::is_move_constructible_v<ACP>);
+
 static_assert(zoo::Movable<zoo::AnyContainer<CP>>, "");
 static_assert(!zoo::MoveOnly<zoo::AnyContainer<CP>>, "");
 static_assert(zoo::Movable<zoo::AnyMovable<CP>>, "");
@@ -55,12 +62,54 @@ static_assert(
     >, ""
 );
 
+
+static_assert(!zoo::detail::RequireMoveOnly_v<zoo::CanonicalPolicy>, "");
+static_assert(zoo::detail::RequireMoveOnly_v<zoo::VTablePolicy<8, 8>>, "");
+struct RequireMoveOnlyFalse {
+    constexpr static auto RequireMoveOnly = false;
+};
+static_assert(!zoo::detail::RequireMoveOnly_v<RequireMoveOnlyFalse>, "");
+
 TEST_CASE("AnyMovable", "[any][type-erasure][contract]") {
-    struct DefaultsTo77 {
-        int value_;
-        DefaultsTo77(): value_{77} {}
-    };
-    zoo::AnyMovable<zoo::CanonicalPolicy> z(std::in_place_type<DefaultsTo77>);
-    REQUIRE(typeid(DefaultsTo77) == z.type());
-    CHECK(77 == z.state<DefaultsTo77>()->value_);
+    SECTION("May construct with single argument l-value in_place_type") {
+        struct Def77 {
+            int value_;
+            Def77(): value_{77} {}
+        };
+        zoo::AnyMovable<zoo::CanonicalPolicy> z(std::in_place_type<Def77>);
+        REQUIRE(typeid(Def77) == z.type());
+        CHECK(77 == z.state<Def77>()->value_);
+    }
+    using Small =
+        zoo::AnyMovable<zoo::VTablePolicy<sizeof(void *), alignof(void *)>>;
+    SECTION("Destroys") {
+        int v = 95;
+        struct TracesDestruction {
+            TracesDestruction(int &who): who_(who) {}
+            ~TracesDestruction() { who_ = 83; }
+            int &who_;
+        };
+        {
+            Small inPlace(std::in_place_type<TracesDestruction>, v);
+            CHECK(95 == v);
+        }
+        REQUIRE(83 == v);
+    }
+    SECTION("Moves") {
+        struct TracesMovement {
+            int trace_ = 94;
+            TracesMovement() = default;
+            TracesMovement(const TracesMovement &) = delete;
+            TracesMovement(TracesMovement &&m) noexcept: trace_(31)
+            { m.trace_ = 76; }
+        };
+        Small
+            originallyEmpty,
+            defaulted(std::in_place_type<TracesMovement>);
+        auto defaultedPtr = defaulted.state<TracesMovement>();
+        CHECK(94 == defaultedPtr->trace_);
+        originallyEmpty = std::move(defaulted);
+        CHECK(31 == originallyEmpty.state<TracesMovement>()->trace_);
+        CHECK(76 == defaultedPtr->trace_);
+    }
 }
