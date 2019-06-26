@@ -208,23 +208,23 @@ public:
 }
 
 template<typename Policy>
-struct AnyContainerCopyable: detail::AnyContainerBase<Policy> {
+struct AnyCopyable: detail::AnyContainerBase<Policy> {
     using Base = detail::AnyContainerBase<Policy>;
 
     using Base::Base;
 
-    AnyContainerCopyable(const AnyContainerCopyable &model) {
+    AnyCopyable(const AnyCopyable &model) {
         auto thy = this->container();
         model.container()->copy(thy);
     }
 
-    AnyContainerCopyable(AnyContainerCopyable &&) = default;
+    AnyCopyable(AnyCopyable &&) = default;
 
     template<typename Argument>
     std::enable_if_t<
         std::is_assignable_v<Base, Argument> &&
         std::is_copy_constructible_v<std::decay_t<Argument>>,
-        AnyContainerCopyable &
+        AnyCopyable &
     > operator=(Argument &&a) noexcept(noexcept(
         std::declval<Base &>() = std::forward<Argument>(a)
     )) {
@@ -244,8 +244,50 @@ struct AnyContainerCopyable: detail::AnyContainerBase<Policy> {
     }
 };
 
-template<typename P>
-using AnyContainer = AnyContainerCopyable<P>;
+template<typename Policy>
+struct AnyMovable: detail::AnyContainerBase<Policy> {
+    using Base = detail::AnyContainerBase<Policy>;
+    using Base::Base;
+
+    template<typename Arg>
+    constexpr static auto SuitableForBuilding() {
+        return
+            meta::NotBasedOn<Arg, AnyMovable>() && // disables self-building
+            !std::is_lvalue_reference_v<Arg>
+        ;
+    }
+
+    AnyMovable(const AnyMovable &) = delete;
+    AnyMovable(AnyMovable &&) = default;
+
+    template<
+        typename Arg,
+        typename = std::enable_if_t<SuitableForBuilding<Arg>()>
+    >
+    AnyMovable(Arg &&a): Base(std::forward<Arg>(a)) {}
+
+    AnyMovable &operator=(const AnyMovable &) = delete;
+    AnyMovable &operator=(AnyMovable &&) = default;
+
+    template<typename Argument>
+    std::enable_if_t<
+        SuitableForBuilding<Argument>(),
+        AnyMovable &
+    > operator=(Argument &&argument) noexcept(
+        noexcept(std::declval<Base &>() = std::forward<Argument>(argument))
+    ) {
+        Base::operator=(std::forward<Argument>(argument));
+        return *this;
+    }
+};
+
+template<typename Policy>
+using AnyContainer =
+    std::conditional_t<
+        detail::RequireMoveOnly_v<Policy>,
+        AnyMovable<Policy>,
+        AnyCopyable<Policy>
+    >;
 
 template<typename Policy>
 inline
@@ -261,4 +303,3 @@ T *anyContainerCast(const AnyContainer<Policy> *ptr) noexcept {
 
 }
 #endif
-
