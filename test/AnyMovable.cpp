@@ -8,6 +8,7 @@
 
 #include "zoo/AnyMovable.h"
 #include "zoo/Any/VTable.h"
+#include "zoo/any.h"
 
 #include "catch2/catch.hpp"
 
