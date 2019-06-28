@@ -5,6 +5,7 @@
 //
 
 #include "zoo/AnyContainer.h"
+#include "zoo/Any/VTable.h"
 
 #include "catch2/catch.hpp"
 
@@ -37,7 +38,28 @@ struct MockContainer:
 
 }
 
-TEST_CASE("Mock Affordances") {
+TEST_CASE("Mock Affordances", "[any][mostly-compile-time]") {
     test_affordances::MockContainer mc;
     REQUIRE(&mc == mc.thy());
 }
+
+constexpr auto
+    VPSize = sizeof(void *),
+    VPAlignment = alignof(void *);
+
+struct RTTIPolicy: zoo::VTablePolicy<VPSize, VPAlignment> {
+    template<typename T>
+    struct Affordances {
+        const std::type_info &type() const noexcept {
+            auto t = static_cast<const T *>(this);
+            return t->container()->type();
+        }
+    };
+};
+
+/*
+TEST_CASE("Affordances", "[any]") {
+    zoo::AnyContainer<RTTIPolicy> rttiAny;
+    REQUIRE(typeid(void) == rttiAny.type());
+}
+*/

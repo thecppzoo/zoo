@@ -1,7 +1,10 @@
 #ifndef Zoo_Any_VTable_h
 #define Zoo_Any_VTable_h
 
+#include "zoo/Any/Traits.h"
+
 #include <new>
+#include <typeinfo>
 
 namespace zoo {
 
