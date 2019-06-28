@@ -14,10 +14,13 @@
 namespace zoo {
 namespace detail {
 
-template<typename, bool = true>
+template<typename, typename = const bool>
 struct PRMO_impl: std::false_type {};
+
 template<typename Policy>
-struct PRMO_impl<Policy, bool(Policy::RequireMoveOnly)>: std::true_type {};
+struct PRMO_impl<Policy, decltype(Policy::RequireMoveOnly)>:
+    std::conditional_t<Policy::RequireMoveOnly, std::true_type, std::false_type>
+{};
 
 template<typename Policy>
 constexpr auto RequireMoveOnly_v = PRMO_impl<Policy>::value;
