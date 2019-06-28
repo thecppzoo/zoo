@@ -25,6 +25,25 @@ struct PRMO_impl<Policy, decltype(Policy::RequireMoveOnly)>:
 template<typename Policy>
 constexpr auto RequireMoveOnly_v = PRMO_impl<Policy>::value;
 
+struct NoAffordances {};
+
+template<typename Container, typename Policy, typename = void>
+struct PolicyAffordances_impl {
+    using type = NoAffordances;
+};
+
+template<typename Container, typename Policy>
+struct PolicyAffordances_impl<
+    Container,
+    Policy,
+    std::void_t<typename Policy::template Affordances<Container>>
+> {
+    using type = typename Policy::template Affordances<Container>;
+};
+
+template<typename Container, typename Policy>
+using PolicyAffordances = typename PolicyAffordances_impl<Container, Policy>::type;
+
 template<typename Policy>
 struct AnyContainerBase {
     using Container = typename Policy::MemoryLayout;
@@ -305,4 +324,5 @@ T *anyContainerCast(const AnyContainer<Policy> *ptr) noexcept {
 }
 
 }
+
 #endif
