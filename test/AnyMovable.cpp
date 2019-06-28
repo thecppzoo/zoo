@@ -2,7 +2,6 @@
 //  AnyMovable.cpp
 //
 //  Created by Eduardo Madrid on 6/24/19.
-//  Copyright © 2019 Eduardo Madrid. All rights reserved.
 //
 
 #include "zoo/Any/VTable.h"
@@ -61,6 +60,19 @@ static_assert(
     >, ""
 );
 
+
+namespace test_RMO_impl {
+
+struct DoesNotHaveMember {};
+static_assert(!zoo::detail::PRMO_impl<DoesNotHaveMember>::value, "");
+struct HasMember { constexpr static auto RequireMoveOnly = true; };
+static_assert(
+    std::is_same_v<const bool, decltype(HasMember::RequireMoveOnly)>, ""
+);
+static_assert(zoo::detail::PRMO_impl<HasMember>::value, "");
+
+}
+
 using MoveOnlyPolicy = zoo::VTablePolicy<8, 8>;
 
 static_assert(!zoo::detail::RequireMoveOnly_v<zoo::CanonicalPolicy>, "");
@@ -116,4 +128,12 @@ TEST_CASE("AnyMovable", "[any][type-erasure][contract]") {
         CHECK(31 == originallyEmpty.state<TracesMovement>()->trace_);
         CHECK(76 == defaultedPtr->trace_);
     }
+}
+
+#include "zoo/AnyCallable.h"
+#include "zoo/Any/VTable.h"
+
+TEST_CASE("AnyCallable<AnyMovable<MoveOnlyPolicy>>") {
+    using AC = zoo::AnyCallable<zoo::AnyMovable<MoveOnlyPolicy>, int(void *)>;
+    AC def;
 }

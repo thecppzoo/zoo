@@ -1,10 +1,3 @@
-//
-//  VTable.h
-//
-//  Created by Eduardo Madrid on 6/24/19.
-//  Copyright © 2019 Eduardo Madrid. All rights reserved.
-//
-
 #ifndef Zoo_Any_VTable_h
 #define Zoo_Any_VTable_h
 

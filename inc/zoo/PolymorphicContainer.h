@@ -2,11 +2,12 @@
 //  PolymorphicContainer.h
 //
 //  Created by Eduardo Madrid on 6/7/19.
-//  Copyright © 2019 Eduardo Madrid. All rights reserved.
 //
 
 #ifndef PolymorphicContainer_h
 #define PolymorphicContainer_h
+
+// clang-format off
 
 #include "ValueContainer.h"
 
@@ -125,9 +126,9 @@ struct RuntimePolymorphicAnyPolicyDecider<Size, Alignment, ValueType, true> {
 template<typename ValueType>
 constexpr bool canUseValueSemantics(int size, int alignment) {
     return
-    alignment % alignof(ValueType) == 0 &&
-    sizeof(ValueType) <= size &&
-    std::is_nothrow_move_constructible<ValueType>::value;
+        alignment % alignof(ValueType) == 0 &&
+        sizeof(ValueType) <= size &&
+        std::is_nothrow_move_constructible<ValueType>::value;
 }
 
 template<int Size, int Alignment>
@@ -136,13 +137,14 @@ struct RuntimePolymorphicAnyPolicy {
     
     template<typename ValueType>
     using Builder =
-    typename RuntimePolymorphicAnyPolicyDecider<
-    Size,
-    Alignment,
-    ValueType,
-    canUseValueSemantics<ValueType>(Size, Alignment)
-    >::type;
+        typename RuntimePolymorphicAnyPolicyDecider<
+            Size,
+            Alignment,
+            ValueType,
+            canUseValueSemantics<ValueType>(Size, Alignment)
+        >::type;
 };
 
 }
+
 #endif /* PolymorphicContainer_h */
