@@ -225,6 +225,13 @@ struct ConverterPolicy {
     bool isRuntimeReference(MemoryLayout &e) {
         return dynamic_cast<ConverterReferentialDriver<V> *>(e.driver());
     }
+
+    template<typename C>
+    struct Affordances {
+        auto &type() const noexcept {
+            return static_cast<const C *>(this)->container()->type();
+        }
+    };
 };
 
 template<int ToSize, int ToAlignment, int FromSize, int FromAlignment>

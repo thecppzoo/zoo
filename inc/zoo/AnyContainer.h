@@ -170,9 +170,10 @@ public:
 
     bool has_value() const noexcept { return container()->nonEmpty(); }
 
+    /*
     const std::type_info &type() const noexcept {
         return container()->type();
-    }
+    }*/
 
     template<typename ValueType>
     auto *state() noexcept {
@@ -274,12 +275,12 @@ struct AnyMovable: detail::AnyContainerBase<Policy> {
 };
 
 template<typename Policy>
-using AnyContainer =
-    std::conditional_t<
+using AnyContainer = AnyCopyable<Policy>;
+/*    std::conditional_t<
         detail::RequireMoveOnly_v<Policy>,
         AnyMovable<Policy>,
         AnyCopyable<Policy>
-    >;
+    >;*/
 
 template<typename Policy>
 inline

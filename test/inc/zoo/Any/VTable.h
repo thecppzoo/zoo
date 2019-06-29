@@ -5,6 +5,7 @@
 
 #include <new>
 #include <typeinfo>
+#include <utility>
 
 namespace zoo {
 
@@ -37,23 +38,35 @@ struct TypeErasedContainer {
     void move(void *to) noexcept { vTable_->move(this, to); }
 };
 
-template<int Size, int Alignment, typename V>
-struct SmallBufferTypeEraser: TypeErasedContainer<Size, Alignment> {
-    using Me = SmallBufferTypeEraser;
-
-    V *value() noexcept { return this->template as<V>(); }
+template<typename D, typename V>
+struct SmallBufferTypeEraserCRT {
+    V *value() noexcept { return static_cast<D *>(this)->template as<V>(); }
 
     inline const static TypeErasureOperations VTable = {
-        [](void *who) noexcept { static_cast<Me *>(who)->value()->~V(); },
+        [](void *who) noexcept { static_cast<D *>(who)->value()->~V(); },
         [](void *from, void *to) noexcept {
-            new (to) Me(std::move(*static_cast<Me *>(from)->value()));
+            new (to) D(std::move(*static_cast<D *>(from)->value()));
         }
     };
 
     template<typename... Args>
-    SmallBufferTypeEraser(Args &&...args) {
-        this->vTable_ = &VTable;
+    void build(Args &&...args) {
         new(value()) V(std::forward<Args>(args)...);
+    }
+};
+
+template<int Size, int Alignment, typename V>
+struct SmallBufferTypeEraser:
+    TypeErasedContainer<Size, Alignment>,
+    SmallBufferTypeEraserCRT<SmallBufferTypeEraser<Size, Alignment, V>, V>
+{
+    using B =
+        SmallBufferTypeEraserCRT<SmallBufferTypeEraser<Size, Alignment, V>, V>;
+
+    template<typename... Args>
+    SmallBufferTypeEraser(Args &&...args) {
+        this->vTable_ = &B::VTable;
+        this->build(std::forward<Args>(args)...);
     }
 };
 
@@ -96,6 +109,66 @@ struct VTablePolicy {
     constexpr static auto RequireMoveOnly = true;
 };
 
-}
+namespace RTTI {
+
+struct RTTIOperation: TypeErasureOperations {
+    const std::type_info &(*type)() noexcept;
+};
+
+template<typename D>
+struct VTCBase {
+    const std::type_info &type() const noexcept {
+        auto rtti = static_cast<const RTTIOperation *>(this->vTable_);
+        return rtti->type();
+    }
+};
+
+template<int S, int A>
+struct TEC: TypeErasedContainer<S, A>, VTCBase<TEC<S, A>> {
+    TEC() { this->vTable_ = &Defaulted; }
+
+    using B = TypeErasedContainer<S, A>;
+
+    inline static const RTTIOperation Defaulted = {
+        B::Empty.destroy,
+        B::Empty.move,
+        []() noexcept -> decltype(auto) { return typeid(void); }
+    };
+};
+
+template<int S, int A, typename V>
+struct SBTE: SmallBufferTypeEraserCRT<SBTE<S, A, V>, V>, TEC<S, A> {
+    using Base = SmallBufferTypeEraserCRT<SBTE<S, A, V>, V>;
+
+    template<typename... Args>
+    SBTE(Args &&...args): Base(std::forward<Args>(args)...) {
+        this->vTable_ = &VTable;
+    }
+
+    RTTIOperation VTable = {
+        Base::VTable::destroy,
+        Base::VTable::move,
+        []() noexcept -> decltype(auto) { return typeid(V); }
+    };
+};
+
+template<int Size, int Alignment>
+struct RTTI {
+    using MemoryLayout = TEC<Size, Alignment>;
+
+    template<typename T>
+    using Builder = SBTE<Size, Alignment, T>;
+
+    template<typename C>
+    struct Affordances {
+        const std::type_info &type() const noexcept {
+            return static_cast<const C *>(this)->container()->type();
+        }
+    };
+
+    constexpr static auto RequireMoveOnly = true;
+};
+
+}}
 
 #endif /* VTable_h */
