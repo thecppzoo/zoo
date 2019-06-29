@@ -118,8 +118,10 @@ struct RTTIOperation: TypeErasureOperations {
 template<typename D>
 struct VTCBase {
     const std::type_info &type() const noexcept {
-        auto rtti = static_cast<const RTTIOperation *>(this->vTable_);
-        return rtti->type();
+        return
+            static_cast<const RTTIOperation *>(
+                static_cast<const D *>(this)->vTable_
+            )->type();
     }
 };
 

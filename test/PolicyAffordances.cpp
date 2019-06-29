@@ -47,19 +47,8 @@ constexpr auto
     VPSize = sizeof(void *),
     VPAlignment = alignof(void *);
 
-struct RTTIPolicy: zoo::VTablePolicy<VPSize, VPAlignment> {
-    template<typename T>
-    struct Affordances {
-        const std::type_info &type() const noexcept {
-            auto t = static_cast<const T *>(this);
-            return t->container()->type();
-        }
-    };
-};
-
-/*
 TEST_CASE("Affordances", "[any]") {
-    zoo::AnyContainer<RTTIPolicy> rttiAny;
+    zoo::AnyMovable<zoo::RTTI::RTTI<VPSize, VPAlignment>> rttiAny;
     REQUIRE(typeid(void) == rttiAny.type());
 }
-*/
+
