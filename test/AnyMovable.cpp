@@ -73,7 +73,7 @@ static_assert(zoo::detail::PRMO_impl<HasMember>::value, "");
 
 }
 
-using MoveOnlyPolicy = zoo::VTablePolicy<8, 8>;
+using MoveOnlyPolicy = zoo::RTTI::RTTI<sizeof(void *), alignof(void *)>;
 
 static_assert(!zoo::detail::RequireMoveOnly_v<zoo::CanonicalPolicy>, "");
 static_assert(zoo::detail::RequireMoveOnly_v<MoveOnlyPolicy>, "");
@@ -85,6 +85,15 @@ static_assert(std::is_same_v<
     zoo::AnyContainer<MoveOnlyPolicy>,
     zoo::AnyMovable<MoveOnlyPolicy>
 >, "");
+
+namespace zoo {
+
+template<typename Policy>
+auto &type(const detail::AnyContainerBase<Policy> &c) {
+    return typeid(Policy);
+}
+
+}
 
 TEST_CASE("AnyMovable", "[any][type-erasure][contract]") {
     SECTION("May construct with single argument l-value in_place_type") {
@@ -133,7 +142,9 @@ TEST_CASE("AnyMovable", "[any][type-erasure][contract]") {
 #include "zoo/AnyCallable.h"
 #include "zoo/Any/VTable.h"
 
-TEST_CASE("AnyCallable<AnyMovable<MoveOnlyPolicy>>") {
-    using AC = zoo::AnyCallable<zoo::AnyMovable<MoveOnlyPolicy>, int(void *)>;
+TEST_CASE("AnyContainer<MoveOnlyPolicy>") {
+    zoo::AnyMovable<MoveOnlyPolicy> empty;
+    type(empty);
+    using AC = zoo::AnyCallable<zoo::AnyContainer<MoveOnlyPolicy>, int(void *)>;
     AC def;
 }

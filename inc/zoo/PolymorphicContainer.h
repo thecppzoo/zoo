@@ -143,6 +143,13 @@ struct RuntimePolymorphicAnyPolicy {
             ValueType,
             canUseValueSemantics<ValueType>(Size, Alignment)
         >::type;
+
+    template<typename C>
+    struct Affordances {
+        const std::type_info &type() const noexcept {
+            return static_cast<const C *>(this)->container()->type();
+        }
+    };
 };
 
 }
