@@ -8,11 +8,14 @@ struct Destructor {
     int *ptr;
 
     Destructor(int *p): ptr(p) {}
+    Destructor(const Destructor &) = default;
+    Destructor(Destructor &&) = default;
 
     ~Destructor() { *ptr = 1; }
 };
 
-struct alignas(16) D2: Destructor { using Destructor::Destructor; };
+struct alignas(2 * sizeof(void *)) D2: Destructor
+{ using Destructor::Destructor; };
 
 struct Big { double a, b; };
 
@@ -80,10 +83,14 @@ void testAnyImplementation() {
     SECTION("Copy constructor -- Referential") {
         Big b = { 3.14159265, 2.7182 };
         ExtAny big{b};
+        auto bigA = zoo::anyContainerCast<Big>(&big);
+        REQUIRE(bigA->a == b.a);
+        REQUIRE(bigA->b == b.b);
         ExtAny copy{big};
         REQUIRE(zoo::isRuntimeReference<Big>(copy));
         REQUIRE(typeid(Big) == copy.type());
         auto addr = zoo::anyContainerCast<Big>(&copy);
+        REQUIRE(addr != bigA);
         CHECK(addr->a == b.a);
         CHECK(addr->b == b.b);
     }
