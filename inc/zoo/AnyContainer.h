@@ -23,6 +23,9 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
 
     AnyContainerBase() noexcept { new(m_space) Container; }
 
+    constexpr static void (AnyContainerBase::*NoInit)(void *) = nullptr;
+    AnyContainerBase(void (AnyContainerBase::*)(void *)) {}
+
     AnyContainerBase(AnyContainerBase &&moveable) noexcept {
         auto source = moveable.container();
         source->move(container());
@@ -201,7 +204,7 @@ struct AnyCopyable: detail::AnyContainerBase<Policy> {
 
     using Base::Base;
 
-    AnyCopyable(const AnyCopyable &model) {
+    AnyCopyable(const AnyCopyable &model): Base{Base::NoInit} {
         auto thy = this->container();
         model.container()->copy(thy);
     }
