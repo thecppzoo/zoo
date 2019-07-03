@@ -5,12 +5,10 @@
 //  Created by Eduardo Madrid on 6/27/19.
 //
 
+#include "zoo/AlignedStorage.h"
+
 #include <typeinfo>
 #include <utility>
-
-constexpr auto
-    VPSize = sizeof(void *),
-    VPAlignment = alignof(void *);
 
 /// \brief Operations is a mixin of operation states and functions
 template<typename...Opers>
@@ -33,27 +31,6 @@ struct Type {
     const std::type_info &(*type)() noexcept;
 };
 }
-
-template<int S, int A>
-struct AlignedStorage {
-    constexpr static auto Size = S, Alignment = A;
-
-    alignas(Alignment) std::byte space_[Size];
-
-    template<typename T>
-    T *as() noexcept { return reinterpret_cast<T *>(&space_); }
-    template<typename T>
-    T *as() const noexcept {
-        return const_cast<AlignedStorage *>(this)->as<T>();
-    }
-
-    template<typename T, typename... Args>
-    #define PP_ZOO_BUILD_EXPRESSION new(space_) T(std::forward<Args>(args)...)
-    T *build(Args &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION)) {
-        return PP_ZOO_BUILD_EXPRESSION;
-    #undef PP_ZOO_BUILD_EXPRESSION
-    }
-};
 
 template<
     typename Storage, template<class> typename... Affordances
@@ -159,7 +136,7 @@ struct Type {
     auto &type() const noexcept { return d(this)->vTable_->type(); }
 };
 
-using Goldilocks = AlignedStorage<1 * VPSize, VPAlignment>;
+using Goldilocks = zoo::AlignedStorage<1 * zoo::VPSize, zoo::VPAlignment>;
 using C = Container<Goldilocks, Destroy, Move, Copy, Type>;
 
 template<typename V>
@@ -177,7 +154,7 @@ struct Value: C {
         to->vTable_ = this->vTable_;
     }
 
-    V *value() const noexcept { return this->template as<V>(); }
+    V *value() const noexcept { return const_cast<Value *>(this)->template as<V>(); }
 
     void copy_impl(Value *to) const {
         to->template build<V>(*value());
@@ -205,7 +182,9 @@ struct Reference: C {
         this->vTable_ = &C::Defaults;
     }
 
-    V *&value() const { return *this->template as<V *>(); }
+    V *&value() const {
+        return *const_cast<Reference *>(this)->template as<V *>();
+    }
 
     void copy_impl(Reference *to) const {
         to->value() = new V(*value());
