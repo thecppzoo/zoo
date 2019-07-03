@@ -9,7 +9,6 @@
 #include "catch2/catch.hpp"
 
 #include <type_traits>
-#include <vector>
 
 using namespace zoo;
 
@@ -99,7 +98,7 @@ static_assert(
 using A = AlignedStorage<>;
 
 static_assert(
-    noexcept(std::declval<A &>().build<Constructors, void *>(nullptr)),
+    noexcept(std::declval<A &>().build<Constructors>(nullptr)),
     "Failed to preserve noexceptness of constructor"
 );
 

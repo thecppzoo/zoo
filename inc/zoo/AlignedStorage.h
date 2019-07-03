@@ -108,7 +108,6 @@ struct AlignedStorage {
 
     template<typename T>
     T *as() noexcept { return reinterpret_cast<T *>(&space_); }
-
     template<typename T>
     const T *as() const noexcept {
         return const_cast<AlignedStorage *>(this)->as<T>();
