@@ -6,6 +6,7 @@
 //
 
 #include "zoo/AlignedStorage.h"
+#include "CheapRTTI.hpp"
 
 #include <typeinfo>
 #include <utility>
@@ -30,14 +31,22 @@ struct Copy {
 struct Type {
     const std::type_info &(*type)() noexcept;
 };
+
+struct CheapRTTI {
+    const int *index;
+};
+
 }
+
+template<typename D>
+struct Destroy;
 
 template<
     typename Storage, template<class> typename... Affordances
 >
 // An abbreviation to reduce the noise of the variadic CRTP pattern
 #define PP_ZOO_AFFORDANCES Affordances<Container<Storage, Affordances...>>
-struct Container: Storage, PP_ZOO_AFFORDANCES... {
+struct Container: protected Storage, public PP_ZOO_AFFORDANCES... {
     using Ops = Operations<typename PP_ZOO_AFFORDANCES::Operation...>;
 
     const Ops *vTable_ = &Defaults;
@@ -57,6 +66,8 @@ struct Container: Storage, PP_ZOO_AFFORDANCES... {
         this->move(to);
         this->destroy();
     }
+
+    using Destroy<Container>::destroy;
 };
 #undef PP_ZOO_AFFORDANCES
 
@@ -136,8 +147,23 @@ struct Type {
     auto &type() const noexcept { return d(this)->vTable_->type(); }
 };
 
+template<typename>
+struct Registration {
+    inline static const int index = int(zoo::cheapRTTIRegistration());
+};
+
+template<typename D>
+struct CheapRTTI {
+    using Operation = op::CheapRTTI;
+    inline static const int defaulted = int(zoo::cheapRTTIRegistration());
+    inline static const auto val = &defaulted;
+    template<typename V>
+    inline static const int function = Registration<typename V::type>::index;
+    auto cheap() const noexcept { return *static_cast<const D *>(this)->vTable_->index; }
+};
+
 using Goldilocks = zoo::AlignedStorage<1 * zoo::VPSize, zoo::VPAlignment>;
-using C = Container<Goldilocks, Destroy, Move, Copy, Type>;
+using C = Container<Goldilocks, Destroy, Move, Copy, Type, CheapRTTI>;
 
 template<typename V>
 struct Value: C {
@@ -213,6 +239,10 @@ struct RecurringPolicy {
     struct Affordances {
         const std::type_info &type() const noexcept {
             return static_cast<const C *>(this)->container()->type();
+        }
+
+        int cheap() const noexcept {
+            return static_cast<const C *>(this)->container()->cheap();
         }
     };
 
