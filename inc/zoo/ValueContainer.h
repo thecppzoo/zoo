@@ -22,10 +22,10 @@ struct ValueContainerCRT {
 
     ValueType *thy() { return reinterpret_cast<ValueType *>(d()->m_space); }
     
-    ValueContainerCRT(typename IAC::NONE) {}
+    void build(typename IAC::NONE) {}
     
     template<typename... Args>
-    ValueContainerCRT(Args &&... args) {
+    void build(Args &&... args) {
         new(d()->m_space) ValueType{std::forward<Args>(args)...};
     }
     
@@ -62,14 +62,14 @@ struct ReferentialContainerCRT {
     
     ValueType *thy() { return *pThy(); }
     
-    ReferentialContainerCRT(typename IAC::NONE) {}
+    void build(typename IAC::NONE) {}
     
     template<typename... Values>
-    ReferentialContainerCRT(Values &&... values) {
+    void build(Values &&... values) {
         *pThy() = new ValueType{std::forward<Values>(values)...};
     }
     
-    ReferentialContainerCRT(typename IAC::NONE, ValueType *ptr) {
+    void build(typename IAC::NONE, ValueType *ptr) {
         *pThy() = ptr;
     }
     

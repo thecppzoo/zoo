@@ -56,7 +56,10 @@ struct ValueContainer:
         ValueType
     >;
 
-    using Base::Base;
+    template<typename... Args>
+    ValueContainer(Args &&...args) {
+        this->build(std::forward<Args>(args)...);
+    }
 
     void destroy() noexcept override { Base::destroy(); }
     
@@ -94,7 +97,10 @@ struct ReferentialContainer:
             ValueType
         >;
 
-    using Base::Base;
+    template<typename... Args>
+    ReferentialContainer(Args &&...args) {
+        this->build(std::forward<Args>(args)...);
+    }
 
     void destroy() noexcept override { Base::destroy(); }
     
