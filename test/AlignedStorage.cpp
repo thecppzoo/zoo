@@ -82,8 +82,6 @@ static_assert(
     "must preserve the r-value category of the arguments"
 );
 
-constexpr Constructors &makeReference();
-
 static_assert(
     !MayCallBuild_<
         AlignedStorage<>, Constructors,
