@@ -100,6 +100,7 @@ void build(T &to, Args &&... args)
 
 }
 
+///! \note What about constructors and destructor?
 template<int S = VPSize, int A = VPAlignment>
 struct AlignedStorage {
     constexpr static auto Size = S, Alignment = A;
