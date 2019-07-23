@@ -41,17 +41,6 @@ struct MakeInvoker<Container, R(Args...)> {
 
 template<typename TypeErasureProvider>
 struct AnyCallSignature: TypeErasureProvider {
-    /*template<
-        typename Argument,
-        typename =
-            std::enable_if_t<
-                std::is_base_of_v<AnyCallSignature, std::decay_t<Argument>>
-            >
-    >
-    AnyCallSignature(Argument &&a):
-        TypeErasureProvider(std::forward<Argument>(a))
-    {}*/
-
     using TypeErasureProvider::TypeErasureProvider;
 
 protected:
