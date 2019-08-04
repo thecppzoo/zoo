@@ -2,9 +2,17 @@ dist: bionic
 
 language: cpp
 
-compiler:
-  - gcc
-  - clang
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      addons: &gcc8
+        apt:
+          sources: ubuntu-toolchain-r-test
+          packages: ['g++-9']
+      env: COMPILER='g++-9'
+    - os: linux
+      compiler: clang
 
 before_script:
   - mkdir build
