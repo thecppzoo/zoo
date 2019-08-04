@@ -5,13 +5,6 @@ language: cpp
 matrix:
   include:
     - os: linux
-      compiler: gcc
-      addons: &gcc9
-        apt:
-          sources: ubuntu-toolchain-r-test
-          packages: ['g++-9']
-      env: CXX='g++-9'
-    - os: linux
       compiler: clang
 
 before_script:
