@@ -31,9 +31,30 @@ endif()
 
 message(STATUS "Additional sources:" ${ADDITIONAL_SOURCES})
 
-add_executable(
-    zooTest${CMAKE_BUILD_TYPE}
+set(CURRENT_EXECUTABLE "zooTest${CMAKE_BUILD_TYPE}")
+
+set(
+    ZOO_TEST_SOURCES
     catch_main.cpp variant.cpp AnyCallable.cpp AnyExtended.cpp any.cpp
     algorithm/cfs.cpp algorithm/quicksort.cpp egyptian.cpp
-    ${ADDITIONAL_SOURCES}
 )
+
+add_executable(
+    ${CURRENT_EXECUTABLE} ${ZOO_TEST_SOURCES} ${ADDITIONAL_SOURCES}
+)
+
+# CMake build : library tests
+
+#configure variables
+set(TEST_APP_NAME "${CURRENT_EXECUTABLE}Test")
+
+add_executable(${TEST_APP_NAME} ${ZOO_TEST_SOURCES})
+
+#set includes
+include_directories(${TEST_THIRD_PARTY_INCLUDE_PATH})
+
+# Turn on CMake testing capabilities
+enable_testing()
+
+#parse catch tests
+ParseAndAddCatchTests(${TEST_APP_NAME})
