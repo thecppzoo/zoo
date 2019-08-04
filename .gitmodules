@@ -1,3 +1,6 @@
 [submodule "benchmark/dependencies/google_benchmark"]
 	path = benchmark/dependencies/google_benchmark
 	url = https://github.com/google/benchmark.git
+[submodule "test/third_party/Catch2"]
+	path = test/third_party/Catch2
+	url = https://github.com/catchorg/Catch2.git
