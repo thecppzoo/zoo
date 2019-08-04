@@ -1,6 +1,6 @@
-cmake_minimum_required (VERSION 3.0)
+cmake_minimum_required (VERSION 3.8)
 
-set(CMAKE_CXX_FLAGS -std=c++17)
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_CXX_FLAGS_UBSAN "-fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
 # set(CMAKE_EXE_LINKER_FLAGS_UBSAN -fsanitize=undefined)
@@ -15,12 +15,14 @@ configure_file (
     "${PROJECT_BINARY_DIR}/ZooTestConfig.h"
 )
 
+add_subdirectory(third_party EXCLUDE_FROM_ALL)
+enable_testing()
+
 include_directories(
     "${PROJECT_BINARY_DIR}"
     ./inc
     ../inc
-    ../../metatools/inc
-    ../../Catch2/single_include
+    ${TEST_THIRD_PARTY_INCLUDE_PATH}
 )
 
 if("UBSAN" STREQUAL "${CMAKE_BUILD_TYPE}")
