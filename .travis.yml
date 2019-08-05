@@ -1,10 +1,4 @@
 dist: bionic
-addons:
-  apt:
-    sources:
-      - ppa:ubuntu-toolchain-r/test
-    packages:
-      - gcc-9
 
 language: cpp
 
@@ -13,11 +7,21 @@ matrix:
     - os: linux
       compiler: clang
     - os: linux
-      compiler: gcc-9
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-9
+      env:
+         - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9"
+
+before_install:
+    - eval "${MATRIX_EVAL}"
 
 before_script:
-  - mkdir build
-  - cd build
-  - cmake -G "Unix Makefiles" ../test
+    - mkdir build
+    - cd build
+    - cmake -G "Unix Makefiles" ../test
 
 script: make && make test
