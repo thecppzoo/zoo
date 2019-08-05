@@ -1,4 +1,10 @@
 dist: bionic
+addons:
+  apt:
+    sources:
+      - ppa:ubuntu-toolchain-r/test
+    packages:
+      - gcc-9
 
 language: cpp
 
@@ -6,6 +12,8 @@ matrix:
   include:
     - os: linux
       compiler: clang
+    - os: linux
+      compiler: gcc-9
 
 before_script:
   - mkdir build
