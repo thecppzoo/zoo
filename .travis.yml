@@ -1,12 +1,4 @@
 dist: bionic
-
-addons:
-  apt:
-    sources:
-    - sourceline: 'ppa:ubuntu-toolchain-r/test'
-    - packages:
-      - gcc-9
-      - g++-9
     
 language: cpp
 
@@ -27,7 +19,10 @@ matrix:
           - MATRIX_EVAL="CC=clang && CXX=clang++"
 
 before_install:
-    - eval "${MATRIX_EVAL}"
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update -q
+  - sudo apt-get install g++-9 -y
+  - eval "${MATRIX_EVAL}"
 
 before_script:
     - mkdir build
