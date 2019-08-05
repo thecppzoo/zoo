@@ -1,11 +1,9 @@
-dist: bionic
+dist: trusty
 
 language: cpp
 
 matrix:
   include:
-    - os: linux
-      compiler: clang
     - os: linux
       addons:
         apt:
