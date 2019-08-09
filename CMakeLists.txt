@@ -6,4 +6,4 @@ include(${CMAKE_CURRENT_BINARY_DIR}/nlo_link.cmake OPTIONAL)
 add_library(zoo INTERFACE)
 target_include_directories(zoo INTERFACE inc)
 
-nlo_export(ProfilingEngine)
+nlo_export(zoo)
