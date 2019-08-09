@@ -1,7 +1,7 @@
 from conans import CMake, python_requires
 nlo = python_requires("nlo-cmake-pythonlib/1.0@snap/stable")
 
-class ProfilingEngine(nlo.NloBasicCmakeConanFile):
+class Zoo(nlo.NloBasicCmakeConanFile):
     name = "zoo"
     version = "1.0"
     generators = ("nlo_cmake_link", "cmake", "json")
