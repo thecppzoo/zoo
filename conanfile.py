@@ -3,7 +3,6 @@ nlo = python_requires("nlo-cmake-pythonlib/1.0@snap/stable")
 
 class Zoo(nlo.NloBasicCmakeConanFile):
     name = "zoo"
-    version = "1.0"
     generators = ("nlo_cmake_link", "cmake", "json")
     exports_sources = ["CMakeLists.txt", "inc/*"]
     options = {"production": [False, True]}
