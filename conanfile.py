@@ -1,5 +1,4 @@
-from conans import CMake, python_requires
-nlo = python_requires("nlo-cmake-pythonlib/1.0@snap/stable")
+import nlo
 
 class Zoo(nlo.NloBasicCmakeConanFile):
     name = "zoo"
