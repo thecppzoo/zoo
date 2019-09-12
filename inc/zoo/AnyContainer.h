@@ -211,6 +211,9 @@ struct AnyCopyable: detail::AnyContainerBase<Policy> {
 
     AnyCopyable(AnyCopyable &&) = default;
 
+    AnyCopyable& operator=(AnyCopyable&&) = default;
+    AnyCopyable& operator=(const AnyCopyable&) = default;
+
     template<typename Argument>
     std::enable_if_t<
         std::is_assignable_v<Base, Argument> &&
