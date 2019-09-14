@@ -13,6 +13,10 @@
 
 namespace zoo {
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
+#pragma clang diagnostic ignored "-Werror"
+
 template<int Size, int Alignment>
 struct IAnyContainer {
     const void *vtable() const noexcept { return *reinterpret_cast<const void *const *>(this); }
@@ -34,6 +38,8 @@ struct IAnyContainer {
     using NONE = void (IAnyContainer::*)();
     constexpr static NONE None = nullptr;
 };
+
+#pragma clang diagnostic pop
 
 template<int Size, int Alignment>
 struct BaseContainer: IAnyContainer<Size, Alignment> {
