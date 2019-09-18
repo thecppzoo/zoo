@@ -1,6 +1,8 @@
 # Pokerbotic
 
-**Pokerbotic** is a poker engine.  It is being developed by a professional software engineer and a semi-professional poker player with professional knowledge of stochastic processes.
+## This repository will be changing very soon to incorporate feedback from my CPPCon 2019 presentation, please check back in a couple of weeks
+
+**Pokerbotic** is a poker engine.  It has been developed by a professional software engineer and a semi-professional poker player with professional knowledge of stochastic processes little by little.
 
 Currently, we have the hand evaluator framework, that achieves in normally available machines a rate of 100 million evaluations per second, that is, it classifies more than 100 million poker hands into what "four of a kind", etc. they are.
 
