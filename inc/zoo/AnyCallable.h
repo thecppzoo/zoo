@@ -21,16 +21,28 @@ template<typename E, typename S>
 inline
 void swap(AnyCallable<E, S> &ac1, AnyCallable<E, S> &ac2) noexcept;
 
+template<typename R, typename... Args>
+struct TargetInvokeFunction {
+    static R defaultInvoker(Args...) { throw std::bad_function_call{}; }
+
+    R (*invoker_)(Args...) = defaultInvoker;
+};
+
 /// \tparam TypeErasureProvider Must implement a \c state template instance
 /// function that returns a pointer to the held object
 ///
 /// Why inheritance: Client code should be able to enquire the target
 /// as they would any type erased value
 template<typename TypeErasureProvider, typename R, typename... Args>
-struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
-    AnyCallable(): targetInvoker_{emptyInvoker} {}
+struct AnyCallable<TypeErasureProvider, R(Args...)>:
+    TargetInvokeFunction<R, Args..., TypeErasureProvider &>,
+    TypeErasureProvider
+{
+    using Invoker = TargetInvokeFunction<R, Args..., TypeErasureProvider &>;
 
-    AnyCallable(std::nullptr_t): AnyCallable() {}
+    AnyCallable() {}
+
+    AnyCallable(std::nullptr_t) {}
 
     template<
         typename Callable,
@@ -42,8 +54,8 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
         typename = decltype(std::declval<Decayed>()(std::declval<Args>()...))
     >
     AnyCallable(Callable &&target):
-        TypeErasureProvider{std::forward<Callable>(target)},
-        targetInvoker_{invokeTarget<Decayed>}
+        Invoker{invokeTarget<Decayed>},
+        TypeErasureProvider{std::forward<Callable>(target)}
     {}
 
     template<typename Argument>
@@ -58,17 +70,17 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     template<typename... RealArguments>
     R operator()(RealArguments &&... args) const {
         return
-            targetInvoker_(
+            this->invoker_(
                 std::forward<RealArguments>(args)...,
                 const_cast<AnyCallable &>(*this)
             );
     }
 
     void swap(AnyCallable &other) noexcept {
+        zoo::swap(this->invoker_, other.invoker_);
         auto &upcasted = static_cast<TypeErasureProvider &>(*this);
         static_assert(noexcept(upcasted.swap(other)), "");
         upcasted.swap(other);
-        zoo::swap(targetInvoker_, other.targetInvoker_);
     }
 
     explicit operator bool() const noexcept {
@@ -80,7 +92,7 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     }
 
     bool empty() const noexcept {
-        return emptyInvoker == targetInvoker_;
+        return Invoker::defaultInvoker == this->invoker_;
     }
 
     /// \note \c target should not be used, it is a consequence of what we
@@ -111,12 +123,6 @@ private:
     friend inline
     void swap(AnyCallable<E, S> &, AnyCallable<E, S> &) noexcept;
 
-    R (*targetInvoker_)(Args..., TypeErasureProvider &);
-
-    static R emptyInvoker(Args..., TypeErasureProvider &) {
-        throw std::bad_function_call{};
-    }
-
     template<typename T>
     static R invokeTarget(Args... as, TypeErasureProvider &obj) {
         return (*obj.template state<T>())(std::forward<Args>(as)...);
@@ -142,13 +148,7 @@ bool operator!=(
 template<typename E, typename S>
 inline
 void swap(AnyCallable<E, S> &c1, AnyCallable<E, S> &c2) noexcept {
-    auto &upcasted = static_cast<E &>(c1);
-    static_assert(
-        noexcept(swap(upcasted, c2)),
-        "Requires swap of type eraser to be noexcept"
-    );
-    swap(upcasted, c2);
-    swap(c1.targetInvoker_, c2.targetInvoker_);
+    c1.swap(c2);
 }
 
 } // namespace zoo

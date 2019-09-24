@@ -107,6 +107,12 @@ void CallableTests<ErasureProvider>::execute() {
         CHECK(1 == copies);
         CHECK(1 == moves);
     }
+    SECTION("The invoker is at displacement 0") {
+        ZFunction<void(void)> model;
+        CHECK( // both the ZFunction and the invoker have the same address
+            static_cast<void *>(&model.invoker_) == static_cast<void *>(&model)
+        );
+    }
     SECTION("std::function compatibility") {
         struct MyCallable
          {
