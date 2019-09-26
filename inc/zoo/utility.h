@@ -3,13 +3,13 @@
 
 #include <utility>
 
+#include <algorithm>
+    // for swap
+
 namespace zoo {
 
-template<typename T>
-inline
-void swap(T &t1, T &t2) noexcept(noexcept(std::swap(t1, t2))) {
-    std::swap(t1, t2);
-}
+// makes std::swap available for types in namespace zoo
+using std::swap;
 
 template<typename T>
 inline
