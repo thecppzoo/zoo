@@ -97,3 +97,46 @@ TEST_CASE("AnyExtensions", "[contract]") {
         zoo::AnyContainer<zoo::ConverterPolicy<8, 8>>
     >();
 }
+
+namespace pseudo_std {
+
+// swap2 simulates std::swap
+template<typename T>
+void swap2(T &t1, T &t2) { std::swap(t1, t2); }
+
+template<typename T>
+struct Container {
+    T t1_, t2_;
+    Container() { swap2(t1_, t2_); }
+    Container(T t1, T t2): t1_(t1), t2_(t2) { swap2(t1_, t2_); }
+};
+
+}
+
+namespace zoo {
+
+/* this would introduce an ambiguity:
+template<typename T>
+inline
+void swap2(T &t1, T &t2) { std::swap(t1, t2); }
+*/
+
+using pseudo_std::swap2;
+
+inline void swap2(Any &a1, Any &a2) { swap(a1, a2); }
+
+struct Derived: Any {};
+
+struct A { int value_; };
+
+}
+
+TEST_CASE("Example of swap ambiguity") {
+    pseudo_std::Container<zoo::Derived> usedToGiveError;
+    zoo::A a5{5}, a6{6};
+    pseudo_std::Container<zoo::A> swaps(a5, a6);
+    CHECK(swaps.t1_.value_ == 6);
+    CHECK(swaps.t2_.value_ == 5);
+    swap2(a5, a6);
+    CHECK(6 == a5.value_);
+}
