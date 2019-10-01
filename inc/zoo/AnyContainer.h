@@ -234,7 +234,7 @@ struct AnyCopyable: detail::AnyContainerBase<Policy> {
         std::is_copy_constructible_v<ValueType>,
         decltype(BASE_EMPLACE_FORWARDING)
     > {
-        this->template emplace<ValueType>(std::forward<Args>()...);
+        return this->Base::template emplace<ValueType>(std::forward<Args>(args)...);
     }
 };
 

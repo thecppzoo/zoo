@@ -57,6 +57,11 @@ TEST_CASE("Resolved bugs") {
         CHECK(dynamic_cast<Base *>(&c));
         c.destroy();
     }
+    SECTION("Emplace infinite recursion") {
+        Any a;
+        a.emplace<int>(3);
+        REQUIRE(3 == *a.state<int>());
+    }
 }
 
 void debug() {};
