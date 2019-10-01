@@ -7,66 +7,30 @@
 #ifndef ZOO_AnyCallSignature_h
 #define ZOO_AnyCallSignature_h
 
-#include "zoo/AlignedStorage.h"
-#include "meta/NotBasedOn.h"
-
-#include <utility>
+#include "AnyCallable.h"
 
 namespace zoo {
 
-template<typename>
-struct ReturnType_t;
-template<typename R, typename... Args>
-struct ReturnType_t<R(Args...)> { // pending noexcept
-    using type = R;
-};
+class TypeToken {};
 
-template<typename S>
-using ReturnType = typename ReturnType_t<S>::type;
+template<typename TypeErasure>
+struct AnyCallSignature:
+    protected AnyCallable<TypeErasure, TypeToken(TypeToken)>
+{
+    AnyCallSignature() = default;
 
-template<typename, typename>
-struct MakeInvoker;
-template<typename Container, typename R, typename... Args>
-struct MakeInvoker<Container, R(Args...)> {
-    using type = R(*)(Args..., void *);
-
-    template<typename T>
-    static R function(Args... args, void *who) {
-        return
-            (*static_cast<Container *>(who)->template state<T>()) (
-                std::forward<Args>(args)...
-            );
-    }
-};
-
-template<typename TypeErasureProvider>
-struct AnyCallSignature: TypeErasureProvider {
-    using TypeErasureProvider::TypeErasureProvider;
-
-protected:
-    template<typename S>
-    using FunctionPointer = typename MakeInvoker<TypeErasureProvider, S>::type;
-
-    using AnySignature = void(*)();
-    AlignedStorage<sizeof(AnySignature), alignof(AnySignature)> space_;
-
-public:
-    template<typename Target, typename Signature>
-    AnyCallSignature(Target &&t, std::in_place_type_t<Signature>):
-        TypeErasureProvider(std::forward<Target>(t))
+    template<typename S, typename... Args>
+    #define PP_ZOO_CONSTRUCTION_EXPR AnyCallable<TypeErasure, S>(std::forward<Args>(args)...)
+    AnyCallSignature(std::in_place_type_t<S>, Args &&...args)
+        noexcept(noexcept(PP_ZOO_CONSTRUCTION_EXPR))
     {
-        space_.build<FunctionPointer<Signature>>(
-            &MakeInvoker<TypeErasureProvider, Signature>::
-                template function<std::decay_t<Target>>
-        );
+        new(this) PP_ZOO_CONSTRUCTION_EXPR;
+    #undef PP_ZOO_CONSTRUCTION_EXPR
     }
 
-    template<typename Signature, typename... As>
-    ReturnType<Signature> call(As &&...as) {
-        return
-            (*space_.as<FunctionPointer<Signature>>())(
-                std::forward<As>(as)..., this
-            );
+    template<typename Signature>
+    AnyCallable<TypeErasure, Signature> &as() {
+        return reinterpret_cast<AnyCallable<TypeErasure, Signature> &>(*this);
     }
 };
 

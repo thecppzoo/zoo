@@ -106,7 +106,7 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
         return not(*this == nullptr);
     }
 
-private:
+protected:
     template<typename E, typename S>
     friend inline
     void swap(AnyCallable<E, S> &, AnyCallable<E, S> &) noexcept;
