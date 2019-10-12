@@ -117,7 +117,7 @@ struct AnyCallable<TypeErasureProvider, R(Args...)>:
     bool operator==(std::nullptr_t) const noexcept { return empty(); }
 
     bool operator!=(std::nullptr_t) const noexcept {
-        return not(*this == nullptr);
+        return !(*this == nullptr);
     }
 
 protected:
