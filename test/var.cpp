@@ -30,6 +30,21 @@ struct CountsConstructionDestruction {
 int CountsConstructionDestruction::counter_ = 0;
 }
 
+static_assert(std::is_nothrow_default_constructible_v<zoo::Var<int>>);
+static_assert(!std::is_default_constructible_v<HasDestructor>);
+static_assert(
+    !std::is_default_constructible_v<zoo::Var<HasDestructor>>,
+    "Not default constructible first alternative implies not default constructible Var"
+);
+struct ThrowingDefaultConstructor {
+    ThrowingDefaultConstructor() noexcept(false);
+};
+static_assert(!std::is_nothrow_default_constructible_v<ThrowingDefaultConstructor>);
+static_assert(
+    !std::is_default_constructible_v<zoo::Var<ThrowingDefaultConstructor>>,
+    "may-throw default constructible first alternative implies not default constructible Var"
+);
+
 TEST_CASE("Var", "[var]") {
     int value = 4;
     using V2 = zoo::Var<int, char>;

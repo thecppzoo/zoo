@@ -33,23 +33,35 @@ template<typename... Ts>
 constexpr auto MaxAlignment_v = std::max({alignof(Ts)...});
 
 namespace impl {
-template<typename CRTP>
-struct Copiable {
-    Copiable() = default;
-    Copiable(const Copiable &c) {
-        static_cast<CRTP *>(this)->copy(c);
-    }
-    Copiable(Copiable &&) = default;
-};
+    template<typename CRTP>
+    struct DefaultConstructible {
+        DefaultConstructible() noexcept {
+            static_cast<CRTP *>(this)->defaultConstruct();
+        }
+    };
 
-template<typename CRTP>
-struct Movable {
-    Movable() = default;
-    Movable(const Movable &) = default;
-    Movable(Movable &&m) noexcept {
-        static_cast<CRTP *>(this)->move(m);
-    }
-};
+    template<typename CRTP>
+    struct NonDefaultConstructible {
+        NonDefaultConstructible() = delete;
+    };
+
+    template<typename CRTP>
+    struct Copiable {
+        Copiable() = default;
+        Copiable(const Copiable &c) {
+            static_cast<CRTP *>(this)->copy(c);
+        }
+        Copiable(Copiable &&) = default;
+    };
+
+    template<typename CRTP>
+    struct Movable {
+        Movable() = default;
+        Movable(const Movable &) = default;
+        Movable(Movable &&m) noexcept {
+            static_cast<CRTP *>(this)->move(m);
+        }
+    };
 }
 
 template<typename... Ts>
@@ -94,7 +106,16 @@ auto visit(Visitor &&visitor, Va &&var) ->
     decltype(visitor(get<0>(std::forward<Va>(var))));
 
 template<typename... Ts>
-struct Var {
+struct Var:
+        #define PP_VAR_TS_CRTP(TEMPLATE1, TEMPLATE2, ...) \
+            std::conditional_t<__VA_ARGS__, impl::TEMPLATE1<Var<Ts...>>, impl::TEMPLATE2<Var<Ts...>>>
+    PP_VAR_TS_CRTP(
+        DefaultConstructible,
+        NonDefaultConstructible,
+        std::is_nothrow_default_constructible_v<TypeAtIndex_t<0, Ts...>>
+    )
+        #undef PP_VAR_TS_CRTP
+{
     constexpr static auto Count = sizeof...(Ts);
     constexpr static auto Size = MaxSize_v<Ts...>;
     constexpr static auto Alignment = MaxAlignment_v<Ts...>;
@@ -104,8 +125,17 @@ struct Var {
     AlignedStorage<Size, Alignment> space_;
     int typeSwitch_;
 
-    /// \todo Force the first alternative to be nothrow_default_constructible
-    Var() noexcept: Var(std::in_place_index<0>) {}
+    Var() = default;
+
+    auto defaultConstruct() noexcept
+    {
+        if constexpr(
+            std::is_nothrow_default_constructible_v<Var>
+        ) {
+            space_.template build<Alternative_t<0, Var>>();
+            typeSwitch_ = 0;
+        }
+    }
 
     Var(const Var &v): typeSwitch_{v.typeSwitch_} {
         visit(
