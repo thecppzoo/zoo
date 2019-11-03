@@ -45,6 +45,16 @@ static_assert(
     "may-throw default constructible first alternative implies not default constructible Var"
 );
 
+struct NonCopiable {
+    NonCopiable() = default;
+    NonCopiable(const NonCopiable &) = delete;
+};
+static_assert(!std::is_copy_constructible_v<zoo::Var<int, NonCopiable, char>>);
+
+static_assert(!std::is_nothrow_move_constructible_v<MoveThrows>);
+static_assert(!std::is_move_constructible_v<zoo::Var<int, MoveThrows, char>>);
+static_assert(std::is_nothrow_move_constructible_v<zoo::Var<int, char, long>>);
+
 TEST_CASE("Var", "[var]") {
     int value = 4;
     using V2 = zoo::Var<int, char>;
@@ -54,9 +64,7 @@ TEST_CASE("Var", "[var]") {
     static_assert(
         noexcept(std::swap(std::declval<V2 &>(), std::declval<V2 &>())), ""
     );
-    static_assert(
-        !noexcept(std::swap(std::declval<V3 &>(), std::declval<V3 &>())), ""
-    );
+
     using V = zoo::Var<int, HasDestructor>;
     SECTION("Proper construction") {
         V var{std::in_place_index_t<0>{}, 77};

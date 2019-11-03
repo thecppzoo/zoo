@@ -40,7 +40,6 @@ namespace impl {
         }
     };
 
-    template<typename CRTP>
     struct NonDefaultConstructible {
         NonDefaultConstructible() = delete;
     };
@@ -49,9 +48,15 @@ namespace impl {
     struct Copiable {
         Copiable() = default;
         Copiable(const Copiable &c) {
-            static_cast<CRTP *>(this)->copy(c);
+            static_cast<CRTP *>(this)->copy(static_cast<const Copiable &>(c));
         }
         Copiable(Copiable &&) = default;
+    };
+
+    struct NonCopiable {
+        NonCopiable() = default;
+        NonCopiable(const NonCopiable &) = delete;
+        NonCopiable(NonCopiable &&) = default;
     };
 
     template<typename CRTP>
@@ -59,10 +64,14 @@ namespace impl {
         Movable() = default;
         Movable(const Movable &) = default;
         Movable(Movable &&m) noexcept {
-            static_cast<CRTP *>(this)->move(m);
+            static_cast<CRTP *>(this)->move(static_cast<CRTP &&>(m));
         }
     };
-}
+
+    struct NonMovable {
+        NonMovable(NonMovable &&) = delete;
+    };
+};
 
 template<typename... Ts>
 struct Var;
@@ -107,54 +116,67 @@ auto visit(Visitor &&visitor, Va &&var) ->
 
 template<typename... Ts>
 struct Var:
-        #define PP_VAR_TS_CRTP(TEMPLATE1, TEMPLATE2, ...) \
-            std::conditional_t<__VA_ARGS__, impl::TEMPLATE1<Var<Ts...>>, impl::TEMPLATE2<Var<Ts...>>>
+        #define PP_VAR_TS_CRTP(TEMPLATE1, FALSE, ...) \
+            std::conditional_t<__VA_ARGS__, impl::TEMPLATE1<Var<Ts...>>, impl::FALSE>
     PP_VAR_TS_CRTP(
         DefaultConstructible,
         NonDefaultConstructible,
         std::is_nothrow_default_constructible_v<TypeAtIndex_t<0, Ts...>>
+    ),
+    PP_VAR_TS_CRTP(
+        Copiable,
+        NonCopiable,
+        (std::is_copy_constructible_v<Ts> && ...)
+    ),
+    PP_VAR_TS_CRTP(
+        Movable,
+        NonMovable,
+        (std::is_nothrow_move_constructible_v<Ts> && ...)
     )
         #undef PP_VAR_TS_CRTP
 {
     constexpr static auto Count = sizeof...(Ts);
     constexpr static auto Size = MaxSize_v<Ts...>;
     constexpr static auto Alignment = MaxAlignment_v<Ts...>;
-    constexpr static auto NTMC =
-        std::conjunction<std::is_nothrow_move_constructible<Ts>...>::value;
 
     AlignedStorage<Size, Alignment> space_;
     int typeSwitch_;
 
     Var() = default;
-
     auto defaultConstruct() noexcept
     {
-        if constexpr(
-            std::is_nothrow_default_constructible_v<Var>
-        ) {
+        if constexpr(std::is_nothrow_default_constructible_v<Var>) {
             space_.template build<Alternative_t<0, Var>>();
             typeSwitch_ = 0;
         }
     }
 
-    Var(const Var &v): typeSwitch_{v.typeSwitch_} {
-        visit(
-            [&](const auto &c) {
-                using Source = meta::remove_cr_t<decltype(c)>;
-                space_->template build<Source>(c);
-            },
-            v
-        );
+    Var(const Var &) = default;
+    void copy(const Var &v) {
+        if constexpr(std::is_copy_constructible_v<Var>) {
+            visit(
+                [&](const auto &c) {
+                    using Source = meta::remove_cr_t<decltype(c)>;
+                    space_->template build<Source>(c);
+                },
+                v
+            );
+            typeSwitch_ = v.typeSwitch_;
+        }
     }
 
-    Var(Var &&v) noexcept(NTMC): typeSwitch_{v.typeSwitch_} {
-        visit(
-            [&](auto &&m) {
-                using Source = meta::remove_cr_t<decltype(m)>;
-                meta::move_in_place(as<Source>(), std::move(m));
-            },
-            v
-        );
+    Var(Var &&) = default;
+    void move(Var &&v) noexcept {
+        if constexpr(std::is_nothrow_move_constructible_v<Var>) {
+            visit(
+                [&](auto &&m) {
+                    using Source = meta::remove_cr_t<decltype(m)>;
+                    meta::move_in_place(as<Source>(), std::move(m));
+                },
+                v
+            );
+            typeSwitch_ = v.typeSwitch_;
+        }
     }
 
     template<std::size_t Ndx, typename... Args>
@@ -170,7 +192,8 @@ struct Var:
         return *this;
     }
 
-    Var &operator=(Var &&other) noexcept(NTMC) {
+    /// \bug pending SFINAE and noexcept
+    Var &operator=(Var &&other) noexcept {
         destroy();
         new(this) Var{std::move(other)};
         return *this;
