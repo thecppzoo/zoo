@@ -10,6 +10,7 @@ include_directories(
     ../../benchmark/include
     ../inc
     ../junkyard/inc
+    ../test/third_party/Catch2/single_include
 )
 
 # build google benchmark (target: benchmark)
@@ -18,6 +19,8 @@ set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Suppressing benchmark's tests" FORC
 
 add_subdirectory(dependencies/google_benchmark)
 
-add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp sort.cpp)
+add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp sort.cpp catch2BenchmarkMain.cpp catch2Functions.cpp)
+
+add_executable(catch2Benchmark catch2BenchmarkMain.cpp catch2Functions.cpp egyptian.cpp)
 
 target_link_libraries(zooBenchmark benchmark)
