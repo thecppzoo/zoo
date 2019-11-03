@@ -35,9 +35,8 @@ set(CURRENT_EXECUTABLE "zooTest${CMAKE_BUILD_TYPE}")
 
 set(
     ZOO_TEST_SOURCES
-    catch_main.cpp variant.cpp AlignedStorage.cpp AnyCallable.cpp
-    AnyExtended.cpp any.cpp
-    algorithm/cfs.cpp algorithm/quicksort.cpp egyptian.cpp
+    catch_main.cpp any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp
+    algorithm/cfs.cpp algorithm/quicksort.cpp egyptian.cpp var.cpp variant.cpp
 )
 
 add_executable(

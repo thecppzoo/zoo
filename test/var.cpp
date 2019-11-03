@@ -1,6 +1,7 @@
-#include "zoo/variant.h"
+#include "zoo/var.h"
 #include <catch2/catch.hpp>
 
+namespace {
 struct HasDestructor {
     int *ip_;
     HasDestructor(int *ip): ip_{ip} { *ip_ = 1; }
@@ -27,12 +28,13 @@ struct CountsConstructionDestruction {
 };
 
 int CountsConstructionDestruction::counter_ = 0;
+}
 
-TEST_CASE("Variant", "[variant]") {
+TEST_CASE("Var", "[var]") {
     int value = 4;
-    using V2 = zoo::Variant<int, char>;
+    using V2 = zoo::Var<int, char>;
     static_assert(std::is_nothrow_move_constructible_v<V2>, "");
-    using V3 = zoo::Variant<int, MoveThrows, char>;
+    using V3 = zoo::Var<int, MoveThrows, char>;
     static_assert(!std::is_nothrow_move_constructible_v<V3>, "");
     static_assert(
         noexcept(std::swap(std::declval<V2 &>(), std::declval<V2 &>())), ""
@@ -40,7 +42,7 @@ TEST_CASE("Variant", "[variant]") {
     static_assert(
         !noexcept(std::swap(std::declval<V3 &>(), std::declval<V3 &>())), ""
     );
-    using V = zoo::Variant<int, HasDestructor>;
+    using V = zoo::Var<int, HasDestructor>;
     SECTION("Proper construction") {
         V var{std::in_place_index_t<0>{}, 77};
         REQUIRE(77 == *var.as<int>());
@@ -55,7 +57,7 @@ TEST_CASE("Variant", "[variant]") {
     SECTION("visit") {
         V instance;
         auto result = visit(IntReturns1{}, instance);
-        REQUIRE(0 == result);
+        REQUIRE(1 == result);
         instance = V{std::in_place_index_t<1>{}, &value};
         result = visit(IntReturns1{}, instance);
         REQUIRE(0 == result);
@@ -89,13 +91,14 @@ TEST_CASE("Variant", "[variant]") {
         }
     }
     SECTION("GCC Visit") {
-        V instance;
+        int dummy;
+        V instance{std::in_place_index<1>, &dummy};
         REQUIRE(0 == GCC_visit(IntReturns1{}, instance));
-        instance = V{std::in_place_index_t<0>{}, 99};
+        instance = V{std::in_place_index<0>, 99};
         REQUIRE(1 == GCC_visit(IntReturns1{}, instance));
     }
-    SECTION("Array support") {
-        using VArr = zoo::Variant<int, CountsConstructionDestruction[4]>;
+    /*SECTION("Array support") {
+        using VArr = zoo::Var<int, CountsConstructionDestruction[4]>;
         CountsConstructionDestruction::counter_ = 0;
         {
             VArr v{std::in_place_index_t<1>{}};
@@ -104,27 +107,25 @@ TEST_CASE("Variant", "[variant]") {
             CHECK(8 == CountsConstructionDestruction::counter_);
         }
         CHECK(0 == CountsConstructionDestruction::counter_);
-    }
+    }*/
     SECTION("Match") {
-        using V = zoo::Variant<int, double>;
+        using V = zoo::Var<int, double>;
         V vid;
         auto doMatch = [](auto &&v) {
             return match(
                 std::forward<decltype(v)>(v),
-                [](int i) { return 2.0*i; },
-                [](double d) { return d; },
-                [](zoo::BadVariant &&) {
-                    return -1.0;
-                },
-                [](const zoo::BadVariant &) {
-                    return -2.0;
-                }
+                [](const int &) { return -2.0; },
+                [](int &&) { return -1.0; },
+                [](double d) { return d; }
             );
         };
-        CHECK(-2.0 == doMatch(vid));
-        CHECK(-1.0 == doMatch(V{}));
-        vid = V{std::in_place_index_t<0>{}, 3};
-        CHECK(6.0 == doMatch(vid));
-        CHECK(3.14 == doMatch(V{std::in_place_index_t<1>{}, 3.14}));
+        SECTION("Preserves value category") {
+            CHECK(-2.0 == doMatch(vid));
+            CHECK(-1.0 == doMatch(V{}));
+        }
+        SECTION("Normal activation") {
+            vid = V{std::in_place_index_t<0>{}, 3};
+            CHECK(3.14 == doMatch(V{std::in_place_index_t<1>{}, 3.14}));
+        }
     }
 }
