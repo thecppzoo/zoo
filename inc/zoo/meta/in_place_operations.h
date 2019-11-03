@@ -1,6 +1,9 @@
 #ifndef IN_PLACE_OPERATIONS_H
 #define IN_PLACE_OPERATIONS_H
 
+#include <utility>
+#include <new>
+
 namespace zoo { namespace meta {
 
 template<typename T>
