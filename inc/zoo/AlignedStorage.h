@@ -28,11 +28,17 @@ struct Constructible: std::is_constructible<T, Args...> {};
 
 template<typename T, std::size_t L, typename Source>
 struct Constructible<T[L], Source>:
-    Constructible<T, decltype(*&std::declval<Source>()[0])>
+    Constructible<
+        T,
+        meta::copy_cr_t<
+            meta::remove_cr_t<decltype(std::declval<Source>()[0]) &&>,
+            Source
+        >
+    >
 {};
 
 template<typename T, typename... Args>
-constexpr auto Constructible_v = Constructible<T, Args...>::value;
+constexpr auto Constructible_v = Constructible<T, Args &&...>::value;
 
 template<typename T>
 void destroy(T &t) noexcept { t.~T(); }

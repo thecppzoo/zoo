@@ -9,6 +9,7 @@
 #include "catch2/catch.hpp"
 
 #include <type_traits>
+#include <vector>
 
 using namespace zoo;
 
@@ -151,18 +152,91 @@ struct Typical {
     Typical() = default;
     Typical(const Typical &) = default;
     Typical(Typical &&) = default;
-    void *state_;
+    long state_;
 };
 
 using namespace std;
 
 using ForTypical8 = zoo::AlignedStorage<sizeof(Typical) * 8>;
 
-Typical arr8[8];
-Typical arr42[4][2];
+Typical arr8[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+Typical arr42[4][2] = {
+    { 11, 12 },
+    { 21, 22 },
+    { 31, 32 },
+    { 41, 42 }
+};
 
 static_assert(MayCallBuild_<ForTypical8, Typical[8]>(arr8));
 static_assert(MayCallBuild_<ForTypical8, Typical[8]>(&arr8[0]));
 static_assert(MayCallBuild_<ForTypical8, Typical[4][2]>(arr42));
 
+struct Traces {
+    enum Type {
+        DEFAULT, COPIED, MOVED, MOVED_FROM
+    };
+    Type state_;
+    Traces(): state_{DEFAULT} {}
+    Traces(const Traces &): state_{COPIED} {}
+    Traces(Traces &&from) noexcept: state_{MOVED} { from.state_ = MOVED_FROM; }
+};
+
+struct WillThrowOnSomeConstructions {
+    static int globalOrder;
+    static std::vector<int>
+        built, destroyed;
+
+    int order_;
+
+    WillThrowOnSomeConstructions() noexcept(false) {
+        if(5 == globalOrder) { throw std::runtime_error("disliking 5"); }
+        order_ = globalOrder++;
+        built.push_back(order_);
+    }
+
+    ~WillThrowOnSomeConstructions() {
+        destroyed.push_back(order_);
+    }
+};
+
+int WillThrowOnSomeConstructions::globalOrder = 0;
+
+std::vector<int>
+    WillThrowOnSomeConstructions::built,
+    WillThrowOnSomeConstructions::destroyed;
+
+}
+
+TEST_CASE(
+    "Aligned Storage Nested Arrays",
+    "[nested-arrays][aligned-storage][contract][api]"
+) {
+    ForTypical8 ft8;
+    SECTION("Nested Arrays") {
+        ft8.build<Typical[8]>(arr8);
+        CHECK((*ft8.as<Typical[8]>())[5].state_ == 6);
+        ft8.destroy<Typical[8]>();
+        ft8.build<Typical[4][2]>(arr42);
+        CHECK((*ft8.as<Typical[4][2]>())[3][0].state_ == 41);
+    }
+    SECTION("Array value category") {
+        ft8.build<Traces[8]>();
+        auto &t8  = *ft8.as<Traces[8]>();
+        ForTypical8 copy;
+        copy.build<Traces[8]>(std::move(t8));
+        CHECK(Traces::MOVED == (*copy.as<Traces[8]>())[0].state_);
+        CHECK(Traces::MOVED_FROM == t8[4].state_);
+    }
+    SECTION("Partial build failures") {
+        WillThrowOnSomeConstructions::globalOrder = 0;
+        auto
+            &built = WillThrowOnSomeConstructions::built,
+            &destroyed = WillThrowOnSomeConstructions::destroyed;
+        built.clear();
+        destroyed.clear();
+        CHECK_THROWS(ft8.build<WillThrowOnSomeConstructions[8]>());
+        CHECK(5 == WillThrowOnSomeConstructions::built.size());
+        std::vector<int> reversed(built.rbegin(), built.rend());
+        CHECK(reversed == destroyed);
+    }
 }
