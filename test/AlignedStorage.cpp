@@ -121,9 +121,11 @@ using namespace std;
 using ForTypical8 = zoo::AlignedStorage<sizeof(Typical) * 8>;
 
 Typical arr8[8];
+Typical arr42[4][2];
 
 static_assert(MayCallBuild_<ForTypical8, Typical[8]>(arr8));
 static_assert(MayCallBuild_<ForTypical8, Typical[8]>(&arr8[0]));
+static_assert(MayCallBuild_<ForTypical8, Typical[4][2]>(arr42));
 
 }
 

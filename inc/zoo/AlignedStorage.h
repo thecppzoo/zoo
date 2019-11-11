@@ -28,7 +28,7 @@ struct Constructible: std::is_constructible<T, Args...> {};
 
 template<typename T, std::size_t L, typename Source>
 struct Constructible<T[L], Source>:
-    std::is_constructible<T, decltype(*&std::declval<Source>()[0])>
+    Constructible<T, decltype(*&std::declval<Source>()[0])>
 {};
 
 template<typename T, typename... Args>
@@ -50,12 +50,12 @@ void build(T &, Args &&...)
     noexcept(std::is_nothrow_constructible_v<T, Args...>);
 
 template<typename T, std::size_t L, typename ArrayLike>
-auto build(T (&)[L], ArrayLike &&a)
+auto build(T (&destination)[L], ArrayLike &&a)
     noexcept(
         std::is_nothrow_constructible_v<
             T,
             #define PP_ZOO_BUILD_ARRAY_SOURCE_TYPE \
-                meta::copy_cr_t<std::decay_t<decltype(a[0])>, ArrayLike &&> &&
+                meta::copy_cr_t<meta::remove_cr_t<decltype(a[0])>, ArrayLike &&> &&
             PP_ZOO_BUILD_ARRAY_SOURCE_TYPE
         >)
 {
@@ -63,11 +63,12 @@ auto build(T (&)[L], ArrayLike &&a)
             #undef PP_ZOO_BUILD_ARRAY_SOURCE_TYPE
     constexpr auto Noexcept = std::is_nothrow_constructible_v<T, Source>;
     auto
-        base = &a[L],
-        to = base;
+        base = &destination[0],
+        to = base,
+        top = to + L;
     auto from = &a[0];
     auto transport = [&]() {
-        while(to != from) {
+        while(top != to) {
             build(*to, static_cast<Source>(*from));
             ++to; ++from;
         }
