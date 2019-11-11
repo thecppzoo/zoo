@@ -94,7 +94,11 @@ static_assert(
 using A = AlignedStorage<>;
 
 static_assert(
-    noexcept(std::declval<A &>().build<Constructors>(nullptr)),
+    std::is_nothrow_constructible_v<Constructors, void *&&>
+);
+
+static_assert(
+    noexcept(std::declval<A &>().build<Constructors, void *&&>(nullptr)),
     "Failed to preserve noexceptness of constructor"
 );
 
