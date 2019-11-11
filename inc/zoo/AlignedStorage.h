@@ -18,17 +18,18 @@ constexpr auto VPSize = sizeof(void *), VPAlignment = alignof(void *);
 
 namespace impl {
 
+template<typename, typename = void>
+struct Arraish_impl: std::false_type {};
+template<typename T>
+struct Arraish_impl<T, decltype(&std::declval<T>()[0])>: std::true_type {};
+
 template<typename T, typename... Args>
 struct Constructible: std::is_constructible<T, Args...> {};
 
-template<typename T, std::size_t L>
-struct Constructible<T[L], const T (&)[L]>: std::is_copy_constructible<T> {};
-
-template<typename T, std::size_t L>
-struct Constructible<T[L], T (&)[L]>: std::is_copy_constructible<T> {};
-
-template<typename T, std::size_t L>
-struct Constructible<T[L], T (&&)[L]>: std::is_move_constructible<T> {};
+template<typename T, std::size_t L, typename Source>
+struct Constructible<T[L], Source>:
+    std::is_constructible<T, decltype(*&std::declval<Source>()[0])>
+{};
 
 template<typename T, typename... Args>
 constexpr auto Constructible_v = Constructible<T, Args...>::value;
@@ -54,7 +55,7 @@ auto build(T (&)[L], ArrayLike &&a)
         std::is_nothrow_constructible_v<
             T,
             #define PP_ZOO_BUILD_ARRAY_SOURCE_TYPE \
-                meta::copy_cr_t<decltype(a[0]), ArrayLike>
+                meta::copy_cr_t<std::decay_t<decltype(a[0])>, ArrayLike &&> &&
             PP_ZOO_BUILD_ARRAY_SOURCE_TYPE
         >)
 {

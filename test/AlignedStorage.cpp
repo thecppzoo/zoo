@@ -118,20 +118,12 @@ struct Typical {
 
 using namespace std;
 
-using TArray = Typical[13];
+using ForTypical8 = zoo::AlignedStorage<sizeof(Typical) * 8>;
 
-struct HA {
-    TArray arr_;
-    HA() = default;
-};
+Typical arr8[8];
 
-using ZAS = zoo::AlignedStorage<sizeof(HA)>;
-
-void fun() {
-    HA a;
-    ZAS zas;
-    zas.build<TArray>(a.arr_);
-}
+static_assert(MayCallBuild_<ForTypical8, Typical[8]>(arr8));
+static_assert(MayCallBuild_<ForTypical8, Typical[8]>(&arr8[0]));
 
 }
 
