@@ -104,7 +104,8 @@ struct AlignedStorage {
     }
 
     template<typename T, typename... Args>
-    #define PP_ZOO_BUILD_EXPRESSION impl::build(*as<T>(), std::forward<Args>(args)...)
+        #define PP_ZOO_BUILD_EXPRESSION \
+            impl::build(*as<T>(), std::forward<Args>(args)...)
     auto build(Args  &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION)) ->
         std::enable_if_t<
             SuitableType<T>() &&
@@ -113,6 +114,7 @@ struct AlignedStorage {
         >
     {
         PP_ZOO_BUILD_EXPRESSION;
+        #undef PP_ZOO_BUILD_EXPRESSION
         return as<T>();
     }
 
