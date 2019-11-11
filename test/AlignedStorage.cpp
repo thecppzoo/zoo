@@ -107,28 +107,6 @@ static_assert(
     "Failed to preserve may-throwness of constructor"
 );
 
-namespace { // Array support
-
-struct Typical {
-    Typical() = default;
-    Typical(const Typical &) = default;
-    Typical(Typical &&) = default;
-    void *state_;
-};
-
-using namespace std;
-
-using ForTypical8 = zoo::AlignedStorage<sizeof(Typical) * 8>;
-
-Typical arr8[8];
-Typical arr42[4][2];
-
-static_assert(MayCallBuild_<ForTypical8, Typical[8]>(arr8));
-static_assert(MayCallBuild_<ForTypical8, Typical[8]>(&arr8[0]));
-static_assert(MayCallBuild_<ForTypical8, Typical[4][2]>(arr42));
-
-}
-
 struct Fields {
     enum Trace: char { ZERO, ONE, TWO };
     Trace a, b, c;
@@ -165,4 +143,26 @@ TEST_CASE("Aligned Storage", "[aligned-storage][contract][api]") {
         any.destroy<TraceDestructor>();
         CHECK(1 == trace);
     }
+}
+
+namespace { // Array support
+
+struct Typical {
+    Typical() = default;
+    Typical(const Typical &) = default;
+    Typical(Typical &&) = default;
+    void *state_;
+};
+
+using namespace std;
+
+using ForTypical8 = zoo::AlignedStorage<sizeof(Typical) * 8>;
+
+Typical arr8[8];
+Typical arr42[4][2];
+
+static_assert(MayCallBuild_<ForTypical8, Typical[8]>(arr8));
+static_assert(MayCallBuild_<ForTypical8, Typical[8]>(&arr8[0]));
+static_assert(MayCallBuild_<ForTypical8, Typical[4][2]>(arr42));
+
 }
