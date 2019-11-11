@@ -7,6 +7,8 @@
 #ifndef ZOO_AlignedStorage_h
 #define ZOO_AlignedStorage_h
 
+#include "zoo/meta/traits.h"
+
 #include <new>
 #include <type_traits>
 
@@ -15,6 +17,21 @@ namespace zoo {
 constexpr auto VPSize = sizeof(void *), VPAlignment = alignof(void *);
 
 namespace impl {
+
+template<typename T, typename... Args>
+struct Constructible: std::is_constructible<T, Args...> {};
+
+template<typename T, std::size_t L>
+struct Constructible<T[L], const T (&)[L]>: std::is_copy_constructible<T> {};
+
+template<typename T, std::size_t L>
+struct Constructible<T[L], T (&)[L]>: std::is_copy_constructible<T> {};
+
+template<typename T, std::size_t L>
+struct Constructible<T[L], T (&&)[L]>: std::is_move_constructible<T> {};
+
+template<typename T, typename... Args>
+constexpr auto Constructible_v = Constructible<T, Args...>::value;
 
 template<typename T>
 void destroy(T &t) noexcept { t.~T(); }
@@ -31,42 +48,26 @@ template<typename T, typename... Args>
 void build(T &, Args &&...)
     noexcept(std::is_nothrow_constructible_v<T, Args...>);
 
-template<typename T, std::size_t L>
-void build(T (&)[L], const T (&a)[L])
-    noexcept(std::is_nothrow_copy_constructible_v<T>);
-
-template<typename T, std::size_t L>
-void build(T (&destination)[L], T (&&a)[L]) noexcept {
-    auto to = &destination[L];
-    auto from = &a[0];
-    while(to != from) {
-        build(*to++, std::move(*from++));
-    }
-}
-
-template<typename T, typename... Args>
-void build(T &to, Args &&... args)
-    noexcept(std::is_nothrow_constructible_v<T, Args...>)
+template<typename T, std::size_t L, typename ArrayLike>
+auto build(T (&)[L], ArrayLike &&a)
+    noexcept(
+        std::is_nothrow_constructible_v<
+            T,
+            #define PP_ZOO_BUILD_ARRAY_SOURCE_TYPE \
+                meta::copy_cr_t<decltype(a[0]), ArrayLike>
+            PP_ZOO_BUILD_ARRAY_SOURCE_TYPE
+        >)
 {
-    new(&to) T(std::forward<Args>(args)...);
-}
-
-template<typename T, std::size_t L>
-void build(T (&destination)[L], const T (&a)[L])
-    #define PP_ZOO_CONSTRUCTIBILITY_NOEXCEPTNESS_EXPRESSION \
-        std::is_nothrow_copy_constructible_v<T>
-    noexcept(PP_ZOO_CONSTRUCTIBILITY_NOEXCEPTNESS_EXPRESSION)
-{
-    constexpr auto Noexcept =
-        PP_ZOO_CONSTRUCTIBILITY_NOEXCEPTNESS_EXPRESSION;
-    #undef PP_ZOO_CONSTRUCTIBILITY_NOEXCEPTNESS_EXPRESSION
+    using Source = PP_ZOO_BUILD_ARRAY_SOURCE_TYPE;
+            #undef PP_ZOO_BUILD_ARRAY_SOURCE_TYPE
+    constexpr auto Noexcept = std::is_nothrow_constructible_v<T, Source>;
     auto
-        base = &destination[L],
+        base = &a[L],
         to = base;
     auto from = &a[0];
     auto transport = [&]() {
         while(to != from) {
-            build(*to, *from);
+            build(*to, static_cast<Source>(*from));
             ++to; ++from;
         }
     };
@@ -80,6 +81,13 @@ void build(T (&destination)[L], const T (&a)[L])
             throw;
         }
     }
+}
+
+template<typename T, typename... Args>
+void build(T &to, Args &&... args)
+    noexcept(std::is_nothrow_constructible_v<T, Args...>)
+{
+    new(&to) T(std::forward<Args>(args)...);
 }
 
 }
@@ -109,7 +117,7 @@ struct AlignedStorage {
     auto build(Args  &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION)) ->
         std::enable_if_t<
             SuitableType<T>() &&
-                std::is_constructible_v<T, Args...>,
+                impl::Constructible_v<T, Args...>,
             T *
         >
     {

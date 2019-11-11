@@ -37,6 +37,10 @@ constexpr auto MayCallBuild_(As &&...as) {
 }
 
 static_assert(
+    impl::Constructible_v<void *, std::nullptr_t>
+);
+
+static_assert(
     MayCallBuild_<AlignedStorage<>, void *>(nullptr),
     "the default AlignedStorage must be able to build a void *"
 );
@@ -94,11 +98,7 @@ static_assert(
 using A = AlignedStorage<>;
 
 static_assert(
-    std::is_nothrow_constructible_v<Constructors, void *&&>
-);
-
-static_assert(
-    noexcept(std::declval<A &>().build<Constructors, void *&&>(nullptr)),
+    noexcept(std::declval<A &>().build<Constructors, void *>(nullptr)),
     "Failed to preserve noexceptness of constructor"
 );
 
@@ -106,6 +106,34 @@ static_assert(
     !noexcept(std::declval<A &>().build<Constructors>(4.4)),
     "Failed to preserve may-throwness of constructor"
 );
+
+namespace { // Array support
+
+struct Typical {
+    Typical() = default;
+    Typical(const Typical &) = default;
+    Typical(Typical &&) = default;
+    void *state_;
+};
+
+using namespace std;
+
+using TArray = Typical[13];
+
+struct HA {
+    TArray arr_;
+    HA() = default;
+};
+
+using ZAS = zoo::AlignedStorage<sizeof(HA)>;
+
+void fun() {
+    HA a;
+    ZAS zas;
+    zas.build<TArray>(a.arr_);
+}
+
+}
 
 struct Fields {
     enum Trace: char { ZERO, ONE, TWO };
