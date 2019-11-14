@@ -5,7 +5,7 @@
 #include <utility>
 #endif
 
-namespace meta {
+namespace zoo::meta {
     template<typename T>
     struct InplaceType: std::false_type {};
 
