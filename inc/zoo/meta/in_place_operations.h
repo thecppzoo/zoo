@@ -40,7 +40,7 @@ void copy_in_place(void *place, const T &t) {
 }
 
 template<typename T>
-void copy_in_place(std::size_t &, void *, T *);
+void copy_in_place(std::size_t &, void *, const T *);
 
 template<typename T, int L>
 void copy_in_place(void *place, const T (&arr)[L]) {
@@ -49,7 +49,7 @@ void copy_in_place(void *place, const T (&arr)[L]) {
 }
 
 template<typename T>
-void copy_in_place(std::size_t &count, T *place, const T *arr) {
+void copy_in_place(std::size_t &count, void *place, const T *arr) {
     auto n = count;
     auto
         base = static_cast<T *>(place),
