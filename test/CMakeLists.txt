@@ -37,6 +37,7 @@ set(
     ZOO_TEST_SOURCES
     catch_main.cpp any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp
     algorithm/cfs.cpp algorithm/quicksort.cpp egyptian.cpp var.cpp variant.cpp
+    CopyMoveAbilities.cpp
 )
 
 add_executable(
