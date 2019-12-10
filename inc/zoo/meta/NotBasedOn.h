@@ -4,7 +4,7 @@
 #include <type_traits>
 #endif
 
-namespace meta {
+namespace zoo::meta {
 
 /// \brief whether \c T derives from \c Base
 /// \author Andrzej Krzemieński

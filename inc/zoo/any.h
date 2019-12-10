@@ -3,7 +3,8 @@
 
 #include <zoo/PolymorphicContainer.h>
 #include <zoo/utility.h>
-#include "meta/NotBasedOn.h"
+#include "zoo/meta/NotBasedOn.h"
+#include "zoo/meta/copy_and_move_abilities.h"
 
 #ifndef OLD_COMPILER
 #ifndef SIMPLIFY_PREPROCESSING
@@ -20,7 +21,7 @@ in_place_type_t<T> in_place_type;
 
 }
 #endif
-#include "meta/InplaceType.h"
+#include "zoo/meta/InplaceType.h"
 
 #ifndef SIMPLIFY_PREPROCESSING
 #include <new>
@@ -31,20 +32,20 @@ in_place_type_t<T> in_place_type;
 namespace zoo {
 
 template<typename Policy>
-struct AnyContainer {
+struct AnyContainerBase {
     using Container = typename Policy::MemoryLayout;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
 
-    AnyContainer() noexcept { new(m_space) Container; }
+    AnyContainerBase() noexcept { new(m_space) Container; }
 
-    AnyContainer(const AnyContainer &model) {
+    AnyContainerBase(const AnyContainerBase &model) {
         auto source = model.container();
         source->copy(container());
     }
 
-    AnyContainer(AnyContainer &&moveable) noexcept {
+    AnyContainerBase(AnyContainerBase &&moveable) noexcept {
         auto source = moveable.container();
         source->move(container());
     }
@@ -53,12 +54,12 @@ struct AnyContainer {
         typename Initializer,
         typename Decayed = std::decay_t<Initializer>,
         std::enable_if_t<
-            meta::NotBasedOn<Initializer, AnyContainer>() &&
+            meta::NotBasedOn<Initializer, AnyContainerBase>() &&
                 std::is_copy_constructible<Decayed>::value &&
                 !meta::InplaceType<Initializer>::value,
         int> = 0
     >
-    AnyContainer(Initializer &&initializer) {
+    AnyContainerBase(Initializer &&initializer) {
         using Implementation = typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(std::forward<Initializer>(initializer));
     }
@@ -73,7 +74,7 @@ struct AnyContainer {
             int
         > = 0
     >
-    AnyContainer(std::in_place_type_t<ValueType>, Initializers &&...izers) {
+    AnyContainerBase(std::in_place_type_t<ValueType>, Initializers &&...izers) {
         using Implementation = typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(std::forward<Initializers>(izers)...);
     }
@@ -91,7 +92,7 @@ struct AnyContainer {
             int
         > = 0
     >
-    AnyContainer(
+    AnyContainerBase(
         std::in_place_type_t<ValueType>,
         std::initializer_list<UL> il,
         Args &&... args
@@ -100,16 +101,16 @@ struct AnyContainer {
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
 
-    ~AnyContainer() { container()->destroy(); }
+    ~AnyContainerBase() { container()->destroy(); }
 
-    AnyContainer &operator=(const AnyContainer &model) {
+    AnyContainerBase &operator=(const AnyContainerBase &model) {
         auto myself = container();
         myself->destroy();
         model.container()->copy(myself);
         return *this;
     }
 
-    AnyContainer &operator=(AnyContainer &&moveable) noexcept {
+    AnyContainerBase &operator=(AnyContainerBase &&moveable) noexcept {
         auto myself = container();
         myself->destroy();
         moveable.container()->move(myself);
@@ -119,11 +120,11 @@ struct AnyContainer {
     template<
         typename Argument,
         std::enable_if_t<
-            meta::NotBasedOn<Argument, AnyContainer>(),
+            meta::NotBasedOn<Argument, AnyContainerBase>(),
             int
         > = 0
     >
-    AnyContainer &operator=(Argument &&argument) {
+    AnyContainerBase &operator=(Argument &&argument) {
         emplace_impl<Argument>(std::forward<Argument>(argument));
         return *this;
     }
@@ -158,7 +159,7 @@ protected:
     template<typename ValueType, typename... Arguments>
     void emplace_impl(Arguments  &&... arguments) {
         container()->destroy();
-        new(this) AnyContainer(
+        new(this) AnyContainerBase(
             std::in_place_type<std::decay_t<ValueType>>,
             std::forward<Arguments>(arguments)...
         );
@@ -167,7 +168,7 @@ protected:
     template<typename ValueType, typename U, typename... Arguments>
     void emplace_impl(std::initializer_list<U> &il, Arguments &&... args) {
         container()->destroy();
-        new(this) AnyContainer(
+        new(this) AnyContainerBase(
             std::in_place_type<std::decay_t<ValueType>>,
             il,
             std::forward<Arguments>(args)...
@@ -177,10 +178,10 @@ protected:
 public:
     void reset() noexcept {
         container()->destroy();
-        new(this) AnyContainer;
+        new(this) AnyContainerBase;
     }
 
-    void swap(AnyContainer &other) noexcept {
+    void swap(AnyContainerBase &other) noexcept {
         auto oc = other.container();
 
         alignas(alignof(Container))
@@ -215,12 +216,19 @@ public:
 
     template<typename ValueType>
     const ValueType *state() const noexcept {
-        return const_cast<AnyContainer *>(this)->state<ValueType>();
+        return const_cast<AnyContainerBase *>(this)->state<ValueType>();
     }
 
     Container *container() const {
         return reinterpret_cast<Container *>(const_cast<char *>(m_space));
     }
+};
+
+template<typename Policy>
+struct AnyContainer: AnyContainerBase<Policy> {
+    using Base = AnyContainerBase<Policy>;
+    using Base::AnyContainerBase;
+    using Base::operator=;
 };
 
 template<typename Policy>
