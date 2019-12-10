@@ -8,7 +8,7 @@ set(CMAKE_CXX_FLAGS_UBSAN "-fsanitize=undefined -fno-omit-frame-pointer -fno-opt
 set(CMAKE_CXX_FLAGS_ASAN "-fsanitize=address -fno-omit-frame-pointer")
 
 
-project(ZooTest VERSION 1.0)
+project(ZooTest VERSION 1.0 LANGUAGES CXX)
 
 configure_file (
     "${PROJECT_SOURCE_DIR}/ZooTestConfig.h.in"
@@ -33,21 +33,28 @@ message(STATUS "Additional sources:" ${ADDITIONAL_SOURCES})
 
 set(CURRENT_EXECUTABLE "zooTest${CMAKE_BUILD_TYPE}")
 
-add_library(Catch2Main OBJECT catch_main.cpp)
-add_library(AlgorithmTest OBJECT algorithm/cfs.cpp algorithm/quicksort.cpp)
-add_library(TypeErasureTest OBJECT any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp)
-add_library(
-    Uncategorized OBJECT
-    egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp
+set(CATCH2_MAIN_SOURCE catch_main.cpp)
+set(TYPE_ERASURE_SOURCES any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp)
+set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
+set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
+set(
+    ZOO_TEST_SOURCES
+    ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
+    ${MISCELLANEA_SOURCES}
 )
+
+add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
+add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
+add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
+add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
 add_executable(
     ${CURRENT_EXECUTABLE} ${ADDITIONAL_SOURCES}
 )
 target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasureTest Uncategorized)
 
-add_executable(algorithm $<TARGET_OBJECTS:Catch2Main>)
-target_link_libraries(algorithm AlgorithmTest)
+add_executable(algorithm2 $<TARGET_OBJECTS:Catch2Main>)
+target_link_libraries(algorithm2 AlgorithmTest)
 add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main>)
 target_link_libraries(type_erasure TypeErasureTest)
 
@@ -56,8 +63,7 @@ target_link_libraries(type_erasure TypeErasureTest)
 #configure variables
 set(TEST_APP_NAME "${CURRENT_EXECUTABLE}Test")
 
-add_executable(${TEST_APP_NAME} $<TARGET_OBJECTS:Catch2Main>)
-target_link_libraries(${TEST_APP_NAME} AlgorithmTest TypeErasureTest Uncategorized)
+add_executable(${TEST_APP_NAME} ${ZOO_TEST_SOURCES})
 
 #set includes
 include_directories(${TEST_THIRD_PARTY_INCLUDE_PATH})
