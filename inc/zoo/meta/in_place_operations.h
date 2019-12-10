@@ -42,7 +42,7 @@ void copy_in_place(void *place, const T &t) {
 template<typename T>
 void copy_in_place(std::size_t &, void *, const T *);
 
-template<typename T, int L>
+template<typename T, std::size_t L>
 void copy_in_place(void *place, const T (&arr)[L]) {
     auto n = L;
     copy_in_place(n, place, &arr[0]);
@@ -55,7 +55,7 @@ void copy_in_place(std::size_t &count, void *place, const T *arr) {
         base = static_cast<T *>(place),
         destination = base;
     try {
-        for(int i = 0; i < n; i++) {
+        for(std::size_t i = 0; i < n; i++) {
             copy_in_place(destination, arr[i]);
             ++destination;
         }
@@ -73,7 +73,7 @@ void move_in_place(void *place, T &&t) {
 template<typename T>
 void move_in_place(void *, T *, std::size_t) noexcept;
 
-template<typename T, int L>
+template<typename T, std::size_t L>
 void move_in_place(void *place, T (&arr)[L]) noexcept {
     move_in_place(place, &arr[0], L);
 }
@@ -81,7 +81,7 @@ void move_in_place(void *place, T (&arr)[L]) noexcept {
 template<typename T>
 void move_in_place(void *place, T *arr, std::size_t n) noexcept {
     auto destination = static_cast<T *>(place);
-    for(int i = 0; i < n; i++) {
+    for(std::size_t i = 0; i < n; i++) {
         move_in_place(destination + i, std::move(arr[i]));
     }
 }
@@ -94,14 +94,14 @@ void destroy_in_place(T &t) noexcept {
 template<typename T>
 void destroy_in_place(T *, std::size_t) noexcept;
 
-template<typename T, int L>
+template<typename T, std::size_t L>
 void destroy_in_place(T (&arr)[L]) {
     destroy_in_place(&arr[0], L);
 }
 
 template<typename T>
 void destroy_in_place(T *arr, std::size_t n) noexcept {
-    for(int i = n; i--; ) { destroy_in_place(arr[i]); }
+    for(auto i = n; i--; ) { destroy_in_place(arr[i]); }
 }
 
 }}
