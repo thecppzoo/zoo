@@ -24,4 +24,11 @@ SA(is_nothrow_default_constructible_v<NonMovable>)
 SA(!is_copy_constructible_v<NonMovable>);
 SA(!is_move_constructible_v<NonMovable>);
 
-};
+}
+
+#include "catch2/catch.hpp"
+
+TEST_CASE("FAIL") {
+    CHECK(false);
+}
+
