@@ -224,8 +224,28 @@ public:
     }
 };
 
+namespace impl {
+
+template<typename, bool = true> struct HasCopy: std::false_type {};
+template<typename T>
+struct HasCopy<
+    T, bool(std::is_same_v<void (T::*)(T *), decltype(&T::copy)>)
+>: std::true_type {};
+template<typename T>
+struct HasCopy<
+    T, bool(std::is_same_v<void (T::*)(T *) const, decltype(&T::copy)>)
+>: std::true_type {};
+
+};
+
+
 template<typename Policy>
-struct AnyContainer: AnyContainerBase<Policy> {
+struct AnyContainer:
+    AnyContainerBase<Policy>,
+    meta::CopyAndMoveAbilities<
+        impl::HasCopy<typename Policy::MemoryLayout>::value
+    >
+{
     using Base = AnyContainerBase<Policy>;
     using Base::AnyContainerBase;
     using Base::operator=;
