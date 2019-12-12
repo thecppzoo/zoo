@@ -226,18 +226,17 @@ public:
 
 namespace impl {
 
-template<typename, bool = true> struct HasCopy: std::false_type {};
-template<typename T>
-struct HasCopy<
-    T, bool(std::is_same_v<void (T::*)(T *), decltype(&T::copy)>)
->: std::true_type {};
-template<typename T>
-struct HasCopy<
-    T, bool(std::is_same_v<void (T::*)(T *) const, decltype(&T::copy)>)
->: std::true_type {};
+template<auto Value, typename... Expected>
+struct CorrectType:
+    std::disjunction<std::is_same<decltype(Value), Expected>...>
+{};
 
-};
+template<typename T>
+struct HasCopy:
+    CorrectType<&T::copy, void (T::*)(T *), void (T::*)(T *) const>
+{};
 
+}
 
 template<typename Policy>
 struct AnyContainer:
