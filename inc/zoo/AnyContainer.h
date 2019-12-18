@@ -4,27 +4,50 @@
 #include "zoo/Any/Traits.h"
 #include "zoo/utility.h"
 
-#include "meta/NotBasedOn.h"
-#include "meta/InplaceType.h"
+#include "zoo/meta/NotBasedOn.h"
+#include "zoo/meta/InplaceType.h"
+#include "zoo/meta/copy_and_move_abilities.h"
 
-#include <utility>
-#include <new>
-#include <initializer_list>
-#include <typeinfo>
+//#include <new>
+//#include <initializer_list>
 
-namespace zoo { namespace detail {
+namespace zoo {
+
+namespace impl {
+
+template<auto Value, typename... Options>
+struct CorrectType:
+    std::disjunction<std::is_same<decltype(Value), Options>...>
+{};
+
+template<typename T>
+struct HasCopy:
+    CorrectType<
+        &T::copy,
+        void (T::*)(T *),
+        void (T::*)(T *) const,
+        void (T::*)(T *) const noexcept
+    >
+{};
+
+}
 
 template<typename Policy>
-struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
+struct AnyContainerBase:
+        detail::PolicyAffordances<AnyContainerBase<Policy>, Policy>
+{
     using Container = typename Policy::MemoryLayout;
+    constexpr static auto Copyable = impl::HasCopy<Container>::value;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
 
     AnyContainerBase() noexcept { new(m_space) Container; }
 
-    constexpr static void (AnyContainerBase::*NoInit)(void *) = nullptr;
-    AnyContainerBase(void (AnyContainerBase::*)(void *)) {}
+    AnyContainerBase(const AnyContainerBase &model) {
+        auto source = model.container();
+        source->copy(container());
+    }
 
     AnyContainerBase(AnyContainerBase &&moveable) noexcept {
         auto source = moveable.container();
@@ -36,8 +59,10 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
         typename Decayed = std::decay_t<Initializer>,
         std::enable_if_t<
             meta::NotBasedOn<Initializer, AnyContainerBase>() &&
+                (!Copyable || std::is_copy_constructible_v<Decayed>) &&
                 !meta::InplaceType<Initializer>::value,
-        int> = 0
+            int
+        > = 0
     >
     AnyContainerBase(Initializer &&initializer) {
         using Implementation = typename Policy::template Builder<Decayed>;
@@ -49,6 +74,7 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
         typename... Initializers,
         typename Decayed = std::decay_t<ValueType>,
         std::enable_if_t<
+            (!Copyable || std::is_copy_constructible<Decayed>::value) &&
                 std::is_constructible<Decayed, Initializers...>::value,
             int
         > = 0
@@ -63,12 +89,12 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
         typename UL,
         typename... Args,
         typename Decayed = std::decay_t<ValueType>,
-        std::enable_if_t<
+        typename = std::enable_if_t<
+            (!Copyable || std::is_copy_constructible<Decayed>::value) &&
                 std::is_constructible<
                     Decayed, std::initializer_list<UL> &, Args...
-                >::value,
-            int
-        > = 0
+                >::value
+            >
     >
     AnyContainerBase(
         std::in_place_type_t<ValueType>,
@@ -84,7 +110,12 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
     AnyContainerBase &operator=(const AnyContainerBase &model) {
         auto myself = container();
         myself->destroy();
-        model.container()->copy(myself);
+        try {
+            model.container()->copy(myself);
+        } catch(...) {
+            new(m_space) Container;
+            throw;
+        }
         return *this;
     }
 
@@ -109,7 +140,8 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
 
     template<typename ValueType, typename... Arguments>
     std::enable_if_t<
-        std::is_constructible<std::decay_t<ValueType>, Arguments...>::value,
+        std::is_constructible<std::decay_t<ValueType>, Arguments...>::value &&
+            std::is_copy_constructible<std::decay_t<ValueType>>::value,
         ValueType &
     >
     emplace(Arguments  &&... arguments) {
@@ -123,7 +155,8 @@ struct AnyContainerBase: PolicyAffordances<AnyContainerBase<Policy>, Policy> {
             std::decay_t<ValueType>,
             std::initializer_list<U> &,
             Arguments...
-        >::value,
+        >::value &&
+            std::is_copy_constructible<std::decay_t<ValueType>>::value,
         ValueType &
     >
     emplace(std::initializer_list<U> il, Arguments &&... args) {
@@ -196,87 +229,17 @@ public:
     }
 };
 
-}
-
 template<typename Policy>
-struct AnyCopyable: detail::AnyContainerBase<Policy> {
-    using Base = detail::AnyContainerBase<Policy>;
-
-    using Base::Base;
-
-    AnyCopyable(const AnyCopyable &model): Base{Base::NoInit} {
-        auto thy = this->container();
-        model.container()->copy(thy);
-    }
-
-    AnyCopyable(AnyCopyable &&) = default;
-
-    AnyCopyable& operator=(AnyCopyable&&) = default;
-    AnyCopyable& operator=(const AnyCopyable&) = default;
-
-    template<typename Argument>
-    std::enable_if_t<
-        std::is_assignable_v<Base, Argument> &&
-        std::is_copy_constructible_v<std::decay_t<Argument>>,
-        AnyCopyable &
-    > operator=(Argument &&a) noexcept(noexcept(
-        std::declval<Base &>() = std::forward<Argument>(a)
-    )) {
-        this->Base::operator=(std::forward<Argument>(a));
-        return *this;
-    }
-
-    #define BASE_EMPLACE_FORWARDING \
-    std::declval<Base &>().template emplace<ValueType>(std::forward<Args>(args)...)
-    template<typename ValueType, typename... Args>
-    auto emplace(Args &&...args) noexcept(noexcept(BASE_EMPLACE_FORWARDING)) ->
-    std::enable_if_t<
-        std::is_copy_constructible_v<ValueType>,
-        decltype(BASE_EMPLACE_FORWARDING)
-    > {
-        return this->Base::template emplace<ValueType>(std::forward<Args>(args)...);
-    }
-};
-
-template<typename Policy>
-struct AnyMovable: detail::AnyContainerBase<Policy> {
-    using Base = detail::AnyContainerBase<Policy>;
-    using Base::Base;
-
-    template<typename Arg>
-    constexpr static auto SuitableForBuilding() {
-        return
-            meta::NotBasedOn<Arg, AnyMovable>() && // disables self-building
-            !std::is_lvalue_reference_v<Arg>
-        ;
-    }
-
-    AnyMovable(const AnyMovable &) = delete;
-    AnyMovable(AnyMovable &&) = default;
-
-    template<
-        typename Arg,
-        typename = std::enable_if_t<SuitableForBuilding<Arg>()>
+struct AnyContainer:
+    AnyContainerBase<Policy>,
+    meta::CopyAndMoveAbilities<
+        impl::HasCopy<typename Policy::MemoryLayout>::value
     >
-    AnyMovable(Arg &&a): Base(std::forward<Arg>(a)) {}
-
-    AnyMovable &operator=(const AnyMovable &) = delete;
-    AnyMovable &operator=(AnyMovable &&) = default;
-
-    template<typename Argument>
-    std::enable_if_t<
-        SuitableForBuilding<Argument>(),
-        AnyMovable &
-    > operator=(Argument &&argument) noexcept(
-        noexcept(std::declval<Base &>() = std::forward<Argument>(argument))
-    ) {
-        Base::operator=(std::forward<Argument>(argument));
-        return *this;
-    }
+{
+    using Base = AnyContainerBase<Policy>;
+    using Base::AnyContainerBase;
+    using Base::operator=;
 };
-
-template<typename Policy>
-using AnyContainer = AnyCopyable<Policy>;
 
 template<typename Policy>
 inline
