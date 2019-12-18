@@ -8,9 +8,6 @@
 #include "zoo/meta/InplaceType.h"
 #include "zoo/meta/copy_and_move_abilities.h"
 
-//#include <new>
-//#include <initializer_list>
-
 namespace zoo {
 
 namespace impl {
@@ -20,8 +17,11 @@ struct CorrectType:
     std::disjunction<std::is_same<decltype(Value), Options>...>
 {};
 
+template<typename T, typename = void>
+struct HasCopy: std::false_type {};
+
 template<typename T>
-struct HasCopy:
+struct HasCopy<T, std::void_t<decltype(&T::copy)>>:
     CorrectType<
         &T::copy,
         void (T::*)(T *),
