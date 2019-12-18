@@ -57,6 +57,16 @@ struct TwoArgumentConstructor {
 
 template<typename ExtAny>
 void testAnyImplementation() {
+    static_assert(
+        std::is_same_v<
+            ExtAny &,
+            decltype(std::declval<ExtAny &>() = std::declval<ExtAny &&>())
+        >, "the move-assignment operator must return the container reference"
+    );
+    static_assert(
+        noexcept(std::declval<ExtAny &>() = std::declval<ExtAny &&>())
+    );
+
     SECTION("Value Destruction") {
         int value;
         {

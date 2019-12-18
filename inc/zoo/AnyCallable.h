@@ -1,7 +1,7 @@
 #ifndef ZOO_ANY_CALLABLE
 #define ZOO_ANY_CALLABLE
 
-#include "meta/NotBasedOn.h"
+#include "zoo/meta/NotBasedOn.h"
 
 #ifndef SIMPLIFY_PREPROCESSING
 #include <type_traits>
@@ -21,27 +21,13 @@ template<typename E, typename S>
 inline
 void swap(AnyCallable<E, S> &ac1, AnyCallable<E, S> &ac2) noexcept;
 
-struct CopiableEmpty {};
-struct NonCopiableEmpty {
-    NonCopiableEmpty() = default;
-    NonCopiableEmpty(const NonCopiableEmpty &) = delete;
-    NonCopiableEmpty(NonCopiableEmpty &&) = default;
-};
-
 /// \tparam TypeErasureProvider Must implement a \c state template instance
 /// function that returns a pointer to the held object
 ///
 /// Why inheritance: Client code should be able to enquire the target
 /// as they would any type erased value
 template<typename TypeErasureProvider, typename R, typename... Args>
-struct AnyCallable<TypeErasureProvider, R(Args...)>:
-    TypeErasureProvider,
-    std::conditional_t<
-        std::is_copy_constructible_v<TypeErasureProvider>,
-        CopiableEmpty,
-        NonCopiableEmpty
-    >
-{
+struct AnyCallable<TypeErasureProvider, R(Args...)>: TypeErasureProvider {
     AnyCallable(): targetInvoker_{emptyInvoker} {}
 
     AnyCallable(std::nullptr_t): AnyCallable() {}
