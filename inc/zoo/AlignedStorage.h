@@ -142,6 +142,9 @@ struct AlignedStorage {
     }
 };
 
+template<typename V>
+using AlignedStorageFor = AlignedStorage<sizeof(V), alignof(V)>;
+
 }
 
 #endif /* AlignedStorage_h */
