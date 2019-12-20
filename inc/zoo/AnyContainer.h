@@ -21,20 +21,16 @@ template<typename T, typename = void>
 struct HasCopy: std::false_type {};
 
 template<typename T>
-struct HasCopy<T, std::void_t<decltype(&T::copy)>>:
-    CorrectType<
-        &T::copy,
-        void (T::*)(T *),
-        void (T::*)(T *) const,
-        void (T::*)(T *) const noexcept
-    >
-{};
+struct HasCopy<
+        // copy can be called on a T & with a T *
+    T, std::void_t<decltype(std::declval<T &>().copy(std::declval<T *>()))>
+>: std::true_type {};
 
 }
 
 template<typename Policy>
 struct AnyContainerBase:
-        detail::PolicyAffordances<AnyContainerBase<Policy>, Policy>
+    detail::PolicyAffordances<AnyContainerBase<Policy>, Policy>
 {
     using Container = typename Policy::MemoryLayout;
     constexpr static auto Copyable = impl::HasCopy<Container>::value;
