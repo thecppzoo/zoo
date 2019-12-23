@@ -18,7 +18,9 @@ static_assert(impl::HasCopy<CanonicalVTablePolicy::MemoryLayout>::value);
 #include "catch2/catch.hpp"
 
 TEST_CASE("Ligtests") {
-    using VTA = zoo::AnyContainer<zoo::CanonicalVTablePolicy>;
+    //using VTA = zoo::AnyContainer<zoo::CanonicalVTablePolicy>;
+    using Policy = zoo::Policy<zoo::Destroy, zoo::Move, zoo::Copy>;
+    using VTA = zoo::AnyContainer<Policy>;
     static_assert(std::is_default_constructible_v<VTA>);
     static_assert(std::is_nothrow_move_constructible_v<VTA>);
 
