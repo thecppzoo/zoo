@@ -98,6 +98,10 @@ Data type of whatever is needed in the virtual table to implement the affordance
 A `VTableEntry` value templated on a container needed to later accept holding an arbitrary object.  `Default` is allowed to require any API from 
 
 #### `Operation`
+A `VTableEntry` value templated on a container needed to activate the affordance
+
+#### `Mixin`
+The policy's `MemoryLayout` will use CRTP to inject the public members of `Mixin` into itself, it must contain the declaration and implementation of the affordance, that is, the code that picks from the virtual table the `Operation` and calls it.
 
 ## Annotations
 
