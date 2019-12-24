@@ -27,3 +27,84 @@ The objective has been to fully preserve the benefits of type erasure, including
 
 The affordances of moving and especially copying are probably in the hardest of tiers of affordances to implement because they are fundamental operations of the types, thus, they may have the most complicated *implicit API* with the containers and are a good illustration of the maximum challenge users will be faced when doing their own affordances.
 
+## The implicit contract in an affordance specifier
+
+`AnyContainer` is a wrapper for type erasure mechanisms to acquire the full user interface of `std::any`.  To implement all of the contract of `any`, there is the need of a few key mechanisms:
+
+1. A container type over which the micro-API for type erasure can be activated, this component necessarily must be polymorphic
+2. Implementation types that are substitutable to a container, capable of
+    1. Actually holding the value
+    2. Providing the "knowledge" of the held object to the affordances
+3. A type switch mechanism to decide at runtime how to get the right container implementation
+
+The container mentioned above is encapsulated as the member `MemoryLayout` of the policy argument to `AnyContainer`.  And the implementation is decided at compilation time (not runtime) through the policy template member `Builder` which takes a type (what the container will hold) and indicates which implementation to activate.  The container or `MemoryLayout` should somehow be capable of "downcasting" to the right implementation at runtime.  This document deals exclusively with a user-made "virtual table pointer" mechanism.
+
+### The concept of affordance
+
+An affordance allows the container to perform operations.  For this, they have to:
+
+1. Introduce some state to the virtual table which is dependent on the type of the object held, this requires:
+    1. A default value for this state that will allow accepting any arbitrary type later on
+    2. A functional value when the type of the object held is known and the real operation will act on
+    3. Both above must be covariant with the actual container (for example, a copy requires knowing how the container is holding the object)
+2. Utilize those elements in the virtual table to do the polymorphic operation independently of the other affordances
+3. Make available the operation through the container.
+
+Let us study this affordance example:
+```c++
+struct Copy {
+    struct VTableEntry { void (*cp)(void *, const void *); };
+
+    template<typename Container>
+    constexpr static inline VTableEntry Default = { Container::copyVTable };
+
+    template<typename Container>
+    constexpr static inline VTableEntry Operation = { Container::copy };
+
+    template<typename Container>
+    struct Mixin {
+        void copy(void *to) const {
+            auto downcast = static_cast<const Container *>(this);
+            downcast->template vTable<Copy>()->cp(to, downcast);
+        }
+    };
+};
+```
+
+According to the seminal work "Elements of Programming" by Stepanov and McJones, default construction leads to an object that is only "Partially Formed".  In `AnyContainer`, default construction just prepares the instance to accept holding a compatible value, whereas typed-construction realizes the full potential of the container, namely, managing a value on an arbitrary type with the container being able to activate the affordances.  These two levels of initialization are represented or implemented in the generic framework through the members `Default` and `Operation` of each affordance.  The *values* of `Default` and `Operation` are relative to the *container* that would really hold the object, they are templates that take the type of container.  The *types* of `Default` and `Operation` **must be assignment-compatible** with the type of the entries in the vtable that the affordance introduces.
+
+In `Copy`, the affordance adds to the virtual table a function pointer called `cp` that takes a destination pointer and a source pointer, these are the source and destination containers.  `Default` requires the `Container` to provide a class-member `copyVTable`, which should just copy the vtable pointer.  `Operation` requires the `Container` to have a class-member `copy` function.  In this affordance, the actual implementation of how to copy does not reside in the affordance but invokes the container operation; **implicitly it is assumed that the container's `copy` won't be instantiated unless required by this affordance**, in this way, the containers can make a proviso for the possiblity of copying, but not activate it if this affordance is not present, **this is how this affordance controls copyability** *without implementing it*.
+
+In this example, the container implementations and the affordance of copyability are mutually dependent, this is not desirable, but acceptable because there is high cohesion between the ways in which an object can be held and the ways in which it can be copied.  There are some affordances that do not require this.  For example, an affordance of serialization might just require a function pointer in the vtable and a way to get the value held from the container.  A `Type` affordance may just need a `const std::type_info *` in the virtual table and not even access to the object held.
+
+`Copy` has a `Mixin` template member, through CRTP is how the `Container`s acquire the ability of performing the affordance:
+```c++
+template<typename... Affordances>
+struct GenericPolicy {
+    struct VTable: Affordances::VTableEntry... {};
+    using VTHolder = VTableHolder<VTable>;
+    using HoldingModel = void *;
+
+    struct Container: VTHolder, Affordances::template Mixin<Container>... {
+```
+Because `GenericPolicy<Affordances...>::Container` inherits from `Affordances::template Mixin<Container>`, all public members of `Mixin<Containers>` become public for `Container` too.  In this particular case, the API that is made available is `copy(void *)` whose implementation will activate the `cp` member of the virtual table to perform the container copy, and therefore also the value copy.
+
+### Contract Reference
+
+#### `VTableEntry`
+Data type of whatever is needed in the virtual table to implement the affordance
+
+#### `Default`
+A `VTableEntry` value templated on a container needed to later accept holding an arbitrary object.  `Default` is allowed to require any API from 
+
+#### `Operation`
+
+## Implementation annotations
+
+### Why inherit from something that contains the pointer to the virtual table?
+
+According to the rules of the language the state of base classes occur first in the memory layout of the derived objects.  I think for performance reasons the pointer to the vtable should be the first member in the layout.  The only way then is to add it to the container via inheritance, as a member of the first base class.
+
+### Where is the documentation between the specific affordances and the implicit API they require from the containers?
+
+It currently does not exist.  This is the first draft of a mechanism that does not have a precedent in the community, things may change.
