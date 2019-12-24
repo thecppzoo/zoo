@@ -14,7 +14,7 @@ The generally accepted jargon for doing polymorphism (implementing sub-typing re
 
 Type erasure is a very active topic of conceptual development in C++, O'Dwyer reports in ["The space of design choices for `std::function`](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/) a large number of proposals around merely `std::function` that under consideration for addition to the language.
 
-The type erasure framework around `AnyContainer` in this repository already allowed the straightforward codification of **all of those proposals**, for example, `AnyCallable` indeed is just an straightforward extension of `AnyCallable` and is capable of replacing `std::function` in codebases as large as Snapchat's.  Furthermore, move-only containers were implemented.
+The type erasure framework around `AnyContainer` in this repository already allowed the straightforward codification of **all of those proposals**, for example, `AnyCallable` indeed is just an straightforward extension of `AnyCallable` and is capable of replacing `std::function` in codebases as large as Snapchat's.  Furthermore, move-only containers were implemented, and derived components or extensions were made covariant with respect to copyability, but we now deem that previous work as superceded by the techniques in the latest framework.
 
 The latest work on this framework, [`GenericPolicy`](https://github.sc-corp.net/emadrid/szr/blob/6e436e6aaf1d12f2d0992bb3e3f9acf9adec289a/test/inc/zoo/Any/VTablePolicy.h#L204) comes to dramatically simplify the process of developing affordances and defining containers with arbitrary sets of affordances, in which the affordances are specified as trivially as using them as template arguments:
 ```c++
@@ -23,5 +23,5 @@ The latest work on this framework, [`GenericPolicy`](https://github.sc-corp.net/
 ```
 indicates a type erasure policy that can do destruction, moving and copying.  In the same way, the user may remove `Copy` to have move-only, or add `RTTI` for normal RTTI, or remove destruction for things that are never destroyed during the lifetime of the process (thus we don't add the binary size of the code to destroy them), implement serialization/deserialization affordances, introspection; the user gains granularity with regards to the mechanisms to hold the type erased objects (for example, on memory arenas based on their types for better memory locality) without having to rewrite massive amounts of error-prone and subtle code.
 
-The affordances of moving and especially copying 
+The affordances of moving and especially copying are probably in the hardest of tiers of affordances to implement because they are fundamental operations of the types, thus, they may have the most complicated *implicit API* with the containers and are a good illustration of the maximum challenge users will be faced when doing their own affordances.
 
