@@ -7,11 +7,13 @@
 
 namespace zoo {
 
+using CVTP = Policy<zoo::Destroy, zoo::Move, zoo::Copy>;
+
 struct CanonicalVTableAny {
-    AlignedStorageFor<typename CanonicalVTablePolicy::MemoryLayout> space_;
+    AlignedStorageFor<typename CVTP::MemoryLayout> space_;
 };
 
-static_assert(impl::HasCopy<CanonicalVTablePolicy::MemoryLayout>::value);
+static_assert(impl::HasCopy<CVTP::MemoryLayout>::value);
 
 }
 
