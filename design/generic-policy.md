@@ -8,7 +8,7 @@ Description of how to add polymorphic interfaces to `AnyContainer` by assembling
 
 The great software engineer Louis Dionne explains very well what normal C++ polymorphism, based on `virtual` overrides, leaves to be desired in his project [Dyno](https://github.com/ldionne/dyno).
 
-Additionally, in this repository there are a few extra pointers with regards to more subtle needs for polymorphism, in particular sub-typing relationships as in the original meaning of [Barbara Liskov's substitution principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle) that should not force their representation to be sub-classing in C++.  This is better explained in the foundational work by Kevlin Henney, in the [ACCU September 2000 article "From Mechanism to Method: Substitutability"](https://accu.org/index.php/journals/475) and the [C++ Report magazine article with the original implementation of the `any` component](http://www.two-sdg.demon.co.uk/curbralan/papers/ValuedConversions.pdf), which led to `boost::function` and `std::function` and the "mainstreaming" of type erasure as an alternative for polymorphism.
+Additionally, in this repository there are a few extra pointers with regards to more subtle needs for polymorphism, in particular sub-typing relationships as in the original meaning of [Barbara Liskov's substitution principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle) that should not force their representation to be sub-classing in C++.  This is better explained in the foundational work by Kevlin Henney, in the [ACCU September 2000 article "From Mechanism to Method: Substitutability"](https://accu.org/index.php/journals/475) and the [C++ Report magazine article with the original implementation of the `any` component](http://www.two-sdg.demon.co.uk/curbralan/papers/ValuedConversions.pdf), which led to `boost::function` and `std::function` and the "mainstreaming" of type erasure as an alternative for polymorphism, this has been a 20 year journey that keeps going.
 
 The generally accepted jargon for doing polymorphism (implementing sub-typing relationships) without inheritance and `virtual` overrides of member functions is "type erasure".  Within "type erasure", educator Arthur O'Dwyer has coined the concept of "affordance" to refer to the polymorphic operations a "type erased" object is capable of doing, described in his excellent blog article ["What is Type Erasure?"](https://quuxplusone.github.io/blog/2019/03/18/what-is-type-erasure/).
 
@@ -99,7 +99,7 @@ A `VTableEntry` value templated on a container needed to later accept holding an
 
 #### `Operation`
 
-## Implementation annotations
+## Annotations
 
 ### Why inherit from something that contains the pointer to the virtual table?
 
@@ -108,3 +108,10 @@ According to the rules of the language the state of base classes occur first in 
 ### Where is the documentation between the specific affordances and the implicit API they require from the containers?
 
 It currently does not exist.  This is the first draft of a mechanism that does not have a precedent in the community, things may change.
+
+### Is it true that a library thing can be better, even have better performance than *native features of the language*?
+
+Alexander Stepanov coined the phrase "relative performance" to mean performance relative to the native features of a language, and "absolute performance" to mean maximal performance.  Most of C++ features lead to object code with *absolute performance*, but runtime polymorphism based on inheritance and `virtual` overrides is manifestly not one.  The language committe insists on not procclaiming that the virtual table pointer mechanism is the implementation for `virtual` instance member function overrides, insists on prohibiting "type-punning", and also that polymorphism is a sub-class relationship; the combination of these rules force that there is very little that can be known about polymorphic objects (for example, the bind between the implementation functions and their objects) and very weak guarantees; this prevents both compilers from optimizations and users to skillfully craft their polymorphic types for maximal performance.
+
+What this framework does is to use mechanisms of maximal performance to synthetize the requirements for runtime polymorphism and uses the Generic Programming Paradigm to implement subtyping relationships without the drawbacks of Object Orientation subclassing of user types.
+
