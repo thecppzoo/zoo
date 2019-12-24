@@ -60,6 +60,33 @@ struct Copy {
     };
 };
 
+struct RTTI {
+    struct VTableEntry { const std::type_info *ti; };
+
+    template<typename>
+    constexpr static inline VTableEntry Default = { &typeid(void) };
+
+    template<typename Container>
+    constexpr static inline VTableEntry Operation = {
+        &typeid(decltype(*std::declval<Container &>().value()))
+    };
+
+    template<typename Container>
+    struct Mixin {
+        const std::type_info &type() const noexcept {
+            auto downcast = static_cast<const Container *>(this);
+            return *downcast->template vTable<RTTI>()->ti;
+        }
+    };
+
+    template<typename AnyC>
+    struct UserAffordance {
+        const std::type_info &type() const noexcept {
+            return static_cast<const AnyC *>(this)->container()->type();
+        }
+    };
+};
+
 template<typename VirtualTable>
 struct VTableHolder {
     const VirtualTable *ptr_;
@@ -83,13 +110,16 @@ struct BuilderDecider {
         sizeof(V) <= S && AlignmentSuitable && NoThrowMovable;
 };
 
-template<typename... Affordances>
+template<typename... AffordanceSpecifications>
 struct GenericPolicy {
-    struct VTable: Affordances::VTableEntry... {};
+    struct VTable: AffordanceSpecifications::VTableEntry... {};
     using VTHolder = VTableHolder<VTable>;
     using HoldingModel = void *;
 
-    struct Container: VTHolder, Affordances::template Mixin<Container>... {
+    struct Container:
+        VTHolder,
+        AffordanceSpecifications::template Mixin<Container>...
+    {
         AlignedStorageFor<HoldingModel> space_;
 
         static void  moveVTable(void *to, void *from) noexcept {
@@ -103,7 +133,7 @@ struct GenericPolicy {
         }
 
         constexpr static inline VTable Default = {
-            Affordances::template Default<Container>...
+            AffordanceSpecifications::template Default<Container>...
         };
 
         Container(): VTHolder(&Default) {}
@@ -132,7 +162,7 @@ struct GenericPolicy {
         }
 
         constexpr static inline VTable Operations = {
-            Affordances::template Operation<ByValue>...
+            AffordanceSpecifications::template Operation<ByValue>...
         };
 
         template<typename... Args>
@@ -166,7 +196,7 @@ struct GenericPolicy {
         }
 
         constexpr static inline VTable Operations = {
-            Affordances::template Operation<ByReference>...
+            AffordanceSpecifications::template Operation<ByReference>...
         };
 
         ByReference(ByReference *source): Container(&Operations) {
@@ -195,5 +225,13 @@ struct GenericPolicy {
 
 template<typename... Affordances>
 using Policy = typename GenericPolicy<Affordances...>::Policy;
+
+template<typename PlainPolicy, typename... AffordanceSpecifications>
+struct ExtendedAffordancePolicy: PlainPolicy {
+    template<typename AnyC>
+    struct Affordances:
+        AffordanceSpecifications::template UserAffordance<AnyC>...
+    {};
+};
 
 }
