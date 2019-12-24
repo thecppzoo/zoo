@@ -94,14 +94,136 @@ Because `GenericPolicy<Affordances...>::Container` inherits from `Affordances::t
 #### `VTableEntry`
 Data type of whatever is needed in the virtual table to implement the affordance
 
-#### `Default`
+#### `template<typename Container> static VTableEntry Default`
 A `VTableEntry` value templated on a container needed to later accept holding an arbitrary object.  `Default` is allowed to require any API from 
 
-#### `Operation`
+#### `template<typename Container> static VTableEntry Operation`
 A `VTableEntry` value templated on a container needed to activate the affordance
 
-#### `Mixin`
-The policy's `MemoryLayout` will use CRTP to inject the public members of `Mixin` into itself, it must contain the declaration and implementation of the affordance, that is, the code that picks from the virtual table the `Operation` and calls it.
+#### `template<typename Container> Mixin`
+The policy's `MemoryLayout` will use the CRTP to inject the public members of `Mixin` into itself, it must contain the declaration and implementation of the affordance, that is, the code that picks from the virtual table the `Operation` and calls it.
+
+## User API affordances
+
+The affordances described thus far are type erasure mechanisms in implementations.
+
+The `AnyContainer` component has a proviso to use affordances provided by the policy in similar way as the `MemoryLayout` of the policies acquire operations from the affordance specifiers: `AnyContainer` CRTPs the type (if it is present) `Affordances` of the policy.
+
+For example, the classical RTTI affordance specifier is currently written as this:
+
+```c++
+struct RTTI {
+    struct VTableEntry { const std::type_info *ti; };
+
+    template<typename>
+    constexpr static inline VTableEntry Default = { &typeid(void) };
+
+    template<typename Container>
+    constexpr static inline VTableEntry Operation = {
+        &typeid(decltype(*std::declval<Container &>().value()))
+    };
+
+    template<typename Container>
+    struct Mixin {
+        const std::type_info &type() const noexcept {
+            auto downcast = static_cast<const Container *>(this);
+            return *downcast->template vTable<RTTI>()->ti;
+        }
+    };
+
+    template<typename AnyC>
+    struct UserAffordance {
+        const std::type_info &type() const noexcept {
+            return static_cast<const AnyC *>(this)->container()->type();
+        }
+    };
+};
+```
+
+There is a `UserAffordance` template that takes the user-facing type erasure container, typically `AnyContainer` on a policy that includes this affordance, and does the necessary steps to produce the `type_info` for the held object.
+
+At this stage in development, the way to make use of the user affordances specified in an affordance specifier is through the template `ExtendedAffordancePolicy`:
+
+```c++
+template<typename PlainPolicy, typename... AffordanceSpecifications>
+struct ExtendedAffordancePolicy: PlainPolicy {
+    template<typename AnyC>
+    struct Affordances:
+        AffordanceSpecifications::template UserAffordance<AnyC>...
+    {};
+};
+```
+
+In the current test file there are several cases of usage of user-facing affordances, including what could be a user-specified affordance called `stringize` which converts the held object to an `std::string`:
+
+From `/test/AnyMovable.cpp`:
+
+```c++
+template<typename Container>
+std::string stringize(const void *ptr) {
+    auto downcast = static_cast<const Container *>(ptr);
+    using T = std::decay_t<decltype(*downcast->value())>;
+    auto &t = *downcast->value();
+    if constexpr(HasToString<T>::value) { return to_string(t); }
+    else if constexpr(HasOperatorInsertion<T>::value) {
+        std::ostringstream ostr;
+        ostr << t;
+        return ostr.str();
+    }
+    else return "";
+}
+
+struct Stringize {
+    struct VTableEntry { std::string (*str)(const void *); };
+
+    template<typename>
+    constexpr static inline VTableEntry Default = {
+        [](const void *) { return std::string(); }
+    };
+
+    template<typename Container>
+    constexpr static inline VTableEntry Operation = { stringize<Container> };
+
+    template<typename Container>
+    struct Mixin {};
+
+    template<typename AnyC>
+    struct UserAffordance {
+        std::string stringize() const {
+            auto container =
+                const_cast<AnyC *>(static_cast<const AnyC *>(this))->container();
+            return container->template vTable<Stringize>()->str(container);
+        }
+    };
+};
+```
+
+At the point of use, this suffices:
+```c++
+zoo::AnyContainer<
+    zoo::ExtendedAffordancePolicy<
+        zoo::Policy<zoo::Destroy, zoo::Move, Stringize>,
+        Stringize
+    >
+> stringizable;
+```
+
+Such code makes a move-only `any` which is capable to convert to string the held objects (by first using the `to_string` function if available for that type or defaulting, if available, to the `operator<<` on an `std::ostream`).
+
+Effectively, this code has implemented an implicit interface "Stringizable" without inheritance nor `virtual` overrides, and the object can be a local variable with the capability of changing type,
+```c++
+REQUIRE("" == stringizable.stringize());
+stringizable = 88;
+auto str = stringizable.stringize();
+REQUIRE("88" == stringizable.stringize());
+Complex c1{0, 1};
+auto c2 = c1;
+stringizable = std::move(c2);
+REQUIRE(to_string(c1) == stringizable.stringize());
+```
+We can see in that code the object `stringizable` began holding nothing, was locally assigned from an integer, which it was able to convert to string, and then assigned again from a `Complex` type for which `to_string(Complex)` exists and will be used.
+
+At the moment as can be seen there is the need for substantial boilerplate, but I hope through usage we will gain experience to decimate this boilerplate.
 
 ## Annotations
 
