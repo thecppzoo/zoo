@@ -6,15 +6,25 @@ Description of how to add polymorphic interfaces to `AnyContainer` by assembling
 
 ## Motivation
 
+### `AnyContainer` history
+
 The great software engineer Louis Dionne explains very well what normal C++ polymorphism, based on `virtual` overrides, leaves to be desired in his project [Dyno](https://github.com/ldionne/dyno).
 
-Additionally, in this repository there are a few extra pointers with regards to more subtle needs for polymorphism, in particular sub-typing relationships as in the original meaning of [Barbara Liskov's substitution principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle) that should not force their representation to be sub-classing in C++.  This is better explained in the foundational work by Kevlin Henney, in the [ACCU September 2000 article "From Mechanism to Method: Substitutability"](https://accu.org/index.php/journals/475) and the [C++ Report magazine article with the original implementation of the `any` component](http://www.two-sdg.demon.co.uk/curbralan/papers/ValuedConversions.pdf), which led to `boost::function` and `std::function` and the "mainstreaming" of type erasure as an alternative for polymorphism, this has been a 20 year journey that keeps going.
+Additionally, in this repository there are a few extra pointers with regards to more subtle needs for polymorphism, in particular sub-typing relationships as in the original meaning of [Barbara Liskov's substitution principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle) that should not force their representation to be sub-classing in C++.  This is better explained in the foundational work by Kevlin Henney, in the [ACCU September 2000 article "From Mechanism to Method: Substitutability"](https://accu.org/index.php/journals/475) and the [C++ Report magazine article with the original implementation of the `any` component](http://www.two-sdg.demon.co.uk/curbralan/papers/ValuedConversions.pdf), which led to `boost::function` and `std::function` and the "mainstreaming" of type erasure as an alternative for polymorphism, this has been a 20 year journey that keeps going. 
 
-The generally accepted jargon for doing polymorphism (implementing sub-typing relationships) without inheritance and `virtual` overrides of member functions is "type erasure".  Within "type erasure", educator Arthur O'Dwyer has coined the concept of "affordance" to refer to the polymorphic operations a "type erased" object is capable of doing, described in his excellent blog article ["What is Type Erasure?"](https://quuxplusone.github.io/blog/2019/03/18/what-is-type-erasure/).
+One particularly complete way of doing polymorphism (implementing sub-typing relationships) without inheritance and `virtual` overrides of member functions is "type erasure".  Within "type erasure", educator Arthur O'Dwyer has coined the concept of "affordance" to refer to the polymorphic operations a "type erased" object is capable of doing, described in his excellent blog article ["What is Type Erasure?"](https://quuxplusone.github.io/blog/2019/03/18/what-is-type-erasure/).
+
+Without the `AnyContainer` framework, users could still benefit from type erasure (as they do with `std::any` and `std::function`), but then have nothing to help them with specifying their own affordance set, or worse, the stock components may not be compatible at all, for example, if you want the equivalent of a move-only function, neither `std::any` nor `std::function` will help you, at the core of those components there is the affordance of copyability, potentially to a local buffer, and thus copyability of the objects it can hold. This has led to even gigantic organizations in the software engineering industry such as Facebook to write their own specific components such as [`folly::Function`](https://github.com/facebook/folly/blob/master/folly/docs/Function.md).
 
 Type erasure is a very active topic of conceptual development in C++, O'Dwyer reports in ["The space of design choices for `std::function`"](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/) a large number of proposals around merely `std::function` that are under consideration for addition to the language.
 
-The type erasure framework `AnyContainer` in this repository already allowed the straightforward codification of **all of those proposals**, for example, `AnyCallable` indeed is just an straightforward extension of `AnyContainer` and is capable of replacing `std::function` in codebases as large as Snapchat's; the performance, binary size improvements of replacing `std::function` by `AnyCallable` have been hard to believe, yet measured rigorously.  Furthermore, move-only containers were implemented, and derived components or extensions such as move only callables were made covariant with respect to copyability maintaining the performance, binary size and clarity improvements, but we now deem that previous work as superceded by the techniques in the latest framework.
+Attempting obtain the benefits of type erasure but with the certainty of maximal performance because of the needs of the industry where I worked at the time, and realizing that work like `folly::Function` are solutions one by one to choices that have obvious generality, I ended up with a complete *conceptualization* of type erasure articulated by applying the Generic Programming paradigm resulting in the framework of `AnyContainer`.
+
+`AnyContainer` already allowed the straightforward codification of **all of the proposals O'Dwyer mentions**, for example, `AnyCallable` indeed is just an straightforward extension of `AnyContainer` and is capable of replacing `std::function` in codebases as large as Snapchat's; the performance, binary size improvements of replacing `std::function` by `AnyCallable` have been hard to believe, yet measured rigorously, attesting to their nearly maximal performance.  Furthermore, move-only containers were implemented, and derived components or extensions such as move only callables were made covariant with respect to copyability maintaining the performance, binary size and clarity improvements, although we now deem that previous work as superceded by the techniques in the latest framework.
+
+However, the framework has been "expert-only". The counterpart of a conceptualization for maximal performance is a conceptualization for ease of use.
+
+### User friendly
 
 The latest work on this framework, [`GenericPolicy`](https://github.sc-corp.net/emadrid/szr/blob/6e436e6aaf1d12f2d0992bb3e3f9acf9adec289a/test/inc/zoo/Any/VTablePolicy.h#L204) comes to dramatically simplify the process of developing affordances and defining containers with arbitrary sets of affordances, in which they are specified as trivially as using them as template arguments, the code
 ```c++
@@ -95,10 +105,10 @@ Because `GenericPolicy<Affordances...>::Container` inherits from `Affordances::t
 Data type of whatever is needed in the virtual table to implement the affordance
 
 #### `template<typename Container> static VTableEntry Default`
-A `VTableEntry` value templated on a container needed to later accept holding an arbitrary object.  `Default` is allowed to require any API from 
+A `VTableEntry` value templated on a container needed to later accept holding an arbitrary object.  `Default` is allowed to require any API from their containers.
 
 #### `template<typename Container> static VTableEntry Operation`
-A `VTableEntry` value templated on a container needed to activate the affordance
+A `VTableEntry` value templated on a container needed to activate the affordance, also, it is allowed to require anything from their containers.
 
 #### `template<typename Container> Mixin`
 The policy's `MemoryLayout` will use the CRTP to inject the public members of `Mixin` into itself, it must contain the declaration and implementation of the affordance, that is, the code that picks from the virtual table the `Operation` and calls it.
@@ -224,6 +234,38 @@ REQUIRE(to_string(c1) == stringizable.stringize());
 We can see in that code the object `stringizable` began holding nothing, was locally assigned from an integer, which it was able to convert to string, and then assigned again from a `Complex` type for which `to_string(Complex)` exists and will be used.
 
 At the moment as can be seen there is the need for substantial boilerplate, but I hope through usage we will gain experience to decimate this boilerplate.
+
+Part of the boilerplate and technicality of user affordances is to make them instance-member-functions of their `AnyContainer`s, but I discourage the use of instance-member-functions in favor of stand-alone functions: Among other things, stand alone functions opt-in into the rich world of function overloads, one of the strongest, most successful parts of C++.
+
+Ideally users would implement their affordances as overloads on `AnyContainer`, either specific or generic policies; what **the *Generic Policy* framework offers** is **the way to inject the essentials of implementation details into the internals of `AnyContainer`**
+
+## Limitations/Future Work
+
+### Covariance of policies and `AnyContainer` and contravariance of the affordance signatures
+
+The Generic Policy framework just described, with some work, could support infinitely recurring substitution:
+If a user has a policy `SuperPolicy` and a policy `SubPolicy` in which all the affordances of `SuperPolicy` are also affordances of `SubPolicy`, but `SubPolicy` has some extra affordances, then it should be possible that `AnyContainer<SuperPolicy>` would accept substitutions from `AnyContainer<SubPolicy>`.
+
+According to the Liskov's Substitution Principle, the signatures of the affordances are allowed to be *contravariant* (intuitively "more accepting" or less restricting).
+
+There are two obstacles:
+1. Covariance of C++ templates with respect to their template arguments has no explicit support.
+2. For many reasons, Object Oriented languages can't support contravariant arguments.
+
+#### Plan to make `AnyContainer` covariant with regards to the subtype relationship of policies
+
+In C++, the only form of type punning allowed is that of the address (or reference) to a derived class to an address (or reference) of a base class.  Thus, to make the `AnyContainer` substitutable:
+
+1. The virtual table between the policies need to have an inheritance relationship
+2. `AnyContainer<SubPolicy>` must inherit from `AnyContainer<SuperPolicy>`
+
+I hope to illustrate this with the affordance of copiability: It is straightforward to make a policy with copiability a sub-type of a policy of the same affordances except copiability.  The infrastructure to specify an `AnyContainer<SubPolicy>` to inherit from `AnyContainer<SuperPolicy>` hasn't been done yet, but the internal mechanisms should be compatible.
+
+A much harder problem that **I do not intend to solve at this moment** is that of **multiple subtyping relationships**, that is, multiple inheritance.
+
+#### Contravariance?
+
+I currently lack experience with substitution + contravariance use cases, this will be revisited when needed.
 
 ## Annotations
 
