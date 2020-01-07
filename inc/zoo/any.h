@@ -7,7 +7,7 @@
 namespace zoo {
 
 using CanonicalPolicy =
-    RuntimePolymorphicAnyPolicy<sizeof(void *), alignof(void *)>;
+RuntimePolymorphicAnyPolicy<sizeof(void *), alignof(void *)>;
 
 using Any = AnyContainer<CanonicalPolicy>;
 
