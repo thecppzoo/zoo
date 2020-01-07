@@ -105,8 +105,6 @@ struct VTablePolicy {
         SmallBufferTypeEraser<Size, Alignment, T>,
         ReferentialTypeEraser<Size, Alignment, T>
     >;
-
-    constexpr static auto RequireMoveOnly = true;
 };
 
 namespace RTTI {

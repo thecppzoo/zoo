@@ -1,135 +1,216 @@
-//
-//  AnyMovable.cpp
-//
-//  Created by Eduardo Madrid on 6/24/19.
-//
+#include "zoo/Any/VTablePolicy.h"
+#include "zoo/AnyContainer.h"
+#include "zoo/AlignedStorage.h"
 
-#include "zoo/Any/VTable.h"
-#include "zoo/any.h"
-
-#include "catch2/catch.hpp"
+#include <utility>
+#include <type_traits>
 
 namespace zoo {
 
-template<typename T>
-constexpr auto Movable =
-    std::is_nothrow_move_constructible_v<T> &&
-    std::is_nothrow_move_assignable_v<T>
-;
+using namespace std;
 
-template<typename What, typename Other>
-constexpr auto ConvertibleOnlyFromRValue =
-    std::is_constructible_v<What, Other &&> &&
-    !std::is_constructible_v<What, const Other &> &&
-    std::is_assignable_v<What, Other &&> &&
-    !std::is_assignable_v<What, const Other &>
-;
+using MoveOnlyPolicy = Policy<Destroy, Move>;
+using MOAC = AnyContainer<MoveOnlyPolicy>;
 
-template<typename T>
-constexpr auto MoveOnly =
-    Movable<T> &&
-    ConvertibleOnlyFromRValue<T, T>
-;
+static_assert(is_nothrow_move_constructible_v<MOAC>);
+static_assert(!is_copy_constructible_v<MOAC>);
 
-}
+using CVTP = Policy<Destroy, Move, Copy>;
 
-using CP = zoo::CanonicalPolicy;
-
-static_assert(zoo::Movable<int>, "");
-static_assert(!zoo::MoveOnly<int>, "");
-static_assert(zoo::Movable<zoo::detail::AnyContainerBase<CP>>);
-
-using ACP = zoo::AnyContainer<CP>;
-static_assert(std::is_default_constructible_v<ACP>);
-static_assert(std::is_move_constructible_v<ACP>);
-
-static_assert(zoo::Movable<zoo::AnyContainer<CP>>, "");
-static_assert(!zoo::MoveOnly<zoo::AnyContainer<CP>>, "");
-static_assert(zoo::Movable<zoo::AnyMovable<CP>>, "");
-static_assert(zoo::MoveOnly<zoo::AnyMovable<CP>>, "");
-
-using AnyMovableCanonical = zoo::AnyMovable<CP>;
-
-static_assert(std::is_default_constructible_v<AnyMovableCanonical>, "");
-static_assert(zoo::MoveOnly<AnyMovableCanonical>, "");
-static_assert(zoo::ConvertibleOnlyFromRValue<AnyMovableCanonical, int>, "");
-static_assert(
-    std::is_constructible_v<
-        AnyMovableCanonical,
-        std::in_place_type_t<int>
-    >, ""
-);
-
-
-namespace test_RMO_impl {
-
-struct DoesNotHaveMember {};
-static_assert(!zoo::detail::PRMO_impl<DoesNotHaveMember>::value, "");
-struct HasMember { constexpr static auto RequireMoveOnly = true; };
-static_assert(
-    std::is_same_v<const bool, decltype(HasMember::RequireMoveOnly)>, ""
-);
-static_assert(zoo::detail::PRMO_impl<HasMember>::value, "");
-
-}
-
-using MoveOnlyPolicy = zoo::RTTI::RTTI<sizeof(void *), alignof(void *)>;
-
-static_assert(!zoo::detail::RequireMoveOnly_v<zoo::CanonicalPolicy>, "");
-static_assert(zoo::detail::RequireMoveOnly_v<MoveOnlyPolicy>, "");
-struct RequireMoveOnlyFalse {
-    constexpr static auto RequireMoveOnly = false;
+struct CanonicalVTableAny {
+    AlignedStorageFor<typename CVTP::MemoryLayout> space_;
 };
-static_assert(!zoo::detail::RequireMoveOnly_v<RequireMoveOnlyFalse>, "");
 
-TEST_CASE("AnyMovable", "[any][type-erasure][contract]") {
-    SECTION("May construct with single argument l-value in_place_type") {
-        struct Def77 {
-            int value_;
-            Def77(): value_{77} {}
-        };
-        zoo::AnyMovable<zoo::CanonicalPolicy> z(std::in_place_type<Def77>);
-        REQUIRE(typeid(Def77) == z.type());
-        CHECK(77 == z.state<Def77>()->value_);
-    }
-    using Small =
-        zoo::AnyMovable<zoo::VTablePolicy<sizeof(void *), alignof(void *)>>;
-    SECTION("Destroys") {
-        int v = 95;
-        struct TracesDestruction {
-            TracesDestruction(int &who): who_(who) {}
-            ~TracesDestruction() { who_ = 83; }
-            int &who_;
-        };
-        {
-            Small inPlace(std::in_place_type<TracesDestruction>, v);
-            CHECK(95 == v);
-        }
-        REQUIRE(83 == v);
-    }
-    SECTION("Moves") {
-        struct TracesMovement {
-            int trace_ = 94;
-            TracesMovement() = default;
-            TracesMovement(const TracesMovement &) = delete;
-            TracesMovement(TracesMovement &&m) noexcept: trace_(31)
-            { m.trace_ = 76; }
-        };
-        Small
-            originallyEmpty,
-            defaulted(std::in_place_type<TracesMovement>);
-        auto defaultedPtr = defaulted.state<TracesMovement>();
-        CHECK(94 == defaultedPtr->trace_);
-        originallyEmpty = std::move(defaulted);
-        CHECK(31 == originallyEmpty.state<TracesMovement>()->trace_);
-        CHECK(76 == defaultedPtr->trace_);
-    }
+static_assert(impl::HasCopy<CVTP::MemoryLayout>::value);
+
 }
 
-#include "zoo/AnyCallable.h"
-#include "zoo/Any/VTable.h"
+#include "catch2/catch.hpp"
 
-TEST_CASE("AnyContainer<MoveOnlyPolicy>") {
-    using AC = zoo::AnyCallable<zoo::AnyContainer<MoveOnlyPolicy>, int(void *)>;
-    AC def;
+#include <sstream>
+
+#define MAY_CALL_EXPRESSION(name, ...) \
+template<typename, typename = void> \
+struct name: std::false_type {}; \
+template<typename T> \
+struct name<T, std::void_t<decltype(__VA_ARGS__(std::declval<const T &>()))>>: \
+    std::true_type \
+{};
+
+MAY_CALL_EXPRESSION(HasToString, to_string)
+#define INSERTION_OPERATION_EXPRESSION(arg) std::declval<std::ostream &>() << arg
+MAY_CALL_EXPRESSION(HasOperatorInsertion, INSERTION_OPERATION_EXPRESSION)
+
+struct Complex { double real, imaginary; };
+
+std::ostream &operator<<(std::ostream &out, Complex in) {
+    return out << in.real << " + i" << in.imaginary;
+}
+
+std::string to_string(Complex cx) {
+    std::ostringstream ostr;
+    ostr << '(' << cx << ')';
+    return ostr.str();
+}
+
+static_assert(!HasToString<int>::value);
+static_assert(HasOperatorInsertion<int>::value);
+
+template<typename Container>
+std::string stringize(const void *ptr) {
+    auto downcast = static_cast<const Container *>(ptr);
+    using T = std::decay_t<decltype(*downcast->value())>;
+    auto &t = *downcast->value();
+    if constexpr(HasToString<T>::value) { return to_string(t); }
+    else if constexpr(HasOperatorInsertion<T>::value) {
+        std::ostringstream ostr;
+        ostr << t;
+        return ostr.str();
+    }
+    else return "";
+}
+
+struct Stringize {
+    struct VTableEntry { std::string (*str)(const void *); };
+
+    template<typename>
+    constexpr static inline VTableEntry Default = {
+        [](const void *) { return std::string(); }
+    };
+
+    template<typename Container>
+    constexpr static inline VTableEntry Operation = { stringize<Container> };
+
+    template<typename Container>
+    struct Mixin {};
+
+    template<typename AnyC>
+    struct UserAffordance {
+        std::string stringize() const {
+            auto container =
+                const_cast<AnyC *>(static_cast<const AnyC *>(this))->container();
+            return container->template vTable<Stringize>()->str(container);
+        }
+    };
+};
+
+TEST_CASE("Ligtests") {
+    //using VTA = zoo::AnyContainer<zoo::CanonicalVTablePolicy>;
+    using Policy = zoo::Policy<zoo::Destroy, zoo::Move, zoo::Copy>;
+    using VTA = zoo::AnyContainer<Policy>;
+    static_assert(std::is_default_constructible_v<VTA>);
+    static_assert(std::is_nothrow_move_constructible_v<VTA>);
+
+    SECTION("Destruction") {
+        SECTION("Destruction of default constructed") {
+            VTA a;
+        }
+        int trace = 0;
+
+        struct TracesDestruction {
+            int &trace_;
+
+            TracesDestruction(int &trace): trace_(trace) {}
+            ~TracesDestruction() { trace_ = 1; }
+        };
+
+        SECTION("By value") {
+            REQUIRE(0 == trace);
+            {
+                VTA a(std::in_place_type<TracesDestruction>, trace);
+            }
+            REQUIRE(1 == trace);
+        }
+        SECTION("By reference") {
+            struct Large: TracesDestruction {
+                using TracesDestruction::TracesDestruction;
+                double whatever[3];
+            };
+            REQUIRE(0 == trace);
+            {
+                VTA a(std::in_place_type<Large>, trace);
+            }
+            REQUIRE(1 == trace);
+        }
+    }
+    SECTION("Moving") {
+        struct TracesMoves {
+            int *resource_;
+
+            TracesMoves(int *p): resource_(p) {}
+
+            TracesMoves(const TracesMoves &) {
+                throw std::runtime_error("unreachable called");
+            }
+
+            TracesMoves(TracesMoves &&m) noexcept: resource_(m.resource_) {
+                m.resource_ = nullptr;
+            }
+
+            ~TracesMoves() {
+                if(resource_) { *resource_ = 0; }
+            }
+        };
+        int something = 1;
+        SECTION("By Value") {
+            {
+                VTA a;
+                {
+                    VTA tmp(std::in_place_type<TracesMoves>, &something);
+                    REQUIRE(1 == something);
+                    a = std::move(tmp);
+                }
+                REQUIRE(1 == something); // tmp if moved does not refer to something
+            }
+            REQUIRE(0 == something); // a referred to something, cleared
+        }
+        SECTION("By Reference") {
+            struct Big {
+                void *myself_;
+                int *padding_;
+                Big(): myself_(this) {}
+            };
+            VTA a(std::in_place_type<Big>);
+            auto originalPlace = a.state<Big>()->myself_;
+            VTA other(std::move(a));
+            a.reset();
+            REQUIRE(other.state<Big>()->myself_ == originalPlace);
+        }
+    }
+    SECTION("Flexible affordances") {
+        using RTTIMO = zoo::Policy<zoo::Destroy, zoo::Move, zoo::RTTI>;
+        using RTTIPolicy = zoo::ExtendedAffordancePolicy<RTTIMO, zoo::RTTI>;
+        using RTTIMOAC = zoo::AnyContainer<RTTIPolicy>;
+        RTTIMOAC mo;
+        SECTION("Defaulted") {
+            auto &typeidVoid = typeid(void);
+            auto &mot = mo.type();
+            REQUIRE(typeidVoid == mot);
+        }
+        SECTION("Value") {
+            mo = 4;
+            REQUIRE(typeid(int) == mo.type());
+        }
+        SECTION("Reference") {
+            struct Complex { double real; double img; };
+            mo = Complex{};
+            REQUIRE(typeid(Complex) == mo.type());
+        }
+    }
+    SECTION("User affordance") {
+        zoo::AnyContainer<
+            zoo::ExtendedAffordancePolicy<
+                zoo::Policy<zoo::Destroy, zoo::Move, Stringize>,
+                Stringize
+            >
+        > stringizable;
+        REQUIRE("" == stringizable.stringize());
+        stringizable = 88;
+        auto str = stringizable.stringize();
+        REQUIRE("88" == stringizable.stringize());
+        Complex c1{0, 1};
+        auto c2 = c1;
+        stringizable = std::move(c2);
+        REQUIRE(to_string(c1) == stringizable.stringize());
+    }
 }
