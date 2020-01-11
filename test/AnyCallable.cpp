@@ -1,5 +1,6 @@
 #include "AnyCallableGeneric.h"
 
+/*
 TEST_CASE("function", "[any][type-erasure][functional]") {
     CallableTests<zoo::AnyContainer<zoo::CanonicalPolicy>>::execute();
 }
@@ -14,3 +15,4 @@ static_assert(std::is_copy_assignable_v<zoo::function<void()>>);
 
 static_assert(std::is_nothrow_move_constructible_v<MoveOnlyCallable<void()>>);
 static_assert(std::is_nothrow_move_assignable_v<MoveOnlyCallable<void()>>);
+*/

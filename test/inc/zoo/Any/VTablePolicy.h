@@ -100,7 +100,7 @@ struct VTableHolder {
     VTableHolder(const VirtualTable *p): ptr_(p) {}
 };
 
-template<int S, int A, typename V>
+template<std::size_t S, std::size_t A, typename V>
 struct BuilderDecider {
     constexpr static auto NoThrowMovable =
         std::is_nothrow_move_constructible_v<V>;
@@ -110,11 +110,10 @@ struct BuilderDecider {
         sizeof(V) <= S && AlignmentSuitable && NoThrowMovable;
 };
 
-template<typename... AffordanceSpecifications>
+template<typename HoldingModel, typename... AffordanceSpecifications>
 struct GenericPolicy {
     struct VTable: AffordanceSpecifications::VTableEntry... {};
     using VTHolder = VTableHolder<VTable>;
-    using HoldingModel = void *;
 
     struct Container:
         VTHolder,
@@ -223,8 +222,8 @@ struct GenericPolicy {
     };
 };
 
-template<typename... Affordances>
-using Policy = typename GenericPolicy<Affordances...>::Policy;
+template<typename HoldingModel, typename... Affordances>
+using Policy = typename GenericPolicy<HoldingModel, Affordances...>::Policy;
 
 template<typename PlainPolicy, typename... AffordanceSpecifications>
 struct ExtendedAffordancePolicy: PlainPolicy {

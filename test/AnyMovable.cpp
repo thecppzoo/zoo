@@ -1,5 +1,4 @@
-#include "zoo/Any/VTablePolicy.h"
-#include "zoo/AnyContainer.h"
+#include "zoo/Any/AnyMovable.hpp"
 #include "zoo/AlignedStorage.h"
 
 #include <utility>
@@ -9,13 +8,13 @@ namespace zoo {
 
 using namespace std;
 
-using MoveOnlyPolicy = Policy<Destroy, Move>;
+using MoveOnlyPolicy = Policy<void *, Destroy, Move>;
 using MOAC = AnyContainer<MoveOnlyPolicy>;
 
 static_assert(is_nothrow_move_constructible_v<MOAC>);
 static_assert(!is_copy_constructible_v<MOAC>);
 
-using CVTP = Policy<Destroy, Move, Copy>;
+using CVTP = Policy<void *, Destroy, Move, Copy>;
 
 struct CanonicalVTableAny {
     AlignedStorageFor<typename CVTP::MemoryLayout> space_;
@@ -96,7 +95,7 @@ struct Stringize {
 
 TEST_CASE("Ligtests") {
     //using VTA = zoo::AnyContainer<zoo::CanonicalVTablePolicy>;
-    using Policy = zoo::Policy<zoo::Destroy, zoo::Move, zoo::Copy>;
+    using Policy = zoo::Policy<void *, zoo::Destroy, zoo::Move, zoo::Copy>;
     using VTA = zoo::AnyContainer<Policy>;
     static_assert(std::is_default_constructible_v<VTA>);
     static_assert(std::is_nothrow_move_constructible_v<VTA>);
@@ -178,7 +177,7 @@ TEST_CASE("Ligtests") {
         }
     }
     SECTION("Flexible affordances") {
-        using RTTIMO = zoo::Policy<zoo::Destroy, zoo::Move, zoo::RTTI>;
+        using RTTIMO = zoo::Policy<void *, zoo::Destroy, zoo::Move, zoo::RTTI>;
         using RTTIPolicy = zoo::ExtendedAffordancePolicy<RTTIMO, zoo::RTTI>;
         using RTTIMOAC = zoo::AnyContainer<RTTIPolicy>;
         RTTIMOAC mo;
@@ -200,7 +199,7 @@ TEST_CASE("Ligtests") {
     SECTION("User affordance") {
         zoo::AnyContainer<
             zoo::ExtendedAffordancePolicy<
-                zoo::Policy<zoo::Destroy, zoo::Move, Stringize>,
+                zoo::Policy<void *, zoo::Destroy, zoo::Move, Stringize>,
                 Stringize
             >
         > stringizable;
