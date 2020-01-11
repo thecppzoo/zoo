@@ -36,7 +36,7 @@ set(CURRENT_EXECUTABLE "zooTest${CMAKE_BUILD_TYPE}")
 set(CATCH2_MAIN_SOURCE catch_main.cpp)
 set(
     TYPE_ERASURE_SOURCES
-    any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp AnyMovable.cpp
+    any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp GenericPolicy.cpp
 )
 set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
 set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
@@ -48,7 +48,7 @@ set(
 
 add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
 add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
-add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
+add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES} inc/zoo/Any/AnyMovable.hpp)
 add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
 add_executable(

@@ -14,6 +14,9 @@ using MOAC = AnyContainer<MoveOnlyPolicy>;
 static_assert(is_nothrow_move_constructible_v<MOAC>);
 static_assert(!is_copy_constructible_v<MOAC>);
 
+using LargeMoveOnlyPolicy = Policy<void *[2], Destroy, Move>;
+//static_assert(!std::is_constructible_v<zoo::AnyContainerBase<MoveOnlyPolicy>, const zoo::AnyContainerBase<LargeMoveOnlyPolicy> &>);
+
 using CVTP = Policy<void *, Destroy, Move, Copy>;
 
 struct CanonicalVTableAny {
@@ -22,7 +25,18 @@ struct CanonicalVTableAny {
 
 static_assert(impl::HasCopy<CVTP::MemoryLayout>::value);
 
-}
+namespace detail { // the traits are correct
+
+struct Unrelated {};
+static_assert(!IsContainer_impl<Unrelated>::value);
+
+struct HasPolicyType { using Policy = int; };
+static_assert(!IsContainer_impl<HasPolicyType>::value);
+
+struct MoacDerivative: MOAC {};
+static_assert(IsContainer_impl<MoacDerivative>::value);
+
+}}
 
 #include "catch2/catch.hpp"
 
@@ -92,6 +106,11 @@ struct Stringize {
         }
     };
 };
+
+TEST_CASE("Move Only") {
+/*    zoo::AnyContainerBase<zoo::LargeMoveOnlyPolicy> q;
+    zoo::AnyContainerBase<zoo::MoveOnlyPolicy>haha(q);*/
+}
 
 TEST_CASE("Ligtests") {
     //using VTA = zoo::AnyContainer<zoo::CanonicalVTablePolicy>;

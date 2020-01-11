@@ -28,10 +28,11 @@ struct HasCopy<
 
 }
 
-template<typename Policy>
+template<typename Policy_>
 struct AnyContainerBase:
-    detail::PolicyAffordances<AnyContainerBase<Policy>, Policy>
+    detail::PolicyAffordances<AnyContainerBase<Policy_>, Policy_>
 {
+    using Policy = Policy_;
     using Container = typename Policy::MemoryLayout;
     constexpr static auto Copyable = impl::HasCopy<Container>::value;
 
@@ -100,6 +101,12 @@ struct AnyContainerBase:
         using Implementation = typename Policy::template Builder<Decayed>;
         new(m_space) Implementation(il, std::forward<Args>(args)...);
     }
+
+    template<
+        typename OtherPolicy,
+        int = std::enable_if_t<detail::CompatiblePolicy_v<Policy, OtherPolicy>, int>(0)
+    >
+    AnyContainerBase(const AnyContainerBase<OtherPolicy> &);
 
     ~AnyContainerBase() { container()->destroy(); }
 
