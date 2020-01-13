@@ -1,3 +1,5 @@
+#include "zoo/Any/Traits.h"
+
 #include "zoo/AlignedStorage.h"
 
 #include <typeinfo>
@@ -110,6 +112,10 @@ struct BuilderDecider {
         sizeof(V) <= S && AlignmentSuitable && NoThrowMovable;
 };
 
+// Do not define, this is to capture packs of types
+template<typename...>
+struct CompatibilityParameters;
+
 template<typename HoldingModel, typename... AffordanceSpecifications>
 struct GenericPolicy {
     struct VTable: AffordanceSpecifications::VTableEntry... {};
@@ -213,12 +219,14 @@ struct GenericPolicy {
 
         template<typename V>
         using Builder =
-        std::conditional_t<
-            BuilderDecider<sizeof(HoldingModel), alignof(HoldingModel), V>::
-                SmallBufferSuitable,
-            ByValue<V>,
-            ByReference<V>
-        >;
+            std::conditional_t<
+                BuilderDecider<sizeof(HoldingModel), alignof(HoldingModel), V>::
+                    SmallBufferSuitable,
+                ByValue<V>,
+                ByReference<V>
+            >;
+
+         using Compatibility = CompatibilityParameters<HoldingModel, AffordanceSpecifications...>;
     };
 };
 
@@ -231,6 +239,20 @@ struct ExtendedAffordancePolicy: PlainPolicy {
     struct Affordances:
         AffordanceSpecifications::template UserAffordance<AnyC>...
     {};
+};
+
+template<typename BasePolicy, typename... Extensions>
+struct DerivedPolicy {
+    using MemoryLayout = typename BasePolicy::MemoryLayout;
+
+    template<typename V>
+    struct DerivedByValue: BasePolicy::template Builder<V> {};
+
+    template<typename V>
+    struct DerivedByReference: BasePolicy::template Builder<V> {};
+
+    template<typename V>
+    using Builder = typename BasePolicy::template Builder<V>;
 };
 
 }

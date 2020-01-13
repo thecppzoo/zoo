@@ -36,7 +36,7 @@ set(CURRENT_EXECUTABLE "zooTest${CMAKE_BUILD_TYPE}")
 set(CATCH2_MAIN_SOURCE catch_main.cpp)
 set(
     TYPE_ERASURE_SOURCES
-    any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp GenericPolicy.cpp
+    any.cpp AlignedStorage.cpp AnyCallable.cpp AnyExtended.cpp GenericPolicy.cpp ../inc/zoo/Any/Traits.h
 )
 set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
 set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)

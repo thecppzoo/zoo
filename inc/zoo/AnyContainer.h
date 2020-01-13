@@ -55,7 +55,7 @@ struct AnyContainerBase:
         typename Initializer,
         typename Decayed = std::decay_t<Initializer>,
         std::enable_if_t<
-            meta::NotBasedOn<Initializer, AnyContainerBase>() &&
+            !detail::IsAnyContainer_impl<Decayed>::value &&
                 (!Copyable || std::is_copy_constructible_v<Decayed>) &&
                 !meta::InplaceType<Initializer>::value,
             int
@@ -132,7 +132,7 @@ struct AnyContainerBase:
     template<
         typename Argument,
         std::enable_if_t<
-            meta::NotBasedOn<Argument, AnyContainerBase>(),
+            !detail::IsAnyContainer_impl<std::decay_t<Argument>>::value,
             int
         > = 0
     >

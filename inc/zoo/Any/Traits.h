@@ -47,10 +47,10 @@ struct AnyContainerBase;
 
 namespace detail {
 template<typename, typename = void>
-struct IsContainer_impl: std::false_type {};
+struct IsAnyContainer_impl: std::false_type {};
 
 template<typename T>
-struct IsContainer_impl<T, std::void_t<typename T::Policy>>:
+struct IsAnyContainer_impl<T, std::void_t<typename T::Policy>>:
     std::conjunction<std::is_base_of<AnyContainerBase<typename T::Policy>, T>>
 {};
 
