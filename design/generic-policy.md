@@ -47,7 +47,7 @@ The affordances of moving and especially copying are probably in the hardest of 
     2. Providing the "knowledge" of the held object to the affordances
 3. A type switch mechanism to decide at runtime how to get the right container implementation
 
-The container mentioned above is encapsulated as the member `MemoryLayout` of the policy argument to `AnyContainer`.  And the implementation is decided at compilation time (not runtime) through the policy template member `Builder` which takes a type (what the container will hold) and indicates which implementation to activate.  The container or `MemoryLayout` should somehow be capable of "downcasting" to the right implementation at runtime.  This document deals exclusively with a user-made "virtual table pointer" mechanism.
+The container mentioned above is encapsulated as the member `MemoryLayout` of the policy argument to `AnyContainer`.  And the implementation is decided at compilation time (not runtime) through the policy template member `Builder` which takes a type (what the container will hold) and indicates which implementation to activate.  The container or `MemoryLayout` should somehow be capable of "downcasting" to the right implementation at runtime.  This document deals exclusively with a user-made "virtual table pointer" mechanism, I mean not the intrinsic language feature, but a feature implemented in normal C++.
 
 ### The concept of affordance
 
@@ -59,6 +59,8 @@ An affordance allows the container to perform operations.  For this, they have t
     3. Both above must be covariant with the actual container (for example, a copy requires knowing how the container is holding the object)
 2. Utilize those elements in the virtual table to do the polymorphic operation independently of the other affordances
 3. Make available the operation through the container.
+
+#### Generic Programming Concepts about Affordances
 
 Let us study this affordance example:
 ```c++
@@ -81,7 +83,9 @@ struct Copy {
 };
 ```
 
-According to the seminal work "Elements of Programming" by Stepanov and McJones, default construction leads to an object that is only "Partially Formed".  In `AnyContainer`, default construction just prepares the instance to accept holding a compatible value, whereas typed-construction realizes the full potential of the container, namely, managing a value on an arbitrary type with the container being able to activate the affordances.  These two levels of initialization are represented or implemented in the generic framework through the members `Default` and `Operation` of each affordance.  The *values* of `Default` and `Operation` are relative to the *container* that would really hold the object, they are templates that take the type of container.  The *types* of `Default` and `Operation` **must be assignment-compatible** with the type of the entries in the vtable that the affordance introduces.
+An affordance may require held-object-type state and also held-object-instance state. For held-object-type state requirements we add something to the virtual table, something of type `VTableEntry`, in the example what we need is not data but the functions to do the copy. Things that are specific to the instance of the object being held are modeled by having access to the object.
+
+The member `Default` is there for default construction, and default construction is present only because it is part of `std::any` and `std::function`.  Default construction just makes an empty instance, that is, one that does not really have something, just prepare it to accept holding a compatible value later, and this is an affordance by itself, with its binary-size penalty, vtable for a defaulted `AnyContainer`.  According to the seminal work "Elements of Programming" by Stepanov and McJones, default construction leads to an object that is only "Partially Formed", something not really useful, that by its presence encourages the antipattern of two-phase initialization; we could save binary space by removing it if we could change the specification of `std::any` and `std::function`, or use different programming techniques, work that could be made later.  When the container realizes its full potential, the access to the affordances is through `Operation`. The *values* of `Default` and `Operation` are relative to the *container implementation* that would really hold the object, they are templates that take the type of container.  The *types* of `Default` and `Operation` **must be assignment-compatible** with the type of the entries in the vtable that the affordance introduces, `VTableEntry`.
 
 In `Copy`, the affordance adds to the virtual table a function pointer called `cp` that takes a destination pointer and a source pointer, these are the source and destination containers.  `Default` requires the `Container` to provide a class-member `copyVTable`, which should just copy the vtable pointer.  `Operation` requires the `Container` to have a class-member `copy` function.  In this affordance, the actual implementation of how to copy does not reside in the affordance but invokes the container operation; **implicitly it is assumed that the container's `copy` won't be instantiated unless required by this affordance**, in this way, the containers can make a proviso for the possiblity of copying, but not activate it if this affordance is not present, **this is how this affordance controls copyability** *without implementing it*.
 
