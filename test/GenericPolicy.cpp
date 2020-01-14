@@ -1,4 +1,5 @@
 #include "zoo/Any/AnyMovable.hpp"
+#include "zoo/Any/DerivedVTablePolicy.h"
 #include "zoo/AlignedStorage.h"
 
 #include <utility>
@@ -26,7 +27,7 @@ struct CanonicalVTableAny {
     AlignedStorageFor<typename CVTP::MemoryLayout> space_;
 };
 
-static_assert(impl::HasCopy<CVTP::MemoryLayout>::value);
+static_assert(detail::HasCopy<CVTP::MemoryLayout>::value);
 
 namespace detail { // the traits are correct
 
@@ -110,9 +111,17 @@ struct Stringize {
     };
 };
 
-TEST_CASE("Move Only") {
-/*    zoo::AnyContainerBase<zoo::LargeMoveOnlyPolicy> q;
-    zoo::AnyContainerBase<zoo::MoveOnlyPolicy>haha(q);*/
+TEST_CASE("Composed Policies") {
+    using ComposedPolicy = zoo::DerivedPolicy<zoo::MoveOnlyPolicy, Stringize>;
+    using ComposedAC = zoo::AnyContainer<ComposedPolicy>;
+    SECTION("Derived defaults preserved") {
+        ComposedAC defaulted;
+        REQUIRE(&ComposedPolicy::DefaultImplementation::Default == defaulted.container()->ptr_);
+    }
+    SECTION("Operational") {
+        ComposedAC operational = 34;
+        REQUIRE(&ComposedPolicy::Builder<int>::Operations == operational.container()->ptr_);
+    }
 }
 
 TEST_CASE("Ligtests") {

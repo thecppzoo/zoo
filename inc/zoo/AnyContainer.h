@@ -10,7 +10,7 @@
 
 namespace zoo {
 
-namespace impl {
+namespace detail {
 
 template<auto Value, typename... Options>
 struct CorrectType:
@@ -26,6 +26,16 @@ struct HasCopy<
     T, std::void_t<decltype(std::declval<T &>().copy(std::declval<T *>()))>
 >: std::true_type {};
 
+template<typename Policy, typename = void>
+struct MakeDefaultMemoryLayout_impl {
+    static void execute(void *to) noexcept { new(to) typename Policy::MemoryLayout; }
+};
+
+template<typename Policy>
+struct MakeDefaultMemoryLayout_impl<Policy, std::void_t<typename Policy::DefaultImplementation>> {
+    static void execute(void *to) noexcept { new(to) typename Policy::DefaultImplementation; }
+};
+
 }
 
 template<typename Policy_>
@@ -34,12 +44,14 @@ struct AnyContainerBase:
 {
     using Policy = Policy_;
     using Container = typename Policy::MemoryLayout;
-    constexpr static auto Copyable = impl::HasCopy<Container>::value;
+    constexpr static auto Copyable = detail::HasCopy<Container>::value;
 
     alignas(alignof(Container))
     char m_space[sizeof(Container)];
 
-    AnyContainerBase() noexcept { new(m_space) Container; }
+    AnyContainerBase() noexcept {
+        detail::MakeDefaultMemoryLayout_impl<Policy>::execute(m_space);
+    }
 
     AnyContainerBase(const AnyContainerBase &model) {
         auto source = model.container();
@@ -236,7 +248,7 @@ template<typename Policy>
 struct AnyContainer:
     AnyContainerBase<Policy>,
     meta::CopyAndMoveAbilities<
-        impl::HasCopy<typename Policy::MemoryLayout>::value
+        detail::HasCopy<typename Policy::MemoryLayout>::value
     >
 {
     using Base = AnyContainerBase<Policy>;

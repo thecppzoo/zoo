@@ -1,3 +1,6 @@
+#ifndef ZOO_VTABLE_POLICY_H
+#define ZOO_VTABLE_POLICY_H
+
 #include "zoo/Any/Traits.h"
 
 #include "zoo/AlignedStorage.h"
@@ -119,6 +122,7 @@ struct CompatibilityParameters;
 template<typename HoldingModel, typename... AffordanceSpecifications>
 struct GenericPolicy {
     struct VTable: AffordanceSpecifications::VTableEntry... {};
+
     using VTHolder = VTableHolder<VTable>;
 
     struct Container:
@@ -171,7 +175,14 @@ struct GenericPolicy {
         };
 
         template<typename... Args>
-        ByValue(Args &&...args): Container(&Operations) {
+        ByValue(Args &&...args):
+            ByValue(&Operations, std::forward<Args>(args)...)
+        {}
+
+        template<typename... Args>
+        ByValue(const VTable *ops, Args &&...args):
+            Container(ops)
+        {
             this->space_.template build<V>(std::forward<Args>(args)...);
         }
     };
@@ -204,18 +215,26 @@ struct GenericPolicy {
             AffordanceSpecifications::template Operation<ByReference>...
         };
 
-        ByReference(ByReference *source): Container(&Operations) {
+        ByReference(ByReference *source): Container(source->ptr_) {
             pValue() = source->pValue();
         }
 
         template<typename... Args>
-        ByReference(Args &&...args): Container(&Operations) {
+        ByReference(const VTable *ops, Args &&...args): Container(ops) {
             pValue() = new V(std::forward<Args>(args)...);
         }
+
+        template<typename... Args>
+        ByReference(Args &&...args):
+            ByReference(&Operations, std::forward<Args>(args)...)
+        {}
+
     };
 
     struct Policy {
         using MemoryLayout = Container;
+
+        using DefaultImplementation = Container;
 
         template<typename V>
         using Builder =
@@ -226,7 +245,11 @@ struct GenericPolicy {
                 ByReference<V>
             >;
 
-         using Compatibility = CompatibilityParameters<HoldingModel, AffordanceSpecifications...>;
+        constexpr static auto
+            Size = sizeof(HoldingModel),
+            Alignment = alignof(HoldingModel);
+
+        using VTable = VTable;
     };
 };
 
@@ -241,18 +264,6 @@ struct ExtendedAffordancePolicy: PlainPolicy {
     {};
 };
 
-template<typename BasePolicy, typename... Extensions>
-struct DerivedPolicy {
-    using MemoryLayout = typename BasePolicy::MemoryLayout;
-
-    template<typename V>
-    struct DerivedByValue: BasePolicy::template Builder<V> {};
-
-    template<typename V>
-    struct DerivedByReference: BasePolicy::template Builder<V> {};
-
-    template<typename V>
-    using Builder = typename BasePolicy::template Builder<V>;
-};
-
 }
+
+#endif

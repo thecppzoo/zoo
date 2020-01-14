@@ -48,7 +48,7 @@ set(
 
 add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
 add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
-add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES} inc/zoo/Any/AnyMovable.hpp)
+add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES} inc/zoo/Any/AnyMovable.hpp inc/zoo/Any/DerivedVTablePolicy.h)
 add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
 add_executable(
