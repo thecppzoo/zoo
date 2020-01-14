@@ -8,4 +8,20 @@ To achieve substitutability the language puts us in a corner that basically only
 
 Therefore, if we want to substitute among `AnyContainer<P1>` and `AnyContainer<P2>`, we can only do it if `P1::MemoryLayout` is a base class of `P2::MemoryLayout`, and at the same time, to be valid, the implementations in P2 must inherit from the implementations in P1, taken together these two things force that `P1::MemoryLayout` is the same as `P2::MemoryLayout`.
 
+## Covariance of `AnyContainer<BasePolicy>` and `AnyContainer<ExtendedBasePolicy>`
+
+`ExtendedBasePolicy` is a policy composed from `BasePolicy` and its own extra affordances, that is, the result of
+`DerivedPolicy<BasePolicy, X, Y, Z>` where `X`, `Y`, `Z` are affordance specifications.  Notice that `BasePolicy` is not a base class of `ExtendedBasePolicy`.
+
+We want the following code to be completely valid:
+
+```c++
+AnyContainer<ExtendedBasePolicy> ebp;
+AnyContainer<BasePolicy> *bpp = &ebp, &bpr = ebp;
+```
+
+The language forces us to make `AnyContainer<ExtendedBasePolicy>` a derived class of `AnyContainer<BasePolicy>`.
+
+Above we have explained the VTables are compatible.
+
 
