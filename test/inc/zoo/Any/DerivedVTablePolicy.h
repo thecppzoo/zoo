@@ -6,10 +6,16 @@
 namespace zoo {
 
 template<typename BasePolicy, typename... Extensions>
-struct DerivedPolicy {
+struct DerivedVTablePolicy {
+    using ComposedFrom = BasePolicy;
+
     using MemoryLayout = typename BasePolicy::MemoryLayout;
 
     struct VTable: BasePolicy::VTable, Extensions::VTableEntry... {};
+
+    using TypeSwitch = VTable;
+
+    struct ExtraAffordances: Extensions::template Raw<VTable, MemoryLayout>... {};
 
     struct DefaultImplementation: MemoryLayout {
         constexpr static inline VTable Default = {
@@ -40,6 +46,9 @@ struct DerivedPolicy {
             )
         {}
     };
+
+    template<typename AnyC>
+    struct Affordances: Extensions::template UserAffordance<AnyC>... {};
 };
 
 }

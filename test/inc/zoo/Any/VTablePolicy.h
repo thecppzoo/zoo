@@ -54,7 +54,7 @@ struct Copy {
     constexpr static inline VTableEntry Default = { Container::copyVTable };
 
     template<typename Container>
-    constexpr static inline VTableEntry Operation = { Container::copy };
+    constexpr static inline VTableEntry Operation = { Container::copyOp };
 
     template<typename Container>
     struct Mixin {
@@ -63,6 +63,19 @@ struct Copy {
             downcast->template vTable<Copy>()->cp(to, downcast);
         }
     };
+
+    template<typename TypeSwitch, typename MemoryLayout>
+    struct Raw {
+        static void copy(void *to, const void *from) {
+            auto downcast = static_cast<const MemoryLayout *>(from);
+            auto vtable = downcast->ptr_;
+            auto ts = static_cast<const TypeSwitch *>(vtable);
+            ts->cp(to, downcast);
+        }
+    };
+
+    template<typename>
+    struct UserAffordance {};
 };
 
 struct RTTI {
@@ -165,7 +178,7 @@ struct GenericPolicy {
             new(to) ByValue(std::move(*downcast->value()));
         }
 
-        static void copy(void *to, const void *from) {
+        static void copyOp(void *to, const void *from) {
             auto downcast = static_cast<const ByValue *>(from);
             new(to) ByValue(*downcast->value());
         }
@@ -206,7 +219,7 @@ struct GenericPolicy {
             downcast->pValue() = nullptr;
         }
 
-        static void copy(void *to, const void *from) {
+        static void copyOp(void *to, const void *from) {
             auto downcast = static_cast<const ByReference *>(from);
             new(to) ByReference(*downcast->value());
         }

@@ -58,7 +58,7 @@ target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasure
 
 add_executable(algorithm2 $<TARGET_OBJECTS:Catch2Main>)
 target_link_libraries(algorithm2 AlgorithmTest)
-add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main>)
+add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main> inc/zoo/DerivedAnyContainer.h inc/zoo/Any/DerivedVTablePolicy_fwd.h)
 target_link_libraries(type_erasure TypeErasureTest)
 
 # CMake build : library tests

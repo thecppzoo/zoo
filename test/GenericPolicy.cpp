@@ -1,5 +1,5 @@
-#include "zoo/Any/AnyMovable.hpp"
 #include "zoo/Any/DerivedVTablePolicy.h"
+#include "zoo/Any/AnyMovable.hpp"
 #include "zoo/AlignedStorage.h"
 
 #include <utility>
@@ -12,8 +12,14 @@ using namespace std;
 using MoveOnlyPolicy = Policy<void *, Destroy, Move>;
 using MOAC = AnyContainer<MoveOnlyPolicy>;
 
+namespace dp {
+
+//AnyContainer<DerivedVTablePolicy<MoveOnlyPolicy, Copy>> instance;
+
+}
+
 static_assert(is_nothrow_move_constructible_v<MOAC>);
-static_assert(!is_copy_constructible_v<MOAC>);
+//static_assert(!is_copy_constructible_v<MOAC>);
 
 using LargeMoveOnlyPolicy = Policy<void *[2], Destroy, Move>;
 static_assert(
@@ -27,7 +33,7 @@ struct CanonicalVTableAny {
     AlignedStorageFor<typename CVTP::MemoryLayout> space_;
 };
 
-static_assert(detail::HasCopy<CVTP::MemoryLayout>::value);
+static_assert(detail::AffordsCopying<CVTP>::value);
 
 namespace detail { // the traits are correct
 
@@ -112,7 +118,7 @@ struct Stringize {
 };
 
 TEST_CASE("Composed Policies") {
-    using ComposedPolicy = zoo::DerivedPolicy<zoo::MoveOnlyPolicy, Stringize>;
+    using ComposedPolicy = zoo::DerivedVTablePolicy<zoo::MoveOnlyPolicy, zoo::Copy>;
     using ComposedAC = zoo::AnyContainer<ComposedPolicy>;
     SECTION("Derived defaults preserved") {
         ComposedAC defaulted;
@@ -121,6 +127,15 @@ TEST_CASE("Composed Policies") {
     SECTION("Operational") {
         ComposedAC operational = 34;
         REQUIRE(&ComposedPolicy::Builder<int>::Operations == operational.container()->ptr_);
+    }
+    SECTION("Compatibility with super container") {
+        ComposedAC operational = 34;
+        zoo::AnyContainer<zoo::MoveOnlyPolicy> &moac = operational;
+        REQUIRE(&ComposedPolicy::Builder<int>::Operations == moac.container()->ptr_);
+        ComposedPolicy::DefaultImplementation di, other;
+        static_assert(zoo::detail::AffordsCopying<ComposedPolicy>::value);
+        ComposedAC copy = operational;
+        //REQUIRE(34 == *copy.state<int>());
     }
 }
 

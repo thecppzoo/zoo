@@ -17,48 +17,82 @@ struct CorrectType:
     std::disjunction<std::is_same<decltype(Value), Options>...>
 {};
 
-template<typename T, typename = void>
-struct HasCopy: std::false_type {};
+/// \note the following type is needed only for legacy reasons, old-policies
+/// did not differentiate between the memory layout and the default builder
+template<typename P, typename = void>
+struct PolicyDefaultBuilder {
+    using type = typename P::MemoryLayout;
+};
+template<typename P>
+struct PolicyDefaultBuilder<P, std::void_t<typename P::DefaultImplementation>> {
+    using type = typename P::DefaultImplementation;
+};
 
-template<typename T>
-struct HasCopy<
-        // copy can be called on a T & with a T *
-    T, std::void_t<decltype(std::declval<T &>().copy(std::declval<T *>()))>
+template<typename, typename = void>
+struct MemoryLayoutHasCopy: std::false_type {};
+template<typename Policy>
+struct MemoryLayoutHasCopy<
+    Policy,
+    std::void_t<decltype(&Policy::MemoryLayout::copy)>
 >: std::true_type {};
 
-template<typename Policy, typename = void>
-struct MakeDefaultMemoryLayout_impl {
-    static void execute(void *to) noexcept { new(to) typename Policy::MemoryLayout; }
-};
+template<typename, typename = void>
+struct ExtraAffordanceOfCopying: std::false_type {};
+template<typename Policy>
+struct ExtraAffordanceOfCopying<
+    Policy,
+    std::void_t<decltype(&Policy::ExtraAffordances::copy)>
+>: std::true_type {};
 
 template<typename Policy>
-struct MakeDefaultMemoryLayout_impl<Policy, std::void_t<typename Policy::DefaultImplementation>> {
-    static void execute(void *to) noexcept { new(to) typename Policy::DefaultImplementation; }
-};
+using AffordsCopying =
+    std::disjunction<
+        MemoryLayoutHasCopy<Policy>, ExtraAffordanceOfCopying<Policy>
+    >;
 
 }
 
+template<typename>
+struct AnyContainer;
+
+template<typename Policy, typename = void>
+struct CompositionChain {
+    struct Base {
+        using TokenType = void (Base::*)();
+        constexpr static TokenType Token = nullptr;
+        Base(TokenType) noexcept {}
+
+        alignas(alignof(typename Policy::MemoryLayout))
+        char m_space[sizeof(typename Policy::MemoryLayout)];
+    };
+};
+
+template<typename Policy>
+struct CompositionChain<Policy, std::void_t<typename Policy::ComposedFrom>> {
+    using Base = AnyContainer<typename Policy::ComposedFrom>;
+};
+
 template<typename Policy_>
 struct AnyContainerBase:
+    CompositionChain<Policy_>::Base,
     detail::PolicyAffordances<AnyContainerBase<Policy_>, Policy_>
 {
     using Policy = Policy_;
+    using SuperContainer = typename CompositionChain<Policy>::Base;
     using Container = typename Policy::MemoryLayout;
-    constexpr static auto Copyable = detail::HasCopy<Container>::value;
+    constexpr static auto Copyable = detail::AffordsCopying<Policy>::value;
 
-    alignas(alignof(Container))
-    char m_space[sizeof(Container)];
-
-    AnyContainerBase() noexcept {
-        detail::MakeDefaultMemoryLayout_impl<Policy>::execute(m_space);
+    AnyContainerBase() noexcept: SuperContainer(SuperContainer::Token) {
+        new(this->m_space) typename detail::PolicyDefaultBuilder<Policy>::type;
     }
 
-    AnyContainerBase(const AnyContainerBase &model) {
+    AnyContainerBase(const AnyContainerBase &model): SuperContainer(SuperContainer::Token) {
         auto source = model.container();
-        source->copy(container());
+        //if(source->copy(container());
+
     }
 
-    AnyContainerBase(AnyContainerBase &&moveable) noexcept {
+    AnyContainerBase(AnyContainerBase &&moveable) noexcept: SuperContainer(SuperContainer::Token) {
         auto source = moveable.container();
         source->move(container());
     }
@@ -73,9 +107,9 @@ struct AnyContainerBase:
             int
         > = 0
     >
-    AnyContainerBase(Initializer &&initializer) {
+    AnyContainerBase(Initializer &&initializer): SuperContainer(SuperContainer::Token)  {
         using Implementation = typename Policy::template Builder<Decayed>;
-        new(m_space) Implementation(std::forward<Initializer>(initializer));
+        new(this->m_space) Implementation(std::forward<Initializer>(initializer));
     }
 
     template<
@@ -88,9 +122,9 @@ struct AnyContainerBase:
             int
         > = 0
     >
-    AnyContainerBase(std::in_place_type_t<ValueType>, Initializers &&...izers) {
+    AnyContainerBase(std::in_place_type_t<ValueType>, Initializers &&...izers): SuperContainer(SuperContainer::Token)  {
         using Implementation = typename Policy::template Builder<Decayed>;
-        new(m_space) Implementation(std::forward<Initializers>(izers)...);
+        new(this->m_space) Implementation(std::forward<Initializers>(izers)...);
     }
 
     template<
@@ -109,30 +143,32 @@ struct AnyContainerBase:
         std::in_place_type_t<ValueType>,
         std::initializer_list<UL> il,
         Args &&... args
-    ) {
+    ): SuperContainer(SuperContainer::Token) {
         using Implementation = typename Policy::template Builder<Decayed>;
-        new(m_space) Implementation(il, std::forward<Args>(args)...);
+        new(this->m_space) Implementation(il, std::forward<Args>(args)...);
     }
 
+    /*
     template<
         typename OtherPolicy,
         int = std::enable_if_t<detail::CompatiblePolicy_v<Policy, OtherPolicy>, int>(0)
     >
-    AnyContainerBase(const AnyContainerBase<OtherPolicy> &);
+    AnyContainerBase(const AnyContainerBase<OtherPolicy> &): SuperContainer(SuperContainer::Token) ;
+     */
 
     ~AnyContainerBase() { container()->destroy(); }
 
-    AnyContainerBase &operator=(const AnyContainerBase &model) {
+    /*AnyContainerBase &operator=(const AnyContainerBase &model) {
         auto myself = container();
         myself->destroy();
         try {
             model.container()->copy(myself);
         } catch(...) {
-            new(m_space) Container;
+            new(this->m_space) Container;
             throw;
         }
         return *this;
-    }
+    }*/
 
     AnyContainerBase &operator=(AnyContainerBase &&moveable) noexcept {
         auto myself = container();
@@ -240,19 +276,61 @@ public:
     }
 
     Container *container() const {
-        return reinterpret_cast<Container *>(const_cast<char *>(m_space));
+        return reinterpret_cast<Container *>(const_cast<char *>(this->m_space));
     }
+
+protected:
+    using TokenType = void (AnyContainerBase::*)();
+    constexpr static TokenType Token = nullptr;
+    AnyContainerBase(TokenType): SuperContainer(SuperContainer::Token) {}
 };
 
 template<typename Policy>
-struct AnyContainer:
-    AnyContainerBase<Policy>,
-    meta::CopyAndMoveAbilities<
-        detail::HasCopy<typename Policy::MemoryLayout>::value
-    >
-{
+struct AnyCopyable: AnyContainerBase<Policy> {
     using Base = AnyContainerBase<Policy>;
-    using Base::AnyContainerBase;
+
+    AnyCopyable(AnyCopyable &&) = default;
+
+    AnyCopyable(const AnyCopyable &model): Base(Base::Token) {
+        auto source = model.container();
+        if constexpr(detail::MemoryLayoutHasCopy<Policy>::value) {
+            source->copy(this->container());
+        } else {
+            static_assert(detail::ExtraAffordanceOfCopying<Policy>::value);
+            Policy::ExtraAffordances::copy(this->container(), source);
+        }
+    }
+
+    AnyCopyable &operator=(const AnyCopyable &model) {
+        auto myself = this->container();
+        myself->destroy();
+        try {
+            model.container()->copy(myself);
+        } catch(...) {
+            new(this->m_space) typename Base::Container;
+            throw;
+        }
+        return *this;
+    }
+
+    AnyCopyable &operator=(AnyCopyable &&) = default;
+
+    using Base::Base;
+    using Base::operator=;
+};
+
+template<typename Policy>
+        #define PP_BASE_TYPE \
+            std::conditional_t< \
+                detail::AffordsCopying<Policy>::value, \
+                AnyCopyable<Policy>, \
+                AnyContainerBase<Policy> \
+            >
+struct AnyContainer: PP_BASE_TYPE
+{
+    using Base = typename PP_BASE_TYPE;
+        #undef PP_BASE_TYPE
+    using Base::Base;
     using Base::operator=;
 };
 
