@@ -7,6 +7,8 @@
 
 #include <typeinfo>
 
+#include <functional>
+
 namespace zoo {
 
 struct Destroy {
@@ -27,6 +29,9 @@ struct Destroy {
             downcast->template vTable<Destroy>()->dp(downcast);
         }
     };
+
+    template<typename AnyC>
+    struct UserAffordance {};
 };
 
 struct Move {
@@ -45,6 +50,9 @@ struct Move {
             downcast->template vTable<Move>()->mp(to, downcast);
         }
     };
+
+    template<typename AnyC>
+    struct UserAffordance {};
 };
 
 struct Copy {
@@ -101,6 +109,43 @@ struct RTTI {
     struct UserAffordance {
         const std::type_info &type() const noexcept {
             return static_cast<const AnyC *>(this)->container()->type();
+        }
+    };
+};
+
+template<typename>
+struct CallableViaVTable;
+
+template<typename R, typename... As>
+struct CallableViaVTable<R(As...)> {
+    static R throwStdBadFunctionCall(As..., void *) {
+        throw std::bad_function_call{};
+    }
+
+    template<typename MDC>
+    static R invoke(As... arguments, void *pc) {
+        return (*static_cast<MDC *>(pc)->value())(std::forward<As>(arguments)...);
+    }
+
+    struct VTableEntry {
+        R (*executor_)(As..., void *);
+    };
+
+    template<typename>
+    constexpr static inline VTableEntry Default = { throwStdBadFunctionCall };
+
+    template<typename MostDerivedContainer>
+    constexpr static inline VTableEntry Operation = { invoke<MostDerivedContainer> };
+
+    template<typename Container>
+    struct Mixin {};
+
+    template<typename AnyC>
+    struct UserAffordance {
+        R operator()(As... args) {
+            auto container = static_cast<AnyC *>(this)->container();
+            auto vTP = container->template vTable<CallableViaVTable>();
+            return vTP->executor_(std::forward<As>(args)..., container);
         }
     };
 };
@@ -263,6 +308,9 @@ struct GenericPolicy {
             Alignment = alignof(HoldingModel);
 
         using VTable = VTable;
+
+        template<typename AnyC>
+        struct Affordances: AffordanceSpecifications::template UserAffordance<AnyC>... {};
     };
 };
 

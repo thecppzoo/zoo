@@ -140,6 +140,8 @@ TEST_CASE("Composed Policies") {
         REQUIRE(34 == *copy.state<int>());
         moac = std::move(copy);
         REQUIRE(34 == *moac.state<int>());
+        // this line won't compile, exactly as intended: a copiable "any" requires copyability
+        //copy = std::move(moac);
     }
 }
 
@@ -262,4 +264,22 @@ TEST_CASE("Ligtests") {
         stringizable = std::move(c2);
         REQUIRE(to_string(c1) == stringizable.stringize());
     }
+}
+
+namespace zoo {
+
+template<std::size_t Pointers, typename Signature>
+using NewZooFunction = AnyContainer<typename GenericPolicy<void *[Pointers], Destroy, Move, CallableViaVTable<Signature>>::Policy>;
+
+template<std::size_t Pointers, typename Signature>
+using NewCopyableFunction = AnyContainer<DerivedVTablePolicy<typename GenericPolicy<void *[Pointers], Destroy, Move, CallableViaVTable<Signature>>::Policy, Copy>>;
+
+}
+
+TEST_CASE("New zoo function") {
+    auto doubler = [&](int a) { return 2.0 * a; };
+    zoo::NewCopyableFunction<2, double(int)> cf = doubler;
+    zoo::NewZooFunction<2, double(int)> di = std::move(cf);
+    REQUIRE(6.0 == di(3));
+    //cf = std::move(di);
 }
