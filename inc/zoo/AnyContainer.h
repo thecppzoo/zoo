@@ -86,11 +86,7 @@ struct AnyContainerBase:
         new(this->m_space) typename detail::PolicyDefaultBuilder<Policy>::type;
     }
 
-    AnyContainerBase(const AnyContainerBase &model): SuperContainer(SuperContainer::Token) {
-        auto source = model.container();
-        //if(source->copy(container());
-
-    }
+    AnyContainerBase(const AnyContainerBase &model) = delete;
 
     AnyContainerBase(AnyContainerBase &&moveable) noexcept: SuperContainer(SuperContainer::Token) {
         auto source = moveable.container();
@@ -157,18 +153,6 @@ struct AnyContainerBase:
      */
 
     ~AnyContainerBase() { container()->destroy(); }
-
-    /*AnyContainerBase &operator=(const AnyContainerBase &model) {
-        auto myself = container();
-        myself->destroy();
-        try {
-            model.container()->copy(myself);
-        } catch(...) {
-            new(this->m_space) Container;
-            throw;
-        }
-        return *this;
-    }*/
 
     AnyContainerBase &operator=(AnyContainerBase &&moveable) noexcept {
         auto myself = container();

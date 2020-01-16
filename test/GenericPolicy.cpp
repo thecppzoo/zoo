@@ -130,12 +130,16 @@ TEST_CASE("Composed Policies") {
     }
     SECTION("Compatibility with super container") {
         ComposedAC operational = 34;
-        zoo::AnyContainer<zoo::MoveOnlyPolicy> &moac = operational;
-        REQUIRE(&ComposedPolicy::Builder<int>::Operations == moac.container()->ptr_);
+        static_assert(!zoo::detail::AffordsCopying<zoo::MoveOnlyPolicy>::value);
+        static_assert(!std::is_copy_constructible_v<zoo::AnyContainer<zoo::MoveOnlyPolicy>>);
+        zoo::AnyContainer<zoo::MoveOnlyPolicy> &moacReference = operational, moac;
+        REQUIRE(&ComposedPolicy::Builder<int>::Operations == moacReference.container()->ptr_);
         ComposedPolicy::DefaultImplementation di, other;
         static_assert(zoo::detail::AffordsCopying<ComposedPolicy>::value);
         ComposedAC copy = operational;
-        //REQUIRE(34 == *copy.state<int>());
+        REQUIRE(34 == *copy.state<int>());
+        moac = std::move(copy);
+        REQUIRE(34 == *moac.state<int>());
     }
 }
 
