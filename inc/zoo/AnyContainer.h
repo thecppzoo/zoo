@@ -12,12 +12,7 @@ namespace zoo {
 
 namespace detail {
 
-template<auto Value, typename... Options>
-struct CorrectType:
-    std::disjunction<std::is_same<decltype(Value), Options>...>
-{};
-
-/// \note the following type is needed only for legacy reasons, old-policies
+/// \note the following type is needed only for legacy reasons, old policies
 /// did not differentiate between the memory layout and the default builder
 template<typename P, typename = void>
 struct PolicyDefaultBuilder {
@@ -44,6 +39,9 @@ struct ExtraAffordanceOfCopying<
     std::void_t<decltype(&Policy::ExtraAffordances::copy)>
 >: std::true_type {};
 
+/// Copy constructibility and assignability are fundamental operations that
+/// can not be enabled/disabled with SFINAE, this trait is to detect copyability
+/// in a policy
 template<typename Policy>
 using AffordsCopying =
     std::disjunction<
@@ -51,9 +49,6 @@ using AffordsCopying =
     >;
 
 }
-
-template<typename>
-struct AnyContainer;
 
 template<typename Policy, typename = void>
 struct CompositionChain {
@@ -64,12 +59,16 @@ struct CompositionChain {
 
         alignas(alignof(typename Policy::MemoryLayout))
         char m_space[sizeof(typename Policy::MemoryLayout)];
+
+        // by default, move-only
+        Base(const Base &) = delete;
+        Base &operator=(const Base &) = delete;
     };
 };
 
 template<typename Policy>
-struct CompositionChain<Policy, std::void_t<typename Policy::ComposedFrom>> {
-    using Base = AnyContainer<typename Policy::ComposedFrom>;
+struct CompositionChain<Policy, std::void_t<typename Policy::Base>> {
+    using Base = typename Policy::Base;
 };
 
 template<typename Policy_>
@@ -86,7 +85,7 @@ struct AnyContainerBase:
         new(this->m_space) typename detail::PolicyDefaultBuilder<Policy>::type;
     }
 
-    AnyContainerBase(const AnyContainerBase &model) = delete;
+    AnyContainerBase(const AnyContainerBase &model) = default;
 
     AnyContainerBase(AnyContainerBase &&moveable) noexcept: SuperContainer(SuperContainer::Token) {
         auto source = moveable.container();
@@ -144,15 +143,9 @@ struct AnyContainerBase:
         new(this->m_space) Implementation(il, std::forward<Args>(args)...);
     }
 
-    /*
-    template<
-        typename OtherPolicy,
-        int = std::enable_if_t<detail::CompatiblePolicy_v<Policy, OtherPolicy>, int>(0)
-    >
-    AnyContainerBase(const AnyContainerBase<OtherPolicy> &): SuperContainer(SuperContainer::Token) ;
-     */
-
     ~AnyContainerBase() { container()->destroy(); }
+
+    AnyContainerBase &operator=(const AnyContainerBase &) = default;
 
     AnyContainerBase &operator=(AnyContainerBase &&moveable) noexcept {
         auto myself = container();
@@ -266,6 +259,7 @@ public:
 protected:
     using TokenType = void (AnyContainerBase::*)();
     constexpr static TokenType Token = nullptr;
+
     AnyContainerBase(TokenType): SuperContainer(SuperContainer::Token) {}
 };
 

@@ -5,9 +5,11 @@
 
 namespace zoo {
 
-template<typename BasePolicy, typename... Extensions>
+template<typename BaseContainer, typename... Extensions>
 struct DerivedVTablePolicy {
-    using ComposedFrom = BasePolicy;
+    using Base = BaseContainer;
+
+    using BasePolicy = typename BaseContainer::Policy;
 
     using MemoryLayout = typename BasePolicy::MemoryLayout;
 

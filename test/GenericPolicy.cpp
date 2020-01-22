@@ -9,33 +9,37 @@ namespace zoo {
 
 using namespace std;
 
+// containers without copy are move-only
 using MoveOnlyPolicy = Policy<void *, Destroy, Move>;
+static_assert(!detail::AffordsCopying<MoveOnlyPolicy>::value);
 using MOAC = AnyContainer<MoveOnlyPolicy>;
-
-namespace dp {
-
-//AnyContainer<DerivedVTablePolicy<MoveOnlyPolicy, Copy>> instance;
-
-}
-
+static_assert(2 * sizeof(void *) == sizeof(MOAC));
+static_assert(!is_copy_constructible_v<MOAC>);
 static_assert(is_nothrow_move_constructible_v<MOAC>);
-//static_assert(!is_copy_constructible_v<MOAC>);
 
+// containers with copy are copyable
+using CopyableNonComposedPolicy = Policy<void *, Destroy, Move, Copy>;
+static_assert(detail::AffordsCopying<CopyableNonComposedPolicy>::value);
+using CopyableNonComposedAC = AnyContainer<CopyableNonComposedPolicy>;
+static_assert(is_copy_constructible_v<CopyableNonComposedAC>);
+static_assert(is_nothrow_move_constructible_v<CopyableNonComposedAC>);
+
+using CopyableAnyContainerBasedPolicy = DerivedVTablePolicy<MOAC, Copy>;
+static_assert(detail::AffordsCopying<CopyableAnyContainerBasedPolicy>::value);
+using DerivedCopyableAC = AnyContainer<CopyableAnyContainerBasedPolicy>;
+static_assert(is_copy_constructible_v<DerivedCopyableAC>);
+static_assert(is_nothrow_move_constructible_v<DerivedCopyableAC>);
+
+// Container compatibility based on policy is not yet implemented
 using LargeMoveOnlyPolicy = Policy<void *[2], Destroy, Move>;
 static_assert(
-    !std::is_constructible_v<zoo::AnyContainerBase<MoveOnlyPolicy>,
-    const zoo::AnyContainerBase<LargeMoveOnlyPolicy> &>
+    !std::is_constructible_v<
+        zoo::AnyContainerBase<MoveOnlyPolicy>,
+        const zoo::AnyContainerBase<LargeMoveOnlyPolicy> &
+    >
 );
 
-using CVTP = Policy<void *, Destroy, Move, Copy>;
-
-struct CanonicalVTableAny {
-    AlignedStorageFor<typename CVTP::MemoryLayout> space_;
-};
-
-static_assert(detail::AffordsCopying<CVTP>::value);
-
-namespace detail { // the traits are correct
+namespace detail { // IsAnyContainer_impl trait
 
 struct Unrelated {};
 static_assert(!IsAnyContainer_impl<Unrelated>::value);
@@ -52,6 +56,8 @@ static_assert(IsAnyContainer_impl<MoacDerivative>::value);
 
 #include <sstream>
 
+/// Builds a type trait that determines if the __VA_ARGS__ is callable with
+/// a const-reference
 #define MAY_CALL_EXPRESSION(name, ...) \
 template<typename, typename = void> \
 struct name: std::false_type {}; \
@@ -76,14 +82,16 @@ std::string to_string(Complex cx) {
     return ostr.str();
 }
 
-static_assert(!HasToString<int>::value);
-static_assert(HasOperatorInsertion<int>::value);
+struct Uninsertable {};
 
-template<typename Container>
-std::string stringize(const void *ptr) {
-    auto downcast = static_cast<const Container *>(ptr);
-    using T = std::decay_t<decltype(*downcast->value())>;
-    auto &t = *downcast->value();
+static_assert(!HasToString<int>::value);
+static_assert(HasToString<Complex>::value);
+static_assert(HasOperatorInsertion<int>::value);
+static_assert(HasOperatorInsertion<Complex>::value);
+static_assert(!HasOperatorInsertion<Uninsertable>::value);
+
+template<typename T>
+std::string stringize(const T &t) {
     if constexpr(HasToString<T>::value) { return to_string(t); }
     else if constexpr(HasOperatorInsertion<T>::value) {
         std::ostringstream ostr;
@@ -91,6 +99,11 @@ std::string stringize(const void *ptr) {
         return ostr.str();
     }
     else return "";
+}
+
+template<typename ConcreteValueManager>
+std::string stringizeAffordanceImplementation(const void *ptr) {
+    return stringize(*static_cast<const ConcreteValueManager *>(ptr)->value());
 }
 
 struct Stringize {
@@ -101,9 +114,12 @@ struct Stringize {
         [](const void *) { return std::string(); }
     };
 
-    template<typename Container>
-    constexpr static inline VTableEntry Operation = { stringize<Container> };
+    template<typename ConcreteValueManager>
+    constexpr static inline VTableEntry Operation = {
+        stringizeAffordanceImplementation<ConcreteValueManager>
+    };
 
+    // No extra state/functions needed in the memory layout
     template<typename Container>
     struct Mixin {};
 
@@ -117,9 +133,11 @@ struct Stringize {
     };
 };
 
-TEST_CASE("Composed Policies") {
-    using ComposedPolicy = zoo::DerivedVTablePolicy<zoo::MoveOnlyPolicy, zoo::Copy>;
+TEST_CASE("Composed Policies", "[type-erasure][any][composed-policy][vtable-policy]") {
+    using MoveOnlyAnyContainer = zoo::AnyContainer<zoo::MoveOnlyPolicy>;
+    using ComposedPolicy = zoo::DerivedVTablePolicy<MoveOnlyAnyContainer, zoo::Copy>;
     using ComposedAC = zoo::AnyContainer<ComposedPolicy>;
+
     SECTION("Derived defaults preserved") {
         ComposedAC defaulted;
         REQUIRE(&ComposedPolicy::DefaultImplementation::Default == defaulted.container()->ptr_);
@@ -130,27 +148,23 @@ TEST_CASE("Composed Policies") {
     }
     SECTION("Compatibility with super container") {
         ComposedAC operational = 34;
-        static_assert(!zoo::detail::AffordsCopying<zoo::MoveOnlyPolicy>::value);
-        static_assert(!std::is_copy_constructible_v<zoo::AnyContainer<zoo::MoveOnlyPolicy>>);
         zoo::AnyContainer<zoo::MoveOnlyPolicy> &moacReference = operational, moac;
         REQUIRE(&ComposedPolicy::Builder<int>::Operations == moacReference.container()->ptr_);
-        ComposedPolicy::DefaultImplementation di, other;
-        static_assert(zoo::detail::AffordsCopying<ComposedPolicy>::value);
         ComposedAC copy = operational;
         REQUIRE(34 == *copy.state<int>());
         moac = std::move(copy);
         REQUIRE(34 == *moac.state<int>());
-        // this line won't compile, exactly as intended: a copiable "any" requires copyability
+        // this line won't compile, exactly as intended: a copyable "any" requires copyability
         //copy = std::move(moac);
     }
 }
 
-TEST_CASE("Ligtests") {
-    //using VTA = zoo::AnyContainer<zoo::CanonicalVTablePolicy>;
+TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-policy][vtable-policy][contract]") {
     using Policy = zoo::Policy<void *, zoo::Destroy, zoo::Move, zoo::Copy>;
+    using Implementations = zoo::GenericPolicy<void *, zoo::Destroy, zoo::Move, zoo::Copy>;
+    static_assert(std::is_same_v<Policy, Implementations::Policy>);
     using VTA = zoo::AnyContainer<Policy>;
     static_assert(std::is_default_constructible_v<VTA>);
-    static_assert(std::is_nothrow_move_constructible_v<VTA>);
 
     SECTION("Destruction") {
         SECTION("Destruction of default constructed") {
@@ -169,6 +183,10 @@ TEST_CASE("Ligtests") {
             REQUIRE(0 == trace);
             {
                 VTA a(std::in_place_type<TracesDestruction>, trace);
+                REQUIRE(
+                    &Implementations::ByValue<TracesDestruction>::Operations ==
+                    a.container()->ptr_
+                );
             }
             REQUIRE(1 == trace);
         }
@@ -180,6 +198,10 @@ TEST_CASE("Ligtests") {
             REQUIRE(0 == trace);
             {
                 VTA a(std::in_place_type<Large>, trace);
+                REQUIRE(
+                    &Implementations::ByReference<Large>::Operations ==
+                    a.container()->ptr_
+                );
             }
             REQUIRE(1 == trace);
         }
@@ -209,18 +231,32 @@ TEST_CASE("Ligtests") {
                 {
                     VTA tmp(std::in_place_type<TracesMoves>, &something);
                     REQUIRE(1 == something);
+                    REQUIRE(
+                        &Implementations::ByValue<TracesMoves>::Operations ==
+                        tmp.container()->ptr_
+                    );
                     a = std::move(tmp);
                 }
-                REQUIRE(1 == something); // tmp if moved does not refer to something
+                REQUIRE(1 == something); // if tmp was not "moved-from" in the
+                // previous scope, then the destruction would have cleared
+                // something
             }
             REQUIRE(0 == something); // a referred to something, cleared
         }
         SECTION("By Reference") {
+            // moving for objects not suitable for the local buffer is
+            // the transfer of the pointer
             struct Big {
                 void *myself_;
                 int *padding_;
                 Big(): myself_(this) {}
             };
+            static_assert(
+                std::is_same_v<
+                    Implementations::ByReference<Big>,
+                    typename Policy::Builder<Big>
+                >
+            );
             VTA a(std::in_place_type<Big>);
             auto originalPlace = a.state<Big>()->myself_;
             VTA other(std::move(a));
@@ -250,36 +286,96 @@ TEST_CASE("Ligtests") {
     }
     SECTION("User affordance") {
         zoo::AnyContainer<
-            zoo::ExtendedAffordancePolicy<
-                zoo::Policy<void *, zoo::Destroy, zoo::Move, Stringize>,
-                Stringize
-            >
+            zoo::Policy<void *, zoo::Destroy, zoo::Move, Stringize>
         > stringizable;
         REQUIRE("" == stringizable.stringize());
         stringizable = 88;
         auto str = stringizable.stringize();
         REQUIRE("88" == stringizable.stringize());
-        Complex c1{0, 1};
-        auto c2 = c1;
-        stringizable = std::move(c2);
-        REQUIRE(to_string(c1) == stringizable.stringize());
+        Complex c{0, 1};
+        stringizable = c;
+        REQUIRE(to_string(c) == stringizable.stringize());
     }
 }
 
+// What follows is work-in-progress
 namespace zoo {
 
-template<std::size_t Pointers, typename Signature>
-using NewZooFunction = AnyContainer<typename GenericPolicy<void *[Pointers], Destroy, Move, CallableViaVTable<Signature>>::Policy>;
+template<std::size_t LocalBufferInPointers, typename Signature>
+using CallableViaVTablePolicy =
+    typename GenericPolicy<
+        void *[LocalBufferInPointers],
+        Destroy, Move, CallableViaVTable<Signature>
+    >::Policy;
 
 template<std::size_t Pointers, typename Signature>
-using NewCopyableFunction = AnyContainer<DerivedVTablePolicy<typename GenericPolicy<void *[Pointers], Destroy, Move, CallableViaVTable<Signature>>::Policy, Copy>>;
+using NewZooFunction = AnyContainer<CallableViaVTablePolicy<Pointers, Signature>>;
+template<std::size_t Pointers, typename Signature>
+using NewCopyableFunction =
+    AnyContainer<DerivedVTablePolicy<NewZooFunction<Pointers, Signature>, Copy>>;
+
+template<typename>
+struct Executor;
+
+template<typename R, typename... As>
+struct Executor<R(As...)> {
+    R (*executor_)(As..., void *) = [](As..., void *) -> R { throw 5; };
+
+    Executor() = default;
+    Executor(R (*ptr)(As..., void *)): executor_(ptr) {}
+};
+
+template<typename>
+struct Function;
+
+template<typename R, typename... As>
+struct Function<R(As...)>: Executor<R(As...)>, AnyContainer<MoveOnlyPolicy> {
+    using ContainerBase = AnyContainer<MoveOnlyPolicy>;
+
+    template<typename A>
+    static R doA(As... args, void *p) {
+        return (*static_cast<Function *>(p)->template state<A>())(args...);
+    }
+
+    Function() = default;
+
+    using ContainerBase::ContainerBase;
+
+    template<typename A>
+    Function(A &&a): Executor<R(As...)>(doA<std::decay_t<A>>), ContainerBase(std::forward<A>(a)) {}
+
+    template<typename... CallArguments>
+    R operator()(CallArguments &&...cas) { return this->executor_(std::forward<CallArguments>(cas)..., this); }
+};
 
 }
 
 TEST_CASE("New zoo function") {
     auto doubler = [&](int a) { return 2.0 * a; };
-    zoo::NewCopyableFunction<2, double(int)> cf = doubler;
-    zoo::NewZooFunction<2, double(int)> di = std::move(cf);
-    REQUIRE(6.0 == di(3));
-    //cf = std::move(di);
+    SECTION("VTable executor") {
+        zoo::NewCopyableFunction<2, double(int)> cf = doubler;
+        static_assert(std::is_copy_constructible_v<zoo::NewCopyableFunction<2, double(int)>>);
+        // notice: a move-only callable reference is bound to a copyable one,
+        // without having to make a new object!
+        zoo::NewZooFunction<2, double(int)> &di = cf;
+        static_assert(!std::is_copy_constructible_v<zoo::NewZooFunction<2, double(int)>>);
+        REQUIRE(6.0 == di(3));
+        // this also works, a move-only has all it needs from a copyable
+        di = std::move(cf);
+        REQUIRE(8.0 == di(4));
+        // the following will *not* compile, as intented:
+        // A copyable container does not know how to copy a move-only thing
+        // so it can't generate what it needs for the affordance of copyability
+        //cf = std::move(di);
+    }
+    SECTION("Executor is instance member Function") {
+        using F = zoo::Function<int(double)>;
+        F f = doubler;
+        //REQUIRE(6.0 == f(3));
+        using CopyableFunctionPolicy = zoo::DerivedVTablePolicy<F, zoo::Copy>;
+        using CF = zoo::AnyContainer<CopyableFunctionPolicy>;
+        CF aCopy = doubler;
+        F &reference = aCopy;
+    }
 }
+

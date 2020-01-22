@@ -105,6 +105,16 @@ struct RTTI {
         }
     };
 
+    template<typename TypeSwitch, typename MemoryLayout>
+    struct Raw {
+        static const std::type_info &type(const void *from) {
+            auto downcast = static_cast<const MemoryLayout *>(from);
+            auto vtable = downcast->ptr_;
+            auto ti = static_cast<const TypeSwitch *>(vtable);
+            return ti();
+        }
+    };
+
     template<typename AnyC>
     struct UserAffordance {
         const std::type_info &type() const noexcept {
