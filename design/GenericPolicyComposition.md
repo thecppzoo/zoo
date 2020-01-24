@@ -30,6 +30,7 @@ The language forces us to make `AnyContainer<ExtendedBasePolicy>` a derived clas
 
 Above we have explained the VTables are compatible.
 
-There is the concept of *type switch* lurking again: the vtable is the type switch in the VTable based policies. The natural way to implement the vtables is to emulate "virtual base classes", since we want the behaviors of the most derived class to influence the resulting object, progressively to the most basic.  However, we want the opposite for the value being held: to build it from the most basic to the most derived, in that way, each layer can naturally add their "construction" bit to the object.
+There is the concept of *type switch* lurking again: the vtable is the type switch in the VTable based policies. The natural way to implement the vtables is to emulate "virtual base classes", since we want the behaviors of the most derived class to influence the resulting object, progressively to the most basic.  However, we want the opposite for the value being held: to build it from the most basic to the most derived, in that way, each layer can naturally add their "construction" bit to the object, but alas, this can not happen because the value managers need to be built from the most derived.
 
-Thus, all of the arguments for construction need to be forwarded to the base container when composing them.
+Thus, all of the containers in the middle need "bypassing", this is accomplished by using a type token
+
