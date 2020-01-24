@@ -107,11 +107,11 @@ struct RTTI {
 
     template<typename TypeSwitch, typename MemoryLayout>
     struct Raw {
-        static const std::type_info &type(const void *from) {
+        static const std::type_info &typeId(const void *from) {
             auto downcast = static_cast<const MemoryLayout *>(from);
-            auto vtable = downcast->ptr_;
-            auto ti = static_cast<const TypeSwitch *>(vtable);
-            return ti();
+            auto ts = static_cast<const TypeSwitch *>(downcast->ptr_);
+            auto vtp = static_cast<const VTableEntry *>(ts);
+            return *vtp->ti;
         }
     };
 
@@ -119,6 +119,11 @@ struct RTTI {
     struct UserAffordance {
         const std::type_info &type() const noexcept {
             return static_cast<const AnyC *>(this)->container()->type();
+        }
+
+        const std::type_info &type2() const noexcept {
+            auto thy = static_cast<const AnyC *>(this);
+            return AnyC::Policy::ExtraAffordances::typeId(thy->container());
         }
     };
 };

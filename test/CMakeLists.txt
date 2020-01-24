@@ -48,7 +48,7 @@ set(
 
 add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
 add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
-add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES} inc/zoo/Any/AnyMovable.hpp inc/zoo/Any/DerivedVTablePolicy.h)
+add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
 add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
 add_executable(
@@ -58,7 +58,7 @@ target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasure
 
 add_executable(algorithm2 $<TARGET_OBJECTS:Catch2Main>)
 target_link_libraries(algorithm2 AlgorithmTest)
-add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main> inc/zoo/DerivedAnyContainer.h inc/zoo/Any/DerivedVTablePolicy_fwd.h inc/zoo/AnyContainer_fwd.h)
+add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main>)
 target_link_libraries(type_erasure TypeErasureTest)
 
 # CMake build : library tests

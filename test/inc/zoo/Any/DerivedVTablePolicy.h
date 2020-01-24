@@ -5,6 +5,19 @@
 
 namespace zoo {
 
+namespace impl {
+
+struct EmptyRawAffordances {};
+
+template<typename, typename = void>
+struct RawAffordances_impl { using type = EmptyRawAffordances; };
+template<typename T>
+struct RawAffordances_impl<T, std::void_t<typename T::ExtraAffordances>> {
+    using type = typename T::ExtraAffordances;
+};
+
+}
+
 template<typename BaseContainer, typename... Extensions>
 struct DerivedVTablePolicy {
     using Base = BaseContainer;
@@ -17,7 +30,7 @@ struct DerivedVTablePolicy {
 
     using TypeSwitch = VTable;
 
-    struct ExtraAffordances: Extensions::template Raw<VTable, MemoryLayout>... {};
+    struct ExtraAffordances: impl::RawAffordances_impl<BasePolicy>::type, Extensions::template Raw<VTable, MemoryLayout>... {};
 
     struct DefaultImplementation: MemoryLayout {
         constexpr static inline VTable Default = {
@@ -26,9 +39,6 @@ struct DerivedVTablePolicy {
         };
 
         DefaultImplementation(): MemoryLayout(&Default) {}
-
-        /// \todo is this needed?
-        using MemoryLayout::MemoryLayout;
     };
 
     template<typename V>
@@ -42,8 +52,13 @@ struct DerivedVTablePolicy {
 
         template<typename... Args>
         Builder(Args &&...args):
+            Builder(&Operations, std::forward<Args>(args)...)
+        {}
+
+        template<typename... Args>
+        Builder(const VTable *ops, Args &&...args):
             Base(
-                static_cast<const typename BasePolicy::VTable *>(&Operations),
+                static_cast<const typename BasePolicy::VTable *>(ops),
                 std::forward<Args>(args)...
             )
         {}

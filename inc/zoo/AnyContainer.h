@@ -63,6 +63,9 @@ struct CompositionChain {
         // by default, move-only
         Base(const Base &) = delete;
         Base &operator=(const Base &) = delete;
+
+        template<typename T>
+        void emplaced(T *) noexcept {}
     };
 };
 
@@ -105,6 +108,7 @@ struct AnyContainerBase:
     AnyContainerBase(Initializer &&initializer): SuperContainer(SuperContainer::Token)  {
         using Implementation = typename Policy::template Builder<Decayed>;
         new(this->m_space) Implementation(std::forward<Initializer>(initializer));
+        SuperContainer::emplaced(state<Decayed>());
     }
 
     template<
@@ -120,6 +124,7 @@ struct AnyContainerBase:
     AnyContainerBase(std::in_place_type_t<ValueType>, Initializers &&...izers): SuperContainer(SuperContainer::Token)  {
         using Implementation = typename Policy::template Builder<Decayed>;
         new(this->m_space) Implementation(std::forward<Initializers>(izers)...);
+        SuperContainer::emplaced(state<std::decay_t<ValueType>>());
     }
 
     template<
@@ -141,6 +146,7 @@ struct AnyContainerBase:
     ): SuperContainer(SuperContainer::Token) {
         using Implementation = typename Policy::template Builder<Decayed>;
         new(this->m_space) Implementation(il, std::forward<Args>(args)...);
+        SuperContainer::emplaced(state<std::decay_t<ValueType>>());
     }
 
     ~AnyContainerBase() { container()->destroy(); }
@@ -200,6 +206,7 @@ protected:
             std::in_place_type<std::decay_t<ValueType>>,
             std::forward<Arguments>(arguments)...
         );
+        SuperContainer::emplaced(state<std::decay_t<ValueType>>());
     }
 
     template<typename ValueType, typename U, typename... Arguments>
@@ -210,6 +217,7 @@ protected:
             il,
             std::forward<Arguments>(args)...
         );
+        SuperContainer::emplaced(state<std::decay_t<ValueType>>());
     }
 
 public:
@@ -261,6 +269,9 @@ protected:
     constexpr static TokenType Token = nullptr;
 
     AnyContainerBase(TokenType): SuperContainer(SuperContainer::Token) {}
+
+    template<typename ValueType>
+    void emplaced(ValueType *ptr) noexcept { SuperContainer::template emplaced(ptr); }
 };
 
 template<typename Policy>

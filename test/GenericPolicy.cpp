@@ -157,6 +157,14 @@ TEST_CASE("Composed Policies", "[type-erasure][any][composed-policy][vtable-poli
         // this line won't compile, exactly as intended: a copyable "any" requires copyability
         //copy = std::move(moac);
     }
+    SECTION("Double composition") {
+        using DCP = zoo::DerivedVTablePolicy<ComposedAC, zoo::RTTI>;
+        using DC = zoo::AnyContainer<DCP>;
+        zoo::DerivedVTablePolicy<
+            zoo::AnyContainer<zoo::GenericPolicy<void *, zoo::Destroy, zoo::Move>::Policy>, zoo::Copy
+        >::VTable *ptr = nullptr;
+        DC a = 4;
+    }
 }
 
 TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-policy][vtable-policy][contract]") {
@@ -325,6 +333,9 @@ struct Executor<R(As...)> {
     Executor(R (*ptr)(As..., void *)): executor_(ptr) {}
 };
 
+template<typename Signature>
+Executor(Signature *) -> Executor<Signature>;
+
 template<typename>
 struct Function;
 
@@ -332,20 +343,39 @@ template<typename R, typename... As>
 struct Function<R(As...)>: Executor<R(As...)>, AnyContainer<MoveOnlyPolicy> {
     using ContainerBase = AnyContainer<MoveOnlyPolicy>;
 
-    template<typename A>
-    static R doA(As... args, void *p) {
-        return (*static_cast<Function *>(p)->template state<A>())(args...);
+    template<typename Target>
+    static R invokeTarget(As... args, void *p) {
+        return (*static_cast<Function *>(p)->template state<Target>())(args...);
     }
 
     Function() = default;
+    Function(const Function &) = default;
+    Function(Function &&) = default;
 
-    using ContainerBase::ContainerBase;
+    template<
+        typename Target,
+        typename D = std::decay_t<Target>,
+        int = std::enable_if_t<!std::is_base_of_v<Function, D>, int>(0)
+    >
+    Function(Target &&a):
+        Executor<R(As...)>(invokeTarget<std::decay_t<Target>>),
+        ContainerBase(std::forward<Target>(a))
+    {}
 
-    template<typename A>
-    Function(A &&a): Executor<R(As...)>(doA<std::decay_t<A>>), ContainerBase(std::forward<A>(a)) {}
+    Function(typename ContainerBase::TokenType):
+        Executor<R(As...)>(nullptr),
+        ContainerBase(ContainerBase::Token)
+    {}
 
     template<typename... CallArguments>
-    R operator()(CallArguments &&...cas) { return this->executor_(std::forward<CallArguments>(cas)..., this); }
+    R operator()(CallArguments &&...cas) {
+        return this->executor_(std::forward<CallArguments>(cas)..., this);
+    }
+
+    template<typename T>
+    void emplaced(T *ptr) noexcept {
+        this->executor_ = invokeTarget<T>;
+    }
 };
 
 }
@@ -368,14 +398,33 @@ TEST_CASE("New zoo function") {
         // so it can't generate what it needs for the affordance of copyability
         //cf = std::move(di);
     }
-    SECTION("Executor is instance member Function") {
+    SECTION("Use instance-affordance Function") {
         using F = zoo::Function<int(double)>;
-        F f = doubler;
-        //REQUIRE(6.0 == f(3));
+        static_assert(std::is_nothrow_move_constructible_v<F>);
+        static_assert(!std::is_copy_constructible_v<F>);
         using CopyableFunctionPolicy = zoo::DerivedVTablePolicy<F, zoo::Copy>;
         using CF = zoo::AnyContainer<CopyableFunctionPolicy>;
-        CF aCopy = doubler;
-        F &reference = aCopy;
+        static_assert(std::is_nothrow_move_constructible_v<CF>);
+        static_assert(std::is_copy_constructible_v<CF>);
+
+        SECTION("Executor is instance member Function") {
+            F f = doubler;
+            CF aCopy = doubler;
+            REQUIRE(14.0 == aCopy(7));
+            F &reference = aCopy;
+        }
+        SECTION("Second nesting") {
+            using RTTI_CF_P = zoo::DerivedVTablePolicy<CF, zoo::RTTI>;
+            using RCF = zoo::AnyContainer<RTTI_CF_P>;
+            using namespace std;
+            static_assert(is_base_of_v<CF, RCF>);
+            static_assert(is_same_v<CF, typename RTTI_CF_P::Base>);
+            static_assert(is_constructible_v<RCF, decltype(doubler)>);
+            static_assert(zoo::detail::AffordsCopying<RTTI_CF_P>::value);
+            RCF withRTTI(std::move(doubler));
+            REQUIRE(2.0 == withRTTI(1));
+            auto &type = withRTTI.type2();
+            REQUIRE(typeid(decltype(doubler)) == type);
+        }
     }
 }
-
