@@ -75,9 +75,9 @@ struct Function<ContainerBase, R(As...)>:
     }
 
     void swap(Function &other) noexcept {
-        auto &base = static_cast<ContainerBase &>(this);
+        auto &base = static_cast<ContainerBase &>(*this);
         base.swap(other);
-        auto &executor = static_cast<Executor<R(As...)> &>(this);
+        auto &executor = static_cast<Executor<R(As...)> &>(*this);
         executor.swap(other);
     }
 
@@ -86,6 +86,11 @@ struct Function<ContainerBase, R(As...)>:
         this->executor_ = invokeTarget<T>;
     }
 };
+
+template<typename C, typename Signature>
+void swap(Function<C, Signature> &f1, Function<C, Signature> &f2) {
+    f1.swap(f2);
+}
 
 }
 

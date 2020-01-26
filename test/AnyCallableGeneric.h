@@ -2,10 +2,10 @@
 
 #include <catch2/catch.hpp>
 
-template<typename ErasureProvider>
+template<template<typename> class Functor>
 struct CallableTests {
     template<typename Signature>
-    using ZFunction = zoo::AnyCallable<ErasureProvider, Signature>;
+    using ZFunction = Functor<Signature>;
 
     inline static void execute();
 };
@@ -23,8 +23,8 @@ struct CountsCopiesAndMoves {
     CountsCopiesAndMoves(CountsCopiesAndMoves &&) noexcept { ++moves; }
 };
 
-template<typename ErasureProvider>
-void CallableTests<ErasureProvider>::execute() {
+template<template<typename> class Functor>
+void CallableTests<Functor>::execute() {
     SECTION("Default throws bad_function_call") {
         ZFunction<void()> defaultConstructed;
         REQUIRE_THROWS_AS(defaultConstructed(), std::bad_function_call);
