@@ -49,6 +49,12 @@ struct Move {
             auto downcast = static_cast<Container *>(this);
             downcast->template vTable<Move>()->mp(to, downcast);
         }
+
+        void moveAndDestroy(void *to) noexcept {
+            auto downcast = static_cast<Container *>(this);
+            downcast->template vTable<Move>()->mp(to, downcast);
+            downcast->template vTable<Destroy>()->dp(downcast);
+        }
     };
 
     template<typename AnyC>
@@ -102,6 +108,10 @@ struct RTTI {
         const std::type_info &type() const noexcept {
             auto downcast = static_cast<const Container *>(this);
             return *downcast->template vTable<RTTI>()->ti;
+        }
+
+        bool nonEmpty() const noexcept {
+            return typeid(void) != type();
         }
     };
 
@@ -219,6 +229,7 @@ struct GenericPolicy {
         };
 
         Container(): VTHolder(&Default) {}
+
         using VTHolder::VTHolder;
     };
 
@@ -258,6 +269,8 @@ struct GenericPolicy {
         {
             this->space_.template build<V>(std::forward<Args>(args)...);
         }
+
+        constexpr static auto IsReference = std::false_type::value;
     };
 
     template<typename V>
@@ -302,6 +315,7 @@ struct GenericPolicy {
             ByReference(&Operations, std::forward<Args>(args)...)
         {}
 
+        constexpr static auto IsReference = std::true_type::value;
     };
 
     struct Policy {

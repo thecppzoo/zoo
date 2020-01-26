@@ -1,3 +1,5 @@
+#include "zoo/FundamentalOperationTracing.h"
+
 #include "zoo/FunctionPolicy.h"
 
 #include "catch2/catch.hpp"
@@ -37,6 +39,19 @@ TEST_CASE("New zoo function") {
             REQUIRE(14.0 == aCopy(7));
             F &reference = aCopy;
             REQUIRE(12.0 == reference(6));
+            SECTION("Swapping") {
+                int trace1 = 2, trace2 = 3;
+                auto callable1 = [&](int arg) {
+                    zoo::TracesMoves tm(&trace1);
+                    return *tm.resource_ * arg * 2.0;
+                };
+                auto callable2 = [&](int arg) {
+                    zoo::TracesMoves tm(&trace2);
+                    return *tm.resource_ * arg * 2.0;
+                };
+                F f1(callable1), f2(callable2);
+                swap(f1, f2);
+            }
         }
         SECTION("Second nesting") {
             using RTTI_CF_P = zoo::DerivedVTablePolicy<CF, zoo::RTTI>;

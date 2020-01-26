@@ -1,12 +1,17 @@
-#include "zoo/FunctionPolicy.h"
+#include "GenericAnyTests.h"
 
 #include "zoo/FundamentalOperationTracing.h"
 
 #include "zoo/Any/DerivedVTablePolicy.h"
-#include "zoo/AnyContainer.h"
 
 #include <utility>
 #include <type_traits>
+
+TEST_CASE("VTablePolicy tests, old", "[type-erasure][AnyContainer][any][vtable]") {
+    using GP =
+        zoo::Policy<void *, zoo::Destroy, zoo::Move, zoo::Copy, zoo::RTTI>;
+    testAnyImplementation<zoo::AnyContainer<GP>>();
+}
 
 namespace zoo {
 

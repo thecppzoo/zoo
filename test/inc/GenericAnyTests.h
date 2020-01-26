@@ -64,7 +64,8 @@ void testAnyImplementation() {
         >, "the move-assignment operator must return the container reference"
     );
     static_assert(
-        noexcept(std::declval<ExtAny &>() = std::declval<ExtAny &&>())
+        noexcept(std::declval<ExtAny &>() = std::declval<ExtAny &&>()),
+        "move-assignment of an any container must be noexcept"
     );
 
     SECTION("Value Destruction") {
@@ -88,7 +89,8 @@ void testAnyImplementation() {
     SECTION("Referential Semantics - Size") {
         ExtAny v{Big{}};
         REQUIRE(zoo::isRuntimeReference<Big>(v));
-        REQUIRE(v.has_value());
+        auto hasValue = v.has_value();
+        REQUIRE(hasValue);
     }
     SECTION("Copy constructor -- Referential") {
         Big b = { 3.14159265, 2.7182 };
@@ -119,8 +121,13 @@ void testAnyImplementation() {
         auto original = zoo::anyContainerCast<Big>(&movingFrom);
         ExtAny movingTo{std::move(movingFrom)};
         auto afterMove = zoo::anyContainerCast<Big>(&movingTo);
-        CHECK(!movingFrom.has_value());
         REQUIRE(original == afterMove);
+        SECTION("Moved-from referential may be assigned") {
+            movingFrom = 5; // may be assigned
+            REQUIRE(movingFrom.has_value());
+            REQUIRE(typeid(int) == movingFrom.type());
+            CHECK(5 == *zoo::anyContainerCast<int>(&movingFrom));
+        }
     }
     SECTION("Initializer constructor -- copying") {
         Moves value;
