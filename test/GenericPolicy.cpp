@@ -1,3 +1,5 @@
+#include "zoo/FunctionPolicy.h"
+
 #include "zoo/Any/DerivedVTablePolicy.h"
 #include "zoo/AnyContainer.h"
 
@@ -305,80 +307,6 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
     }
 }
 
-// What follows is work-in-progress
-namespace zoo {
-
-template<std::size_t LocalBufferInPointers, typename Signature>
-using CallableViaVTablePolicy =
-    typename GenericPolicy<
-        void *[LocalBufferInPointers],
-        Destroy, Move, CallableViaVTable<Signature>
-    >::Policy;
-
-template<std::size_t Pointers, typename Signature>
-using NewZooFunction = AnyContainer<CallableViaVTablePolicy<Pointers, Signature>>;
-template<std::size_t Pointers, typename Signature>
-using NewCopyableFunction =
-    AnyContainer<DerivedVTablePolicy<NewZooFunction<Pointers, Signature>, Copy>>;
-
-template<typename>
-struct Executor;
-
-template<typename R, typename... As>
-struct Executor<R(As...)> {
-    R (*executor_)(As..., void *) = [](As..., void *) -> R { throw 5; };
-
-    Executor() = default;
-    Executor(R (*ptr)(As..., void *)): executor_(ptr) {}
-};
-
-template<typename Signature>
-Executor(Signature *) -> Executor<Signature>;
-
-template<typename>
-struct Function;
-
-template<typename R, typename... As>
-struct Function<R(As...)>: Executor<R(As...)>, AnyContainer<MoveOnlyPolicy> {
-    using ContainerBase = AnyContainer<MoveOnlyPolicy>;
-
-    template<typename Target>
-    static R invokeTarget(As... args, void *p) {
-        return (*static_cast<Function *>(p)->template state<Target>())(args...);
-    }
-
-    Function() = default;
-    Function(const Function &) = default;
-    Function(Function &&) = default;
-
-    template<
-        typename Target,
-        typename D = std::decay_t<Target>,
-        int = std::enable_if_t<!std::is_base_of_v<Function, D>, int>(0)
-    >
-    Function(Target &&a):
-        Executor<R(As...)>(invokeTarget<std::decay_t<Target>>),
-        ContainerBase(std::forward<Target>(a))
-    {}
-
-    Function(typename ContainerBase::TokenType):
-        Executor<R(As...)>(nullptr),
-        ContainerBase(ContainerBase::Token)
-    {}
-
-    template<typename... CallArguments>
-    R operator()(CallArguments &&...cas) {
-        return this->executor_(std::forward<CallArguments>(cas)..., this);
-    }
-
-    template<typename T>
-    void emplaced(T *ptr) noexcept {
-        this->executor_ = invokeTarget<T>;
-    }
-};
-
-}
-
 TEST_CASE("New zoo function") {
     auto doubler = [&](int a) { return 2.0 * a; };
     SECTION("VTable executor") {
@@ -398,7 +326,7 @@ TEST_CASE("New zoo function") {
         //cf = std::move(di);
     }
     SECTION("Use instance-affordance Function") {
-        using F = zoo::Function<int(double)>;
+        using F = zoo::Function<void *, int(double)>;
         static_assert(std::is_nothrow_move_constructible_v<F>);
         static_assert(!std::is_copy_constructible_v<F>);
         using CopyableFunctionPolicy = zoo::DerivedVTablePolicy<F, zoo::Copy>;
