@@ -29,6 +29,10 @@ struct Executor<R(As...)> {
 
     Executor() = default;
     Executor(R (*ptr)(As..., void *)): executor_(ptr) {}
+
+    void swap(Executor &other) noexcept {
+        std::swap(*this, other);
+    }
 };
 
 template<typename Signature>
@@ -37,11 +41,10 @@ Executor(Signature *) -> Executor<Signature>;
 template<typename, typename>
 struct Function;
 
-template<typename ModelType, typename R, typename... As>
-struct Function<ModelType, R(As...)>: Executor<R(As...)>, AnyContainer<Policy<ModelType, Destroy, Move>> {
-    using ModelPolicy = Policy<ModelType, Destroy, Move>;
-    using ContainerBase = AnyContainer<ModelPolicy>;
-
+template<typename ContainerBase, typename R, typename... As>
+struct Function<ContainerBase, R(As...)>:
+    Executor<R(As...)>, ContainerBase
+{
     template<typename Target>
     static R invokeTarget(As... args, void *p) {
         return (*static_cast<Function *>(p)->template state<Target>())(args...);
@@ -69,6 +72,13 @@ struct Function<ModelType, R(As...)>: Executor<R(As...)>, AnyContainer<Policy<Mo
     template<typename... CallArguments>
     R operator()(CallArguments &&...cas) {
         return this->executor_(std::forward<CallArguments>(cas)..., this);
+    }
+
+    void swap(Function &other) noexcept {
+        auto &base = static_cast<ContainerBase &>(this);
+        base.swap(other);
+        auto &executor = static_cast<Executor<R(As...)> &>(this);
+        executor.swap(other);
     }
 
     template<typename T>

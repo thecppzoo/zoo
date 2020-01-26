@@ -21,7 +21,9 @@ TEST_CASE("New zoo function") {
         //cf = std::move(di);
     }
     SECTION("Use instance-affordance Function") {
-        using F = zoo::Function<void *, int(double)>;
+        using MOP = zoo::Policy<void *, zoo::Destroy, zoo::Move>;
+        using MOAC = zoo::AnyContainer<MOP>;
+        using F = zoo::Function<MOAC, int(double)>;
         static_assert(std::is_nothrow_move_constructible_v<F>);
         static_assert(!std::is_copy_constructible_v<F>);
         using CopyableFunctionPolicy = zoo::DerivedVTablePolicy<F, zoo::Copy>;
@@ -34,6 +36,7 @@ TEST_CASE("New zoo function") {
             CF aCopy = doubler;
             REQUIRE(14.0 == aCopy(7));
             F &reference = aCopy;
+            REQUIRE(12.0 == reference(6));
         }
         SECTION("Second nesting") {
             using RTTI_CF_P = zoo::DerivedVTablePolicy<CF, zoo::RTTI>;

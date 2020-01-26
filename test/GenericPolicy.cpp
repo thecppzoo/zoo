@@ -1,5 +1,7 @@
 #include "zoo/FunctionPolicy.h"
 
+#include "zoo/FundamentalOperationTracing.h"
+
 #include "zoo/Any/DerivedVTablePolicy.h"
 #include "zoo/AnyContainer.h"
 
@@ -181,31 +183,21 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
         }
         int trace = 0;
 
-        struct TracesDestruction {
-            int &trace_;
-
-            TracesDestruction(int &trace): trace_(trace) {}
-            ~TracesDestruction() { trace_ = 1; }
-        };
-
         SECTION("By value") {
             REQUIRE(0 == trace);
             {
-                VTA a(std::in_place_type<TracesDestruction>, trace);
+                VTA a(std::in_place_type<zoo::TracesDestruction>, trace);
                 REQUIRE(
-                    &Implementations::ByValue<TracesDestruction>::Operations ==
+                    &Implementations::ByValue<zoo::TracesDestruction>::Operations ==
                     a.container()->ptr_
                 );
             }
             REQUIRE(1 == trace);
         }
         SECTION("By reference") {
-            struct Large: TracesDestruction {
-                using TracesDestruction::TracesDestruction;
-                double whatever[3];
-            };
             REQUIRE(0 == trace);
             {
+                using Large = zoo::LargeTracesDestruction;
                 VTA a(std::in_place_type<Large>, trace);
                 REQUIRE(
                     &Implementations::ByReference<Large>::Operations ==
@@ -216,32 +208,15 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
         }
     }
     SECTION("Moving") {
-        struct TracesMoves {
-            int *resource_;
-
-            TracesMoves(int *p): resource_(p) {}
-
-            TracesMoves(const TracesMoves &) {
-                throw std::runtime_error("unreachable called");
-            }
-
-            TracesMoves(TracesMoves &&m) noexcept: resource_(m.resource_) {
-                m.resource_ = nullptr;
-            }
-
-            ~TracesMoves() {
-                if(resource_) { *resource_ = 0; }
-            }
-        };
         int something = 1;
         SECTION("By Value") {
             {
                 VTA a;
                 {
-                    VTA tmp(std::in_place_type<TracesMoves>, &something);
+                    VTA tmp(std::in_place_type<zoo::TracesMoves>, &something);
                     REQUIRE(1 == something);
                     REQUIRE(
-                        &Implementations::ByValue<TracesMoves>::Operations ==
+                        &Implementations::ByValue<zoo::TracesMoves>::Operations ==
                         tmp.container()->ptr_
                     );
                     a = std::move(tmp);
