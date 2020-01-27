@@ -28,10 +28,35 @@ struct Destroy {
             auto downcast = static_cast<Container *>(this);
             downcast->template vTable<Destroy>()->dp(downcast);
         }
+
+        template<typename Manager>
+        bool holds() const noexcept {
+            auto downcast = static_cast<const Container *>(this);
+            return
+                Operation<Manager>.dp ==
+                    downcast->template vTable<Destroy>()->dp;
+        }
     };
 
     template<typename AnyC>
-    struct UserAffordance {};
+    struct UserAffordance {
+        template<typename T>
+        bool holds() const noexcept {
+            return
+                static_cast<const AnyC *>(this)->
+                    container()->
+                        template holds<
+                            typename AnyC::Policy::template Builder<T>
+                        >();
+        }
+
+        bool isDefault() const noexcept {
+            return
+                noOp ==
+                    static_cast<const AnyC *>(this)->
+                        container()->template vTable<Destroy>()->dp;
+        }
+    };
 };
 
 struct Move {

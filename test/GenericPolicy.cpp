@@ -148,16 +148,15 @@ TEST_CASE("Composed Policies", "[type-erasure][any][composed-policy][vtable-poli
 
     SECTION("Derived defaults preserved") {
         ComposedAC defaulted;
-        REQUIRE(&ComposedPolicy::DefaultImplementation::Default == defaulted.container()->ptr_);
+        REQUIRE(defaulted.isDefault());
     }
     SECTION("Operational") {
         ComposedAC operational = 34;
-        REQUIRE(&ComposedPolicy::Builder<int>::Operations == operational.container()->ptr_);
+        REQUIRE(operational.holds<int>());
     }
     SECTION("Compatibility with super container") {
         ComposedAC operational = 34;
         zoo::AnyContainer<zoo::MoveOnlyPolicy> &moacReference = operational, moac;
-        REQUIRE(&ComposedPolicy::Builder<int>::Operations == moacReference.container()->ptr_);
         ComposedAC copy = operational;
         REQUIRE(34 == *copy.state<int>());
         moac = std::move(copy);
@@ -192,10 +191,11 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
             REQUIRE(0 == trace);
             {
                 VTA a(std::in_place_type<zoo::TracesDestruction>, trace);
-                REQUIRE(
-                    &Implementations::ByValue<zoo::TracesDestruction>::Operations ==
-                    a.container()->ptr_
+                static_assert(
+                    !Policy::Builder<zoo::TracesDestruction>::IsReference,
+                    "This is mean to test local-buffer values"
                 );
+                REQUIRE(a.holds<zoo::TracesDestruction>());
             }
             REQUIRE(1 == trace);
         }
@@ -203,11 +203,12 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
             REQUIRE(0 == trace);
             {
                 using Large = zoo::LargeTracesDestruction;
-                VTA a(std::in_place_type<Large>, trace);
-                REQUIRE(
-                    &Implementations::ByReference<Large>::Operations ==
-                    a.container()->ptr_
+                static_assert(
+                    Policy::Builder<Large>::IsReference,
+                    "This is mean to test a heap value manager"
                 );
+                VTA a(std::in_place_type<Large>, trace);
+                REQUIRE(a.holds<Large>());
             }
             REQUIRE(1 == trace);
         }
@@ -220,10 +221,11 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
                 {
                     VTA tmp(std::in_place_type<zoo::TracesMoves>, &something);
                     REQUIRE(1 == something);
-                    REQUIRE(
-                        &Implementations::ByValue<zoo::TracesMoves>::Operations ==
-                        tmp.container()->ptr_
+                    static_assert(
+                        !Policy::Builder<zoo::TracesMoves>::IsReference,
+                        "This should test heap-value-manager"
                     );
+                    REQUIRE(tmp.holds<zoo::TracesMoves>());
                     a = std::move(tmp);
                 }
                 REQUIRE(1 == something); // if tmp was not "moved-from" in the
