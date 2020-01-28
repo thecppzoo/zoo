@@ -1,6 +1,36 @@
 #include "GenericAnyTests.h"
 
 #include <zoo/ConverterAny.h>
+#include <zoo/AlignedStorage.h>
+
+struct PolymorphicBase {
+    virtual ~PolymorphicBase() {};
+    virtual int polymorphic();
+};
+
+struct PolymorphicDerived: PolymorphicBase {
+    int polymorphic() override {
+        new(this) PolymorphicBase;
+        return 1;
+    }
+};
+
+int PolymorphicBase::polymorphic() {
+    new(this) PolymorphicDerived;
+    return 0;
+}
+
+TEST_CASE("No need for launder") {
+    PolymorphicBase p;
+    auto total = p.polymorphic();
+    total += p.polymorphic(); // this call is undefined behavior
+    CHECK(0 == total);
+    zoo::AlignedStorageFor<PolymorphicBase> asfpb;
+    asfpb.build<PolymorphicBase>();
+    total = asfpb.as<PolymorphicBase>()->polymorphic();
+    total += asfpb.as<PolymorphicBase>()->polymorphic();
+    CHECK(1 == total);
+}
 
 TEST_CASE("IAnyContainer") {
     using namespace zoo;
