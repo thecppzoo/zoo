@@ -5,7 +5,23 @@
 
 #include "zoo/AnyContainer.h"
 
+#include <functional>
+
 namespace zoo {
+
+namespace impl {
+
+template<typename, typename, typename = void>
+struct MayBeCalled: std::false_type {};
+
+template<typename R, typename... As, typename Target>
+struct MayBeCalled<
+        #define PP_INVOCATION_DECLVAL decltype(std::declval<Target &>()(std::declval<As>()...))
+    R(As...), Target, std::void_t<PP_INVOCATION_DECLVAL>
+>: std::conjunction<std::is_constructible<R, PP_INVOCATION_DECLVAL>> {};
+        #undef PP_INVOCATION_DECLVAL
+
+}
 
 template<std::size_t LocalBufferInPointers, typename Signature>
 using CallableViaVTablePolicy =
@@ -23,11 +39,20 @@ using NewCopyableFunction =
 template<typename>
 struct Executor;
 
+struct bad_function_call: std::bad_function_call {
+    using std::bad_function_call::bad_function_call;
+};
+
 template<typename R, typename... As>
 struct Executor<R(As...)> {
-    R (*executor_)(As..., void *) = [](As..., void *) -> R { throw 5; };
+    constexpr static R (*DefaultExecutor)(As..., void *) =
+        [](As..., void *) -> R {
+            throw bad_function_call();
+        };
 
-    Executor() = default;
+    R (*executor_)(As..., void *);
+
+    Executor(): executor_(DefaultExecutor) {}
     Executor(R (*ptr)(As..., void *)): executor_(ptr) {}
 
     void swap(Executor &other) noexcept {
@@ -54,19 +79,46 @@ struct Function<ContainerBase, R(As...)>:
     Function(const Function &) = default;
     Function(Function &&) = default;
 
+protected:
+    using Ex = Executor<R(As...)>;
+
+    Function(typename ContainerBase::TokenType):
+        Ex(nullptr),
+        ContainerBase(ContainerBase::Token)
+    {}
+    Function(typename ContainerBase::TokenType, std::nullptr_t):
+        ContainerBase(ContainerBase::Token)
+    {}
+    Function(typename ContainerBase::TokenType, Function &&f) noexcept:
+        Ex(f.ptr_),
+        ContainerBase(ContainerBase::Token, std::move(f))
+    {}
+    Function(typename ContainerBase::TokenType, const Function &f):
+        Ex(f.ptr_),
+        ContainerBase(ContainerBase::Token, f)
+    {}
+
+    template<typename T>
+    void emplaced(T *ptr) noexcept {
+        this->executor_ = invokeTarget<T>;
+    }
+
+public:
+    Function(std::nullptr_t): Function() {}
+
     template<
         typename Target,
         typename D = std::decay_t<Target>,
-        int = std::enable_if_t<!std::is_base_of_v<Function, D>, int>(0)
+        int =
+            std::enable_if_t<
+                !std::is_base_of_v<Function, D> &&
+                    impl::MayBeCalled<R(As...), D>::value,
+                int
+            >(0)
     >
     Function(Target &&a):
         Executor<R(As...)>(invokeTarget<std::decay_t<Target>>),
         ContainerBase(std::forward<Target>(a))
-    {}
-
-    Function(typename ContainerBase::TokenType):
-        Executor<R(As...)>(nullptr),
-        ContainerBase(ContainerBase::Token)
     {}
 
     template<typename... CallArguments>
@@ -79,11 +131,6 @@ struct Function<ContainerBase, R(As...)>:
         base.swap(other);
         auto &executor = static_cast<Executor<R(As...)> &>(*this);
         executor.swap(other);
-    }
-
-    template<typename T>
-    void emplaced(T *ptr) noexcept {
-        this->executor_ = invokeTarget<T>;
     }
 };
 

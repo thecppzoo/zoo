@@ -17,6 +17,37 @@ namespace zoo {
 
 using namespace std;
 
+namespace derived_defaulted_is_not_constructible_if_base_not_constructible {
+
+template<typename T>
+struct Base {
+    T t;
+
+    Base() = default;
+    Base(Base &&) = default;
+    Base(const Base &) = delete;
+};
+
+template<typename T>
+struct Derived: Base<T> {
+    Derived() = default;
+    Derived(Derived &&) = default;
+    Derived(const Derived &) = default;
+};
+
+static_assert(!std::is_copy_constructible_v<Derived<int>>);
+
+template<typename T>
+struct D2: Base<T> {
+    D2() = default;
+    D2(D2 &&) = default;
+    D2(const D2 &);
+};
+static_assert(std::is_copy_constructible_v<D2<int>>);
+
+}
+
+
 // containers without copy are move-only
 using MoveOnlyPolicy = Policy<void *, Destroy, Move>;
 static_assert(!detail::AffordsCopying<MoveOnlyPolicy>::value);
@@ -218,6 +249,7 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
         SECTION("By Value") {
             {
                 VTA a;
+                REQUIRE(a.isDefault());
                 {
                     VTA tmp(std::in_place_type<zoo::TracesMoves>, &something);
                     REQUIRE(1 == something);
@@ -228,7 +260,7 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
                     REQUIRE(tmp.holds<zoo::TracesMoves>());
                     a = std::move(tmp);
                 }
-                REQUIRE(1 == something); // if tmp was not "moved-from" in the
+                CHECK(1 == something); // if tmp was not "moved-from" in the
                 // previous scope, then the destruction would have cleared
                 // something
             }
