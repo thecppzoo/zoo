@@ -55,17 +55,23 @@ struct CompositionChain {
     struct Base {
         using TokenType = void (Base::*)();
         constexpr static TokenType Token = nullptr;
-        Base(TokenType) noexcept {}
 
-        alignas(alignof(typename Policy::MemoryLayout))
-        char m_space[sizeof(typename Policy::MemoryLayout)];
+        Base(TokenType) noexcept {}
+        Base(TokenType, std::nullptr_t) noexcept {}
+        Base(TokenType, Base &&) noexcept {}
+        Base(TokenType, const Base &) {}
 
         // by default, move-only
         Base(const Base &) = delete;
-        Base &operator=(const Base &) = delete;
+
+        Base &operator=(Base &&) noexcept { return *this; }
+        Base &operator=(const Base &) { return *this; }
 
         template<typename T>
         void emplaced(T *) noexcept {}
+
+        alignas(alignof(typename Policy::MemoryLayout))
+        char m_space[sizeof(typename Policy::MemoryLayout)];
     };
 };
 
@@ -84,13 +90,18 @@ struct AnyContainerBase:
     using Container = typename Policy::MemoryLayout;
     constexpr static auto Copyable = detail::AffordsCopying<Policy>::value;
 
-    AnyContainerBase() noexcept: SuperContainer(SuperContainer::Token) {
+    AnyContainerBase() noexcept:
+        SuperContainer(SuperContainer::Token, nullptr)
+    {
         new(this->m_space) typename detail::PolicyDefaultBuilder<Policy>::type;
     }
 
-    AnyContainerBase(const AnyContainerBase &model) = default;
-
-    AnyContainerBase(AnyContainerBase &&moveable) noexcept: SuperContainer(SuperContainer::Token) {
+    AnyContainerBase(AnyContainerBase &&moveable) noexcept:
+        SuperContainer(
+            SuperContainer::Token,
+            static_cast<SuperContainer &&>(moveable)
+        )
+    {
         auto source = moveable.container();
         source->move(container());
     }
@@ -105,7 +116,9 @@ struct AnyContainerBase:
             int
         > = 0
     >
-    AnyContainerBase(Initializer &&initializer): SuperContainer(SuperContainer::Token)  {
+    AnyContainerBase(Initializer &&initializer):
+        SuperContainer(SuperContainer::Token)
+    {
         using Implementation = typename Policy::template Builder<Decayed>;
         new(this->m_space) Implementation(std::forward<Initializer>(initializer));
         SuperContainer::emplaced(state<Decayed>());
@@ -151,9 +164,10 @@ struct AnyContainerBase:
 
     ~AnyContainerBase() { container()->destroy(); }
 
-    AnyContainerBase &operator=(const AnyContainerBase &) = default;
-
     AnyContainerBase &operator=(AnyContainerBase &&moveable) noexcept {
+        static_cast<SuperContainer &>(*this) =
+            //static_cast<SuperContainer &&>(moveable);
+            std::move(static_cast<SuperContainer &>(moveable));
         auto myself = container();
         myself->destroy();
         moveable.container()->move(myself);
@@ -268,7 +282,18 @@ protected:
     using TokenType = void (AnyContainerBase::*)();
     constexpr static TokenType Token = nullptr;
 
-    AnyContainerBase(TokenType): SuperContainer(SuperContainer::Token) {}
+    AnyContainerBase(TokenType) noexcept:
+        SuperContainer(SuperContainer::Token)
+    {}
+    AnyContainerBase(TokenType, std::nullptr_t) noexcept:
+        SuperContainer(SuperContainer::Token, nullptr)
+    {}
+    AnyContainerBase(TokenType, AnyContainerBase &&source) noexcept:
+        SuperContainer(SuperContainer::Token, std::move(source))
+    {}
+    AnyContainerBase(TokenType, const AnyContainerBase &model):
+        SuperContainer(SuperContainer::Token, model)
+    {}
 
     template<typename ValueType>
     void emplaced(ValueType *ptr) noexcept { SuperContainer::template emplaced(ptr); }
@@ -280,7 +305,9 @@ struct AnyCopyable: AnyContainerBase<Policy> {
 
     AnyCopyable(AnyCopyable &&) = default;
 
-    AnyCopyable(const AnyCopyable &model): Base(Base::Token) {
+    AnyCopyable(const AnyCopyable &model):
+        Base(Base::Token, model)
+    {
         auto source = model.container();
         if constexpr(detail::MemoryLayoutHasCopy<Policy>::value) {
             source->copy(this->container());
@@ -290,7 +317,10 @@ struct AnyCopyable: AnyContainerBase<Policy> {
         }
     }
 
+    AnyCopyable &operator=(AnyCopyable &&) = default;
+
     AnyCopyable &operator=(const AnyCopyable &model) {
+        static_cast<typename Base::SuperContainer &>(*this) = model;
         auto myself = this->container();
         myself->destroy();
         try {
@@ -301,8 +331,6 @@ struct AnyCopyable: AnyContainerBase<Policy> {
         }
         return *this;
     }
-
-    AnyCopyable &operator=(AnyCopyable &&) = default;
 
     using Base::Base;
     using Base::operator=;

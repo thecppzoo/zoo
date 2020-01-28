@@ -4,6 +4,17 @@
 
 #include "catch2/catch.hpp"
 
+namespace zoo {
+
+static_assert(impl::MayBeCalled<double(char *, int), int(*)(void *, int)>::value);
+static_assert(
+    !impl::MayBeCalled<char *(int), void (*)(int)>::value,
+    "A void * is not convertible to char *"
+);
+static_assert(impl::MayBeCalled<void *(), char *(*)()>::value);
+
+}
+
 TEST_CASE("New zoo function") {
     auto doubler = [&](int a) { return 2.0 * a; };
     SECTION("VTable executor") {
@@ -41,16 +52,30 @@ TEST_CASE("New zoo function") {
             REQUIRE(12.0 == reference(6));
             SECTION("Swapping") {
                 int trace1 = 2, trace2 = 3;
-                auto callable1 = [&](int arg) {
-                    zoo::TracesMoves tm(&trace1);
+                auto callable1 = [tm = zoo::TracesMoves(&trace1)](int arg) {
                     return *tm.resource_ * arg * 2.0;
                 };
-                auto callable2 = [&](int arg) {
-                    zoo::TracesMoves tm(&trace2);
-                    return *tm.resource_ * arg * 2.0;
+                auto callable2 = [tm = zoo::TracesMoves(&trace2)](int arg) {
+                    return *tm.resource_ * arg * 3.0;
                 };
-                F f1(callable1), f2(callable2);
-                swap(f1, f2);
+                REQUIRE(4 == callable1(1));
+                REQUIRE(9 == callable2(1));
+                { // the following block proves only moves are used in swap
+                    F f1(std::move(callable1)), f2(std::move(callable2));
+                    REQUIRE(4 == f1(1));
+                    REQUIRE(9 == f2(1));
+                    swap(f1, f2);
+                    CHECK(9 == f1(1));
+                    CHECK(4 == f2(1));
+                }
+                REQUIRE(0 == trace1);
+                REQUIRE(0 == trace2);
+                SECTION("Copiable swap") {
+                    CF empty;
+                    CF doubles(doubler);
+                    REQUIRE_THROWS_AS(empty(33), zoo::bad_function_call);
+                    REQUIRE(6.0 == doubles(3));
+                }
             }
         }
         SECTION("Second nesting") {
