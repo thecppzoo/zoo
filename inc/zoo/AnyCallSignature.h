@@ -13,15 +13,15 @@ namespace zoo {
 
 class TypeToken {};
 
-template<typename TypeErasure>
-struct AnyCallSignature:
-    protected AnyCallable<TypeErasure, TypeToken(TypeToken)>
+template<template<typename> class Fun>
+struct AnyCallingSignature:
+    protected Fun<TypeToken(TypeToken)>
 {
-    AnyCallSignature() = default;
+    AnyCallingSignature() = default;
 
     template<typename S, typename... Args>
-    #define PP_ZOO_CONSTRUCTION_EXPR AnyCallable<TypeErasure, S>(std::forward<Args>(args)...)
-    AnyCallSignature(std::in_place_type_t<S>, Args &&...args)
+    #define PP_ZOO_CONSTRUCTION_EXPR Fun<S>(std::forward<Args>(args)...)
+    AnyCallingSignature(std::in_place_type_t<S>, Args &&...args)
         noexcept(noexcept(PP_ZOO_CONSTRUCTION_EXPR))
     {
         new(this) PP_ZOO_CONSTRUCTION_EXPR;
@@ -29,10 +29,20 @@ struct AnyCallSignature:
     }
 
     template<typename Signature>
-    AnyCallable<TypeErasure, Signature> &as() {
-        return reinterpret_cast<AnyCallable<TypeErasure, Signature> &>(*this);
+    Fun<Signature> &as() {
+        return reinterpret_cast<Fun<Signature> &>(*this);
     }
 };
+
+template<typename TypeErasure>
+struct AnyCallableProjector {
+    template<typename Signature>
+    using projection = AnyCallable<TypeErasure, Signature>;
+};
+
+template<typename TypeErasure>
+using AnyCallSignature =
+    AnyCallingSignature<AnyCallableProjector<TypeErasure>::template projection>;
 
 }
 
