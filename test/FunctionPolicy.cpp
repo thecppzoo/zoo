@@ -1,3 +1,4 @@
+#include <zoo/AnyCallSignature.h>
 #include "zoo/FundamentalOperationTracing.h"
 
 #include "zoo/FunctionPolicy.h"
@@ -15,7 +16,7 @@ static_assert(impl::MayBeCalled<void *(), char *(*)()>::value);
 
 }
 
-TEST_CASE("New zoo function") {
+TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]") {
     auto doubler = [&](int a) { return 2.0 * a; };
     SECTION("VTable executor") {
         zoo::NewCopyableFunction<2, double(int)> cf = doubler;
@@ -73,7 +74,10 @@ TEST_CASE("New zoo function") {
                 SECTION("Copiable swap") {
                     CF empty;
                     CF doubles(doubler);
-                    REQUIRE_THROWS_AS(empty(33), zoo::bad_function_call);
+                    REQUIRE_THROWS_AS(
+                        empty(33),
+                        zoo::bad_function_call
+                    );
                     REQUIRE(6.0 == doubles(3));
                 }
             }
@@ -91,5 +95,22 @@ TEST_CASE("New zoo function") {
             auto &type = withRTTI.type2();
             REQUIRE(typeid(decltype(doubler)) == type);
         }
+    }
+}
+
+TEST_CASE(
+    "AnyCallingSignature",
+    "[any][generic-policy][type-erasure][functional][undefined-behavior]"
+) {
+    using MOACPolicy = zoo::Policy<void *, zoo::Destroy, zoo::Move>;
+    using MOAC = zoo::AnyContainer<MOACPolicy>;
+    using ACS =
+        zoo::AnyCallingSignature<
+            zoo::FunctionProjector<MOAC>::template projection
+        >;
+    auto doubler = [&](int d) { return 2.0*d; };
+    ACS acs(std::in_place_type<double(int)>, doubler);
+    SECTION("Calling") {
+        CHECK(6.0 == acs.as<double(int)>()(3));
     }
 }

@@ -139,6 +139,12 @@ void swap(Function<C, Signature> &f1, Function<C, Signature> &f2) {
     f1.swap(f2);
 }
 
+template<typename ContainerBase>
+struct FunctionProjector {
+    template<typename Signature>
+    using projection = Function<ContainerBase, Signature>;
+};
+
 }
 
 

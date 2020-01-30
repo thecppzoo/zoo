@@ -11,25 +11,28 @@ struct PolymorphicBase {
 struct PolymorphicDerived: PolymorphicBase {
     int polymorphic() override {
         new(this) PolymorphicBase;
-        return 1;
+        return 2;
     }
 };
 
 int PolymorphicBase::polymorphic() {
     new(this) PolymorphicDerived;
-    return 0;
+    return 1;
 }
 
 TEST_CASE("No need for launder") {
     PolymorphicBase p;
     auto total = p.polymorphic();
     total += p.polymorphic(); // this call is undefined behavior
-    CHECK(0 == total);
+    CHECK(2 == total);
     zoo::AlignedStorageFor<PolymorphicBase> asfpb;
     asfpb.build<PolymorphicBase>();
     total = asfpb.as<PolymorphicBase>()->polymorphic();
+    auto *pointer = asfpb.as<PolymorphicBase>();
+    CHECK(typeid(PolymorphicDerived) == typeid(*pointer));
     total += asfpb.as<PolymorphicBase>()->polymorphic();
-    CHECK(1 == total);
+    asfpb.destroy<PolymorphicBase>();
+    CHECK(3 == total);
 }
 
 TEST_CASE("IAnyContainer") {
@@ -93,8 +96,6 @@ TEST_CASE("Resolved bugs") {
         REQUIRE(3 == *a.state<int>());
     }
 }
-
-void debug() {};
 
 void canonicalOnlyTests() {
     SECTION("Copy constructor - value held is not an \"Any\"") {
