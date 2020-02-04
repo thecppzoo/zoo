@@ -18,7 +18,7 @@ template<typename R, typename... As, typename Target>
 struct MayBeCalled<
         #define PP_INVOCATION_DECLVAL decltype(std::declval<Target &>()(std::declval<As>()...))
     R(As...), Target, std::void_t<PP_INVOCATION_DECLVAL>
->: std::conjunction<std::is_constructible<R, PP_INVOCATION_DECLVAL>> {};
+>: std::disjunction<std::is_same<void, R>, std::is_constructible<R, PP_INVOCATION_DECLVAL>> {};
         #undef PP_INVOCATION_DECLVAL
 
 }
@@ -31,10 +31,10 @@ using CallableViaVTablePolicy =
     >::Policy;
 
 template<std::size_t Pointers, typename Signature>
-using NewZooFunction = AnyContainer<CallableViaVTablePolicy<Pointers, Signature>>;
+using VTableFunction = AnyContainer<CallableViaVTablePolicy<Pointers, Signature>>;
 template<std::size_t Pointers, typename Signature>
-using NewCopyableFunction =
-    AnyContainer<DerivedVTablePolicy<NewZooFunction<Pointers, Signature>, Copy>>;
+using VTableCopyableFunction =
+    AnyContainer<DerivedVTablePolicy<VTableFunction<Pointers, Signature>, Copy>>;
 
 template<typename>
 struct Executor;

@@ -13,18 +13,23 @@ static_assert(
     "A void * is not convertible to char *"
 );
 static_assert(impl::MayBeCalled<void *(), char *(*)()>::value);
+// "returning void" is a special case
+static_assert(impl::MayBeCalled<void(), void(*)()>::value);
 
 }
+
+using MOP = zoo::Policy<void *, zoo::Destroy, zoo::Move>;
+using MOAC = zoo::AnyContainer<MOP>;
 
 TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]") {
     auto doubler = [&](int a) { return 2.0 * a; };
     SECTION("VTable executor") {
-        zoo::NewCopyableFunction<2, double(int)> cf = doubler;
-        static_assert(std::is_copy_constructible_v<zoo::NewCopyableFunction<2, double(int)>>);
+        zoo::VTableCopyableFunction<2, double(int)> cf = doubler;
+        static_assert(std::is_copy_constructible_v<zoo::VTableCopyableFunction<2, double(int)>>);
         // notice: a move-only callable reference is bound to a copyable one,
         // without having to make a new object!
-        zoo::NewZooFunction<2, double(int)> &di = cf;
-        static_assert(!std::is_copy_constructible_v<zoo::NewZooFunction<2, double(int)>>);
+        zoo::VTableFunction<2, double(int)> &di = cf;
+        static_assert(!std::is_copy_constructible_v<zoo::VTableFunction<2, double(int)>>);
         REQUIRE(6.0 == di(3));
         // this also works, a move-only has all it needs from a copyable
         di = std::move(cf);
