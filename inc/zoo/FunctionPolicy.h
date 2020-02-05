@@ -90,17 +90,22 @@ protected:
         ContainerBase(ContainerBase::Token)
     {}
     Function(typename ContainerBase::TokenType, Function &&f) noexcept:
-        Ex(f.ptr_),
+        Ex(f.executor_),
         ContainerBase(ContainerBase::Token, std::move(f))
     {}
     Function(typename ContainerBase::TokenType, const Function &f):
-        Ex(f.ptr_),
+        Ex(f.executor_),
         ContainerBase(ContainerBase::Token, f)
     {}
 
     template<typename T>
     void emplaced(T *ptr) noexcept {
         this->executor_ = invokeTarget<T>;
+    }
+
+    Function &copy_assign(const Function &f) {
+        this->executor_ = f.executor_;
+        return *this;
     }
 
 public:
@@ -121,9 +126,18 @@ public:
         ContainerBase(std::forward<Target>(a))
     {}
 
+    Function &operator=(Function &&) = default;
+    Function &operator=(const Function &m) = default;
+
     template<typename... CallArguments>
-    R operator()(CallArguments &&...cas) {
-        return this->executor_(std::forward<CallArguments>(cas)..., this);
+    R operator()(CallArguments &&...cas) const {
+        auto deconsted = const_cast<Function *>(this);
+        return this->executor_(std::forward<CallArguments>(cas)..., deconsted);
+    }
+
+    template<typename... CallArguments>
+    R const_call(CallArguments &&...cas) const {
+        return const_cast<Function &>(*this)(std::forward<CallArguments>(cas)...);
     }
 
     void swap(Function &other) noexcept {
@@ -132,6 +146,14 @@ public:
         auto &executor = static_cast<Executor<R(As...)> &>(*this);
         executor.swap(other);
     }
+
+    operator bool() const noexcept {
+        return !(this->isDefault());
+    }
+
+    bool operator==(std::nullptr_t) const noexcept { return !bool(*this); }
+
+    bool operator!=(std::nullptr_t) const noexcept { return bool(*this); }
 };
 
 template<typename C, typename Signature>
