@@ -70,6 +70,8 @@ struct CompositionChain {
         template<typename T>
         void emplaced(T *) noexcept {}
 
+        void copy_assign(const Base &) {}
+
         alignas(alignof(typename Policy::MemoryLayout))
         char m_space[sizeof(typename Policy::MemoryLayout)];
     };
@@ -297,6 +299,11 @@ protected:
 
     template<typename ValueType>
     void emplaced(ValueType *ptr) noexcept { SuperContainer::template emplaced(ptr); }
+
+    AnyContainerBase &copy_assign(const AnyContainerBase &model) {
+        SuperContainer::copy_assign(model);
+        return *this;
+    }
 };
 
 template<typename Policy>
@@ -320,11 +327,17 @@ struct AnyCopyable: AnyContainerBase<Policy> {
     AnyCopyable &operator=(AnyCopyable &&) = default;
 
     AnyCopyable &operator=(const AnyCopyable &model) {
-        static_cast<typename Base::SuperContainer &>(*this) = model;
+        if constexpr(std::is_copy_constructible_v<Base>)this->copy_assign(model);
         auto myself = this->container();
         myself->destroy();
         try {
-            model.container()->copy(myself);
+            auto source = model.container();
+            if constexpr(detail::MemoryLayoutHasCopy<Policy>::value) {
+                source->copy(this->container());
+            } else {
+                static_assert(detail::ExtraAffordanceOfCopying<Policy>::value);
+                Policy::ExtraAffordances::copy(this->container(), source);
+            }
         } catch(...) {
             new(this->m_space) typename Base::Container;
             throw;
