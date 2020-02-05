@@ -72,7 +72,7 @@ struct Function<ContainerBase, R(As...)>:
 {
     template<typename Target>
     static R invokeTarget(As... args, void *p) {
-        return (*static_cast<Function *>(p)->template state<Target>())(args...);
+        return (*static_cast<Function *>(p)->template state<Target>())(std::forward<As>(args)...);
     }
 
     Function() = default;
