@@ -86,6 +86,11 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
                     REQUIRE(6.0 == doubles(3));
                 }
             }
+            SECTION("Move assignment") {
+                F f;
+                f = std::move(reference);
+                REQUIRE(10.0 == f(5));
+            }
         }
         SECTION("Second nesting") {
             using RTTI_CF_P = zoo::DerivedVTablePolicy<CF, zoo::RTTI>;

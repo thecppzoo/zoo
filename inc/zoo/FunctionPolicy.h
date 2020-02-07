@@ -79,6 +79,9 @@ struct Function<ContainerBase, R(As...)>:
     Function(const Function &) = default;
     Function(Function &&) = default;
 
+    Function &operator=(Function &&) = default;
+    Function &operator=(const Function &m) = default;
+
 protected:
     using Ex = Executor<R(As...)>;
 
@@ -125,9 +128,6 @@ public:
         Executor<R(As...)>(invokeTarget<std::decay_t<Target>>),
         ContainerBase(std::forward<Target>(a))
     {}
-
-    Function &operator=(Function &&) = default;
-    Function &operator=(const Function &m) = default;
 
     template<typename... CallArguments>
     R operator()(CallArguments &&...cas) const {
