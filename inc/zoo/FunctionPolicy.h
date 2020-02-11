@@ -129,6 +129,11 @@ public:
         ContainerBase(std::forward<Target>(a))
     {}
 
+    Function &operator=(std::nullptr_t) noexcept {
+        (*this) = Function();
+        return *this;
+    }
+
     template<typename... CallArguments>
     R operator()(CallArguments &&...cas) const {
         auto deconsted = const_cast<Function *>(this);
