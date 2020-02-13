@@ -129,8 +129,26 @@ public:
         ContainerBase(std::forward<Target>(a))
     {}
 
+    template<typename A>
+    auto operator=(A &&a)
+        noexcept(std::is_nothrow_constructible_v<Function, A &&>) ->
+        std::enable_if_t<
+            std::is_constructible_v<Function, A &&>,
+            Function &
+        >
+    {
+        using Target = std::decay_t<A>;
+        if constexpr(std::is_base_of_v<Function, Target>) {
+            this->executor_ = a.executor_;
+        } else {
+            this->executor_ = invokeTarget<Target>;
+        }
+        static_cast<ContainerBase &>(*this) = std::forward<A>(a);
+        return *this;
+    }
+
     Function &operator=(std::nullptr_t) noexcept {
-        (*this) = Function();
+        *this = Function();
         return *this;
     }
 
