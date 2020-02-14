@@ -120,6 +120,7 @@ public:
         int =
             std::enable_if_t<
                 !std::is_base_of_v<Function, D> &&
+                    std::is_constructible_v<ContainerBase, Target &&> &&
                     impl::MayBeCalled<R(As...), D>::value,
                 int
             >(0)
