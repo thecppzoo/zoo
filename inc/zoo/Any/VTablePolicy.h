@@ -107,9 +107,9 @@ struct Copy {
     struct Raw {
         static void copy(void *to, const void *from) {
             auto downcast = static_cast<const MemoryLayout *>(from);
-            auto vtable = downcast->ptr_;
-            auto ts = static_cast<const TypeSwitch *>(vtable);
-            ts->cp(to, downcast);
+            auto vtable = downcast->pointer();
+            auto entry = static_cast<const TypeSwitch *>(vtable);
+            entry->cp(to, downcast);
         }
     };
 
@@ -144,9 +144,10 @@ struct RTTI {
     struct Raw {
         static const std::type_info &typeId(const void *from) {
             auto downcast = static_cast<const MemoryLayout *>(from);
-            auto ts = static_cast<const TypeSwitch *>(downcast->ptr_);
-            auto vtp = static_cast<const VTableEntry *>(ts);
-            return *vtp->ti;
+            auto typeSwitch =
+                static_cast<const TypeSwitch *>(downcast->pointer());
+            auto entry = static_cast<const VTableEntry *>(typeSwitch);
+            return *entry->ti;
         }
     };
 
@@ -202,15 +203,19 @@ struct CallableViaVTable<R(As...)> {
 
 template<typename VirtualTable>
 struct VTableHolder {
-    const VirtualTable *ptr_;
+    const VirtualTable *pointer_;
 
     /// \brief from the vtable returns the entry corresponding to the affordance
     template<typename Affordance>
     const typename Affordance::VTableEntry *vTable() const noexcept {
-        return static_cast<const typename Affordance::VTableEntry *>(ptr_);
+        return static_cast<const typename Affordance::VTableEntry *>(pointer_);
     }
 
-    VTableHolder(const VirtualTable *p): ptr_(p) {}
+    VTableHolder(const VirtualTable *p): pointer_(p) {}
+
+    auto pointer() const noexcept { return pointer_; }
+
+    void change(const VirtualTable *p) noexcept { pointer_ = p; }
 };
 
 template<std::size_t S, std::size_t A, typename V>
@@ -240,13 +245,15 @@ struct GenericPolicy {
         AlignedStorageFor<HoldingModel> space_;
 
         static void  moveVTable(void *to, void *from) noexcept {
-            static_cast<Container *>(to)->ptr_ =
-                static_cast<Container *>(from)->ptr_;
+            static_cast<Container *>(to)->change(
+                static_cast<Container *>(from)->pointer()
+            );
         }
 
         static void copyVTable(void *to, const void *from) {
-            static_cast<Container *>(to)->ptr_ =
-                static_cast<const Container *>(from)->ptr_;
+            static_cast<Container *>(to)->change(
+                static_cast<const Container *>(from)->pointer()
+            );
         }
 
         constexpr static inline VTable Default = {
@@ -326,7 +333,7 @@ struct GenericPolicy {
             AffordanceSpecifications::template Operation<ByReference>...
         };
 
-        ByReference(ByReference *source): Container(source->ptr_) {
+        ByReference(ByReference *source): Container(source->pointer()) {
             pValue() = source->pValue();
         }
 
