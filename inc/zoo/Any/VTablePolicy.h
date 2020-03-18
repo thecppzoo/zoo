@@ -368,7 +368,7 @@ struct GenericPolicy {
             Size = sizeof(HoldingModel),
             Alignment = alignof(HoldingModel);
 
-        using VTable = VTable;
+        using VTable = GenericPolicy::VTable;
 
         template<typename AnyC>
         struct Affordances: AffordanceSpecifications::template UserAffordance<AnyC>... {};
