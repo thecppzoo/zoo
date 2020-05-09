@@ -12,6 +12,7 @@ matrix:
         - sudo apt-get install g++-9 -y
         - eval "${MATRIX_EVAL}"
     - os: linux
+      dist: bionic
       compiler: clang
       env:
           - MATRIX_EVAL="CC=clang && CXX=clang++"
