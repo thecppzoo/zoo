@@ -13,8 +13,6 @@
 
 using namespace zoo;
 
-#pragma GCC diagnostic ignored "-Wgnu-alignof-expression"
-
 static_assert(VPSize == sizeof(AlignedStorage<>::space_), "incorrect size");
 static_assert(alignof(AlignedStorage<>::space_) == VPAlignment, "misaligned");
 
