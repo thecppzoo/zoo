@@ -14,13 +14,23 @@
 using namespace zoo;
 
 static_assert(VPSize == sizeof(AlignedStorage<>::space_), "incorrect size");
+#ifdef __GNUC__
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wgnu-alignof-expression"
+#endif
 static_assert(alignof(AlignedStorage<>::space_) == VPAlignment, "misaligned");
+#endif
 
 using Big = AlignedStorage<2*VPSize>;
 static_assert(2*VPSize <= sizeof(Big), "larger size not honored");
 using A1 = AlignedStorage<1, 1>;
 static_assert(1 == sizeof(A1::space_), "specific size setting not honored");
+#ifdef __GNUC__
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wgnu-alignof-expression"
+#endif
 static_assert(alignof(A1::space_) == 1, "specific alignment not honored");
+#endif
 
 template<typename Class, typename T>
 std::false_type MayCallBuild(...);
