@@ -117,22 +117,25 @@ struct Copy {
     struct UserAffordance {};
 };
 
+template<typename T>
+const std::type_info &returnsTypeInfo() noexcept { return typeid(T); }
+
 struct RTTI {
-    struct VTableEntry { const std::type_info *ti; };
+    struct VTableEntry { const std::type_info &(*ti)() noexcept; };
 
     template<typename>
-    constexpr static inline VTableEntry Default = { &typeid(void) };
+    constexpr static inline VTableEntry Default = { returnsTypeInfo<void> };
 
     template<typename Container>
     constexpr static inline VTableEntry Operation = {
-        &typeid(decltype(*std::declval<Container &>().value()))
+        returnsTypeInfo<decltype(*std::declval<Container &>().value())>
     };
 
     template<typename Container>
     struct Mixin {
         const std::type_info &type() const noexcept {
             auto downcast = static_cast<const Container *>(this);
-            return *downcast->template vTable<RTTI>()->ti;
+            return downcast->template vTable<RTTI>()->ti();
         }
 
         bool nonEmpty() const noexcept {
@@ -147,7 +150,7 @@ struct RTTI {
             auto typeSwitch =
                 static_cast<const TypeSwitch *>(downcast->pointer());
             auto entry = static_cast<const VTableEntry *>(typeSwitch);
-            return *entry->ti;
+            return entry->ti();
         }
     };
 
