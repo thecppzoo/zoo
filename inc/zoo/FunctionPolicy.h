@@ -63,6 +63,20 @@ struct Executor<R(As...)> {
 template<typename Signature>
 Executor(Signature *) -> Executor<Signature>;
 
+#define VALID_TYPE_TRAIT(name, ...) \
+namespace impl { \
+template<typename, typename = void> \
+struct name##_impl: std::false_type {}; \
+template<typename T> \
+struct name##_impl<T, std::void_t<decltype(__VA_ARGS__)>>: std::true_type {}; \
+}\
+template<typename T> \
+using name = impl::name##_impl<T>; \
+template<typename T> \
+constexpr static auto name##_v = name<T>::value;
+
+VALID_TYPE_TRAIT(HasMemberFunction_type, std::declval<T &>().type())
+
 template<typename, typename>
 struct Function;
 
@@ -172,7 +186,11 @@ public:
     }
 
     operator bool() const noexcept {
-        return !(this->isDefault());
+        if constexpr(HasMemberFunction_type<ContainerBase>::value) {
+            return !(typeid(void) == this->type());
+        } else {
+            return !(this->isDefault());
+        }
     }
 
     bool operator==(std::nullptr_t) const noexcept { return !bool(*this); }

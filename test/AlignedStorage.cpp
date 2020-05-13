@@ -15,13 +15,14 @@ using namespace zoo;
 #pragma GCC diagnostic ignored "-Wgnu-alignof-expression"
 
 static_assert(VPSize == sizeof(AlignedStorage<>::space_), "incorrect size");
-static_assert(alignof(AlignedStorage<>::space_) == VPAlignment, "misaligned");
+static_assert(alignof(AlignedStorage<>) == VPAlignment, "misaligned");
+static_assert(offsetof(AlignedStorage<>, space_) % VPAlignment == 0, "misaligned");
 
 using Big = AlignedStorage<2*VPSize>;
 static_assert(2*VPSize <= sizeof(Big), "larger size not honored");
 using A1 = AlignedStorage<1, 1>;
 static_assert(1 == sizeof(A1::space_), "specific size setting not honored");
-static_assert(alignof(A1::space_) == 1, "specific alignment not honored");
+static_assert(alignof(A1) == 1, "specific alignment not honored"); // Guarantees that space_ alignment is 1
 
 template<typename Class, typename T>
 std::false_type MayCallBuild(...);

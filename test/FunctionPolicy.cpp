@@ -21,15 +21,25 @@ static_assert(impl::MayBeCalled<void(), void(*)()>::value);
 using MOP = zoo::Policy<void *, zoo::Destroy, zoo::Move>;
 using MOAC = zoo::AnyContainer<MOP>;
 
+static_assert(!zoo::HasMemberFunction_type<MOAC>::value);
+
 TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]") {
     auto doubler = [&](int a) { return 2.0 * a; };
     SECTION("VTable executor") {
         zoo::VTableCopyableFunction<2, double(int)> cf = doubler;
-        static_assert(std::is_copy_constructible_v<zoo::VTableCopyableFunction<2, double(int)>>);
+        static_assert(
+            std::is_copy_constructible_v<
+                zoo::VTableCopyableFunction<2, double(int)>
+            >
+        );
         // notice: a move-only callable reference is bound to a copyable one,
         // without having to make a new object!
         zoo::VTableFunction<2, double(int)> &di = cf;
-        static_assert(!std::is_copy_constructible_v<zoo::VTableFunction<2, double(int)>>);
+        static_assert(
+            !std::is_copy_constructible_v<
+                zoo::VTableFunction<2, double(int)>
+            >
+        );
         REQUIRE(6.0 == di(3));
         // this also works, a move-only has all it needs from a copyable
         di = std::move(cf);
@@ -122,5 +132,49 @@ TEST_CASE(
     ACS acs(std::in_place_type<double(int)>, doubler);
     SECTION("Calling") {
         CHECK(6.0 == acs.as<double(int)>()(3));
+    }
+}
+
+struct FakeDestroy: zoo::Destroy {
+    template<typename AnyC>
+    struct UserAffordance: zoo::Destroy::UserAffordance<AnyC> {
+        bool isDefault() const noexcept {
+            return false;
+        }
+    };
+};
+
+TEST_CASE(
+    "MSVC-ICF", "[compiler-bug][icf][rtti]"
+) {
+    using F = zoo::Function<MOAC, void()>;
+    SECTION("Verify cascading for operator bool()") {
+        zoo::Function<
+                zoo::AnyContainer<zoo::Policy<
+                void *,
+                FakeDestroy, zoo::Move
+            >>,
+            void()
+        > relyOnIsDefault;
+        REQUIRE(relyOnIsDefault);
+
+        using WithRTTI = zoo::Function<
+            zoo::AnyContainer<zoo::Policy<
+                void *,
+                FakeDestroy, zoo::Move, zoo::RTTI
+            >>,
+            void()
+        >;
+        static_assert(zoo::HasMemberFunction_type<WithRTTI>::value);
+        WithRTTI f;
+        CHECK(!f); // should use type()
+    }
+    SECTION("Trigger bug") {
+        F fun;
+        REQUIRE(!fun);
+        auto anythingTriviallyDestructible = [](){};
+        fun = anythingTriviallyDestructible;
+        CHECK(fun);
+        REQUIRE(!fun.isDefault());
     }
 }

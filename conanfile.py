@@ -12,5 +12,13 @@ class Zoo(nlo.NloBasicCmakeConanFile):
         "conanfile_rel_path": "auto"
     }
 
+    options = {
+        "enable_testing": {True, False},
+    }
+
+    default_options = {
+        "enable_testing": False,
+    }
+
     def build(self):
         self.simple_cmake_build()
