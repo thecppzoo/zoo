@@ -71,7 +71,7 @@ struct CompositionChain {
         void emplaced(T *) noexcept {}
 
         void copy_assign(const Base &) {}
-
+        static_assert(alignof(typename Policy::MemoryLayout) == 8);
         alignas(alignof(typename Policy::MemoryLayout))
         char m_space[sizeof(typename Policy::MemoryLayout)];
     };
@@ -83,7 +83,7 @@ struct CompositionChain<Policy, std::void_t<typename Policy::Base>> {
 };
 
 template<typename Policy_>
-struct AnyContainerBase:
+struct __declspec(empty_bases) AnyContainerBase:
     CompositionChain<Policy_>::Base,
     detail::PolicyAffordances<AnyContainerBase<Policy_>, Policy_>
 {

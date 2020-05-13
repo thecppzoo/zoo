@@ -241,7 +241,7 @@ struct GenericPolicy {
 
     using VTHolder = VTableHolder<VTable>;
 
-    struct Container:
+    struct __declspec(empty_bases) Container:
         VTHolder,
         AffordanceSpecifications::template Mixin<Container>...
     {
@@ -374,7 +374,7 @@ struct GenericPolicy {
         using VTable = GenericPolicy::VTable;
 
         template<typename AnyC>
-        struct Affordances: AffordanceSpecifications::template UserAffordance<AnyC>... {};
+        struct __declspec(empty_bases) Affordances: AffordanceSpecifications::template UserAffordance<AnyC>... {};
     };
 };
 
