@@ -49,7 +49,7 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
         // so it can't generate what it needs for the affordance of copyability
         //cf = std::move(di);
     }
-#ifndef _MSC_VER
+
     SECTION("Use instance-affordance Function") {
         using MOP = zoo::Policy<void *, zoo::Destroy, zoo::Move>;
         using MOAC = zoo::AnyContainer<MOP>;
@@ -60,7 +60,6 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
         using CF = zoo::AnyContainer<CopyableFunctionPolicy>;
         static_assert(std::is_nothrow_move_constructible_v<CF>);
         static_assert(std::is_copy_constructible_v<CF>);
-
         SECTION("Executor is instance member Function") {
             F f = doubler;
             CF aCopy = doubler;
@@ -103,6 +102,7 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
                 REQUIRE(10.0 == f(5));
             }
         }
+#ifndef _MSC_VER
         SECTION("Second nesting") {
             using RTTI_CF_P = zoo::DerivedVTablePolicy<CF, zoo::RTTI>;
             using RCF = zoo::AnyContainer<RTTI_CF_P>;
@@ -116,8 +116,8 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
             auto &type = withRTTI.type2();
             REQUIRE(typeid(decltype(doubler)) == type);
         }
-    }
 #endif
+    }
 }
 
 TEST_CASE(
