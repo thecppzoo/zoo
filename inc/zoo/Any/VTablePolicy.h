@@ -5,6 +5,8 @@
 
 #include "zoo/AlignedStorage.h"
 
+#include "zoo/pp/platform.h"
+
 #include <typeinfo>
 
 #include <functional>
@@ -241,7 +243,7 @@ struct GenericPolicy {
 
     using VTHolder = VTableHolder<VTable>;
 
-    struct __declspec(empty_bases) Container:
+    struct MSVC_EMPTY_BASES Container:
         VTHolder,
         AffordanceSpecifications::template Mixin<Container>...
     {
@@ -374,7 +376,9 @@ struct GenericPolicy {
         using VTable = GenericPolicy::VTable;
 
         template<typename AnyC>
-        struct __declspec(empty_bases) Affordances: AffordanceSpecifications::template UserAffordance<AnyC>... {};
+        struct MSVC_EMPTY_BASES Affordances:
+            AffordanceSpecifications::template UserAffordance<AnyC>...
+        {};
     };
 };
 
