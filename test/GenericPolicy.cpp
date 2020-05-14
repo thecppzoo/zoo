@@ -7,11 +7,13 @@
 #include <utility>
 #include <type_traits>
 
+#ifndef _MSC_VER
 TEST_CASE("VTablePolicy tests, old", "[type-erasure][AnyContainer][any][vtable]") {
     using GP =
         zoo::Policy<void *, zoo::Destroy, zoo::Move, zoo::Copy, zoo::RTTI>;
     testAnyImplementation<zoo::AnyContainer<GP>>();
 }
+#endif
 
 namespace zoo {
 
@@ -195,6 +197,7 @@ TEST_CASE("Composed Policies", "[type-erasure][any][composed-policy][vtable-poli
         // this line won't compile, exactly as intended: a copyable "any" requires copyability
         //copy = std::move(moac);
     }
+#ifndef _MSC_VER
     SECTION("Double composition") {
         using DCP = zoo::DerivedVTablePolicy<ComposedAC, zoo::RTTI>;
         using DC = zoo::AnyContainer<DCP>;
@@ -203,6 +206,7 @@ TEST_CASE("Composed Policies", "[type-erasure][any][composed-policy][vtable-poli
         >::VTable *ptr = nullptr;
         DC a = 4;
     }
+#endif
 }
 
 TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-policy][vtable-policy][contract]") {
@@ -287,6 +291,7 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
             REQUIRE(other.state<Big>()->myself_ == originalPlace);
         }
     }
+#ifndef _MSC_VER
     SECTION("Flexible affordances") {
         using RTTIMO = zoo::Policy<void *, zoo::Destroy, zoo::Move, zoo::RTTI>;
         using RTTIPolicy = zoo::ExtendedAffordancePolicy<RTTIMO, zoo::RTTI>;
@@ -307,6 +312,7 @@ TEST_CASE("VTable/Composed Policies contract", "[type-erasure][any][composed-pol
             REQUIRE(typeid(Complex) == mo.type());
         }
     }
+#endif
     SECTION("User affordance") {
         zoo::AnyContainer<
             zoo::Policy<void *, zoo::Destroy, zoo::Move, Stringize>

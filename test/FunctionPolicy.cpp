@@ -49,6 +49,7 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
         // so it can't generate what it needs for the affordance of copyability
         //cf = std::move(di);
     }
+#ifndef _MSC_VER
     SECTION("Use instance-affordance Function") {
         using MOP = zoo::Policy<void *, zoo::Destroy, zoo::Move>;
         using MOAC = zoo::AnyContainer<MOP>;
@@ -116,6 +117,7 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
             REQUIRE(typeid(decltype(doubler)) == type);
         }
     }
+#endif
 }
 
 TEST_CASE(
