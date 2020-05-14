@@ -1,6 +1,7 @@
 #ifndef ZOO_ANYCONTAINER_H
 #define ZOO_ANYCONTAINER_H
 
+#include "zoo/pp/platform.h"
 #include "zoo/Any/Traits.h"
 #include "zoo/utility.h"
 
@@ -82,7 +83,7 @@ struct CompositionChain<Policy, std::void_t<typename Policy::Base>> {
 };
 
 template<typename Policy_>
-struct __declspec(empty_bases) AnyContainerBase:
+struct MSVC_EMPTY_BASES AnyContainerBase:
     CompositionChain<Policy_>::Base,
     detail::PolicyAffordances<AnyContainerBase<Policy_>, Policy_>
 {
