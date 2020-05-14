@@ -10,6 +10,4 @@ nlo_export(zoo)
 
 if (NLO_OPTIONS_ZOO_ENABLE_TESTING)
     add_subdirectory(test)
-else ()
-    message (FATAL_ERROR gg)
 endif ()
