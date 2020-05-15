@@ -130,7 +130,11 @@ struct RTTI {
 
     template<typename Container>
     constexpr static inline VTableEntry Operation = {
-        returnsTypeInfo<decltype(*std::declval<Container &>().value())>
+        returnsTypeInfo<
+            // Note: MSVC can't properly use two-phase lookup for this
+            // decltype(*std::declval<Container &>().value())
+            typename Container::ManagedType
+        >
     };
 
     template<typename Container>
@@ -272,6 +276,8 @@ struct GenericPolicy {
 
     template<typename V>
     struct ByValue: Container {
+        using ManagedType = V;
+
         V *value() noexcept { return this->space_.template as<V>(); }
         const V *value() const noexcept {
             return const_cast<ByValue *>(this)->value();
@@ -312,6 +318,8 @@ struct GenericPolicy {
 
     template<typename V>
     struct ByReference: Container {
+        using ManagedType = V;
+
         V *&pValue() noexcept { return *this->space_.template as<V *>(); }
         V *value() noexcept { return pValue(); }
         const V *value() const noexcept {
