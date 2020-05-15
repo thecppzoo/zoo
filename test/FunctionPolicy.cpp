@@ -102,7 +102,6 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
                 REQUIRE(10.0 == f(5));
             }
         }
-#ifndef _MSC_VER
         SECTION("Second nesting") {
             using RTTI_CF_P = zoo::DerivedVTablePolicy<CF, zoo::RTTI>;
             using RCF = zoo::AnyContainer<RTTI_CF_P>;
@@ -116,7 +115,6 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
             auto &type = withRTTI.type2();
             REQUIRE(typeid(decltype(doubler)) == type);
         }
-#endif
     }
 }
 
