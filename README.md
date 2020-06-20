@@ -6,7 +6,5 @@
 
 Library of components.
 
-The repository is pending overhaul in the weeks after CPPCon 2019.
-
-You are encouraged to use the components as they are today but please check back in a few weeks for improvements.
+The repository is being updated with work open sourced by Snap, Inc. you may check in the branch [`snapchat-release`](https://github.com/thecppzoo/zoo/tree/snapchat-release)
 
