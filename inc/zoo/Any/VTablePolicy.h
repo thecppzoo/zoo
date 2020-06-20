@@ -313,7 +313,8 @@ struct GenericPolicy {
             this->space_.template build<V>(std::forward<Args>(args)...);
         }
 
-        constexpr static auto IsReference = std::false_type::value;
+        using IsReferenceTrait = std::false_type;
+        constexpr static inline auto IsReference = IsReferenceTrait::value;
     };
 
     template<typename V>
@@ -360,7 +361,8 @@ struct GenericPolicy {
             ByReference(&Operations, std::forward<Args>(args)...)
         {}
 
-        constexpr static auto IsReference = std::true_type::value;
+        using IsReferenceTrait = std::true_type;
+        constexpr static inline auto IsReference = IsReferenceTrait::value;
     };
 
     struct Policy {
