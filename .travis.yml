@@ -1,5 +1,3 @@
-dist: bionic
-    
 language: cpp
 
 matrix:
@@ -8,16 +6,16 @@ matrix:
       compiler: gcc
       env:
           - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9"
+      before_install:
+        - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        - sudo apt-get update -q
+        - sudo apt-get install g++-9 -y
+        - eval "${MATRIX_EVAL}"
     - os: linux
+      dist: bionic
       compiler: clang
       env:
           - MATRIX_EVAL="CC=clang && CXX=clang++"
-
-before_install:
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  - sudo apt-get update -q
-  - sudo apt-get install g++-9 -y
-  - eval "${MATRIX_EVAL}"
 
 before_script:
     - mkdir build
