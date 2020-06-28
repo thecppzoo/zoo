@@ -217,7 +217,8 @@ struct VTableHolder {
     /// \brief from the vtable returns the entry corresponding to the affordance
     template<typename Affordance>
     const typename Affordance::VTableEntry *vTable() const noexcept {
-        return static_cast<const typename Affordance::VTableEntry *>(pointer_);
+        return //static_cast<const typename Affordance::VTableEntry *>(pointer_);
+            pointer_->template upcast<Affordance>();
     }
 
     VTableHolder(const VirtualTable *p): pointer_(p) {}
@@ -243,7 +244,12 @@ struct CompatibilityParameters;
 
 template<typename HoldingModel, typename... AffordanceSpecifications>
 struct GenericPolicy {
-    struct VTable: AffordanceSpecifications::VTableEntry... {};
+    struct VTable: AffordanceSpecifications::VTableEntry... {
+        template<typename Affordance>
+        const typename Affordance::VTableEntry *upcast() const noexcept {
+            return this;
+        }
+    };
 
     using VTHolder = VTableHolder<VTable>;
 
