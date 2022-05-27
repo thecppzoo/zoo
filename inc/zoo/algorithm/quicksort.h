@@ -6,6 +6,7 @@
 #include <zoo/algorithm/less.h>
 
 #include <array> // for temporary storage
+#include <stdexcept>
 
 namespace zoo {
 
