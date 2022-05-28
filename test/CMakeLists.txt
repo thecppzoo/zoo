@@ -39,6 +39,10 @@ set(
     any.cpp AlignedStorage.cpp AnyCallable.cpp AnyCallSignature.cpp
     AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp
 )
+set(
+    SWAR_SOURCES
+    swar/BasicOperations.cpp
+)
 set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
 set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
 set(
@@ -50,17 +54,20 @@ set(
 add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
 add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
 add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
+add_library(SWARTest OBJECT ${SWAR_SOURCES})
 add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
 add_executable(
     ${CURRENT_EXECUTABLE} ${ADDITIONAL_SOURCES}
 )
-target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasureTest Uncategorized)
+target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasureTest SWARTest Uncategorized)
 
 add_executable(algorithm2 $<TARGET_OBJECTS:Catch2Main>)
 target_link_libraries(algorithm2 AlgorithmTest)
 add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main>)
 target_link_libraries(type_erasure TypeErasureTest)
+add_executable(swar $<TARGET_OBJECTS:Catch2Main>)
+target_link_libraries(swar SWARTest)
 
 # CMake build : library tests
 
