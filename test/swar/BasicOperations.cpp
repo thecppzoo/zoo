@@ -84,6 +84,19 @@ static_assert(0x01 == lowestNBitsMask<1, u8>());
 static_assert(0x03 == lowestNBitsMask<2, u8>());
 static_assert(0x07 == lowestNBitsMask<3, u8>());
 static_assert(0x0F == lowestNBitsMask<4, u8>());
+static_assert(0x1F == lowestNBitsMask<5, u8>());
+
+static_assert(0x01ul == lowestNBitsMask<1, u32>());
+static_assert(0x03ul == lowestNBitsMask<2, u32>());
+static_assert(0x07ul == lowestNBitsMask<3, u32>());
+static_assert(0x0Ful == lowestNBitsMask<4, u32>());
+static_assert(0x1Ful == lowestNBitsMask<5, u32>());
+
+static_assert(0x01ull == lowestNBitsMask<1, u64>());
+static_assert(0x03ull == lowestNBitsMask<2, u64>());
+static_assert(0x07ull == lowestNBitsMask<3, u64>());
+static_assert(0x0Full == lowestNBitsMask<4, u64>());
+static_assert(0x1Full == lowestNBitsMask<5, u64>());
 
 static_assert(0xB == isolate<4>(0x1337'BDBC'2448'ACABull));
 static_assert(0xAB == isolate<8>(0x1337'BDBC'2448'ACABull));

@@ -6,6 +6,8 @@
 
 #include <type_traits>
 
+
+
 namespace zoo { namespace swar {
 
 using u64 = uint64_t;
@@ -129,9 +131,13 @@ template<int NBits, typename T = uint64_t> struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
 
-    constexpr SWAR operator|(SWAR o) const noexcept { return SWAR(m_v | o.m_v); }
-    constexpr SWAR operator&(SWAR o) const noexcept { return SWAR(m_v & o.m_v); }
-    constexpr SWAR operator^(SWAR o) const noexcept { return SWAR(m_v ^ o.m_v); }
+    constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
+    #define SWAR_BINARY_OPERATORS_X_LIST \
+      X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+    #define X(rt,op) constexpr rt operator op (rt o) const noexcept { return rt (m_v op o.m_v); };
+    SWAR_BINARY_OPERATORS_X_LIST
+    #undef X
+    #undef SWAR_BINARY_OPERATORS_X_LIST
 
     constexpr T at(int position) const noexcept {
         constexpr auto filter = (T(1) << NBits) - 1;
@@ -155,6 +161,42 @@ template<int NBits, typename T = uint64_t> struct SWAR {
     }
 
     T m_v;
+};
+
+// SWAR is a useful abstraction for performing computations in lanes overlaid over any given integral type.
+// Doing additions via SWAR techniques requires an extra bit per lane be
+// available past the lane size, _or_ knowledge that both of your MSBs are set
+// 0 (leaving space for the operation).  Similarly, doing multiplications via
+// SWAR techniques require double bits per lane (unless you can bound your
+// inputs at half lane size)
+// This leads to a useful technique (which we use in the robin hood table)
+// where we interleave two related small bit count integers inside of a lane of
+// swar.  More generally, this is useful because it allows fast operations on
+// side a of a lane if side b is blitted out, and vice versa.  In the spirit of
+// separation of concerns, we provide a cut-lane-SWAR abstraction here.
+
+template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARDouble : SWAR<NBitsSideM+NBitsSideL, T> {
+  static constexpr inline auto Available = sizeof(T);
+  static constexpr inline auto LaneBits = NBitsSideL+NBitsSideM;
+  static constexpr inline auto NSlots = Available * 8 / LaneBits;
+
+  // U is most significant bits slice, L is least significant bits slice.
+  // 0x....U2L2U1L1 or UN|LN||...||U2|L2||U1|L1
+  using SD = swar::SWAR<LaneBits, T>;
+  SD data_;
+
+  static constexpr inline auto SideLOnes = makeBitmask<LaneBits, T>(SD{1});
+  static constexpr inline auto SideMOnes = makeBitmask<LaneBits, T>(SD{1<<NBitsSideL});
+  static constexpr inline auto SideLMask = makeBitmask<LaneBits, T>(SD{~(~0ull<<NBitsSideL)});
+  static constexpr inline auto SideMMask = makeBitmask<LaneBits, T>(SD{SideLMask^(~(~0ull<<LaneBits))});
+
+  constexpr auto sideL() {
+    return data_ & SideLMask;
+  }
+  constexpr auto sideM() {
+    return data_ & SideMMask;
+  }
+
 };
 
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
@@ -184,6 +226,13 @@ constexpr auto isolateLSB(T v) {
 template<int NBits, typename T = uint64_t>
 constexpr auto lowestNBitsMask() {
   return (T(1)<<NBits)-1;
+  //return ~((~T(0))<<NBits);
+}
+
+template<int NBits, uint64_t T>
+constexpr auto lowestNBitsMask() {
+  // return (u64(1)<<NBits)-1;
+  return ~((0ull)<<NBits);
 }
 
 /// Clears the block of N bits anchored at the LSB.
