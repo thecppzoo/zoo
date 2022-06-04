@@ -106,7 +106,7 @@ static_assert(0x4321 == popcount<1>(0xF754), "");
 static_assert(0x50004 == popcount<3>(0x3E001122), "");
 
 
-template<typename T> constexpr typename std::make_unsigned<T>::type msb(T v) {
+template<typename T> constexpr typename std::make_unsigned<T>::type msb_index(T v) {
     return 8*sizeof(T) - 1 - __builtin_clzll(v);
 }
 
@@ -134,7 +134,7 @@ template<int Size, typename T = uint64_t> struct SWAR {
         return SWAR(m_v & mask);
     }
 
-    constexpr int top() { return msb(m_v) / Size; }
+    constexpr int top() { return msb_index(m_v) / Size; }
     constexpr int fastIndex() { return __builtin_ctzll(m_v) / Size; }
 
     constexpr SWAR set(int index, int bit) {
@@ -172,6 +172,7 @@ constexpr BooleanSWAR<Size, T> greaterEqualSWAR(SWAR<Size, T> v) {
     return rv;
 }
 
+/// TODO(scottbruceheart) Improve tests
 static_assert(
     0x80880008 == greaterEqualSWAR<3>(SWAR<4, uint32_t>(0x32451027)).value(),
     ""
