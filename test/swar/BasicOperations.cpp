@@ -80,10 +80,10 @@ static_assert(0x20 == isolateLSB<u8>(0xE0));
 static_assert(0x40 == isolateLSB<u8>(0xC0));
 static_assert(0x80 == isolateLSB<u8>(0x80));
 
-static_assert(0x01 == maskLowBits<1, u8>());
-static_assert(0x03 == maskLowBits<2, u8>());
-static_assert(0x07 == maskLowBits<3, u8>());
-static_assert(0x0F == maskLowBits<4, u8>());
+static_assert(0x01 == lowestNBitsMask<1, u8>());
+static_assert(0x03 == lowestNBitsMask<2, u8>());
+static_assert(0x07 == lowestNBitsMask<3, u8>());
+static_assert(0x0F == lowestNBitsMask<4, u8>());
 
 static_assert(0xB == isolate<4>(0x1337'BDBC'2448'ACABull));
 static_assert(0xAB == isolate<8>(0x1337'BDBC'2448'ACABull));
