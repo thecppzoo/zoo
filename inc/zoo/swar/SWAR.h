@@ -108,12 +108,12 @@ constexpr uint64_t popcount(uint64_t a) noexcept {
 
 
 /// Index into the bits of the type T that contains the MSB.
-template<typename T> constexpr typename std::make_unsigned<T>::type msb_index(T v) noexcept {
+template<typename T> constexpr typename std::make_unsigned<T>::type msbIndex(T v) noexcept {
     return 8*sizeof(T) - 1 - __builtin_clzll(v);
 }
 
 /// Index into the bits of the type T that contains the LSB.
-template<typename T> constexpr typename std::make_unsigned<T>::type lsb_index(T v) noexcept {
+template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v) noexcept {
     return __builtin_ctzll(v) + 1;
 }
 
@@ -140,12 +140,9 @@ template<int NBits, typename T = uint64_t> struct SWAR {
         return SWAR(m_v & mask);
     }
 
-    /// The SWAR lane index that contains the MSB.  It is not the bit index of
-    /// the underlying type that contains the MSB.
+    /// The SWAR lane index that contains the MSB.  It is not the bit index of the MSB.
     /// IE: 8 bit wide 32 bit SWAR: 0x0040'0000 will return 5, not 43.
-    constexpr int top() const noexcept { return msb_index(m_v) / NBits; }
-    /// The SWAR lane index that contains the LSB.  It is not the bit index of
-    /// the underlying type that contains the LSB.
+    constexpr int top() const noexcept { return msbIndex(m_v) / NBits; }
     constexpr int lsbIndex() const noexcept { return __builtin_ctzll(m_v) / NBits; }
 
     constexpr SWAR set(int index, int bit) const noexcept {
@@ -160,6 +157,7 @@ template<int NBits, typename T = uint64_t> constexpr auto horizontalEquality(SWA
   return left.m_v == right.m_v;
 }
 
+/// Isolating more than bits in type currently results in disaster.
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
   return pattern & ((T(1)<<NBits)-1);
@@ -171,7 +169,7 @@ constexpr auto clearLSB(T v) {
   return v & (v - 1);
 }
 
-// Sets only the loest bit set in type T
+// Leaves on the lowest bit set, or all 1s for a 0 input.
 template<typename T = uint64_t>
 constexpr auto isolateLSB(T v) {
   return v & ~clearLSB(v);
@@ -204,21 +202,22 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
   return SWAR<NBits, T>(T(v) * Ones);
 }
 
+/// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
 template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     // Booleanness is stored in MSB of a given swar.
-    static constexpr T MSBs = broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1))).value();
+    static constexpr T maskLaneMSB = broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1))).value();
     constexpr explicit BooleanSWAR(T v): SWAR<NBits, T>(v) {}
 
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
-    constexpr int best() const noexcept { return this->top(); }
 
-    constexpr operator bool() const noexcept { return this->m_v; }
-
+    /// BooleanSWAR treats the MSB of each lane as the boolean associated with that lane.
+    /// A logical NOT in this circumstance _only_ flips the MSB of each lane.  This operation is
+    /// not ones or twos complement.
     constexpr BooleanSWAR operator not() const noexcept {
-        return MSBs ^ *this;
+        return maskLaneMSB ^ *this;
     }
  private:
     constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept: SWAR<NBits, T>(initializer) {}
@@ -230,9 +229,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T> greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
-    constexpr auto MSOnes = BooleanSWAR<NBits, T>::MSBs;
+    constexpr auto MLMSB = BooleanSWAR<NBits, T>::maskLaneMSB;
+    // TODO(scottbruceheart) operator- and others on SWAR to avoid using .value here.
     return SWAR<NBits, T>{
-        (((left.value() | MSOnes) - right.value()) & MSOnes)
+        (((left.value() | MLMSB) - right.value()) & MLMSB)
     };
 }
 
