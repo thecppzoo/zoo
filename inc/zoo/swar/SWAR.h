@@ -107,10 +107,12 @@ constexpr uint64_t popcount(uint64_t a) noexcept {
 }
 
 
+/// Index into the bits of the type T that contains the MSB.
 template<typename T> constexpr typename std::make_unsigned<T>::type msb_index(T v) noexcept {
     return 8*sizeof(T) - 1 - __builtin_clzll(v);
 }
 
+/// Index into the bits of the type T that contains the LSB.
 template<typename T> constexpr typename std::make_unsigned<T>::type lsb_index(T v) noexcept {
     return __builtin_ctzll(v) + 1;
 }
@@ -138,9 +140,12 @@ template<int NBits, typename T = uint64_t> struct SWAR {
         return SWAR(m_v & mask);
     }
 
-    /// Notably, this is the SWAR lane index that contains the MSB.
+    /// The SWAR lane index that contains the MSB.  It is not the bit index of
+    /// the underlying type that contains the MSB.
+    /// IE: 8 bit wide 32 bit SWAR: 0x0040'0000 will return 5, not 43.
     constexpr int top() const noexcept { return msb_index(m_v) / NBits; }
-    /// Notably, this is the SWAR lane index that contains the lsb.
+    /// The SWAR lane index that contains the LSB.  It is not the bit index of
+    /// the underlying type that contains the LSB.
     constexpr int lsbIndex() const noexcept { return __builtin_ctzll(m_v) / NBits; }
 
     constexpr SWAR set(int index, int bit) const noexcept {
@@ -160,29 +165,37 @@ constexpr auto isolate(T pattern) {
   return pattern & ((T(1)<<NBits)-1);
 }
 
+/// Clears the lowest bit set in type T
 template<typename T = uint64_t>
 constexpr auto clearLSB(T v) {
   return v & (v - 1);
 }
 
+// Sets only the loest bit set in type T
 template<typename T = uint64_t>
 constexpr auto isolateLSB(T v) {
   return v & ~clearLSB(v);
 }
 
 template<int NBits, typename T = uint64_t>
-constexpr auto maskLowBits() {
-  return (T(1)<<(NBits-1)) | ((T(1)<<(NBits-1))-1);
+constexpr auto lowestNBitsMask() {
+  return (T(1)<<NBits)-1;
 }
 
+/// Clears the block of N bits anchored at the LSB.
+/// clearLSBits<3> applied to binary 00111100 is binary 00100000
 template<int NBits, typename T = uint64_t>
 constexpr auto clearLSBits(T v) {
-  return v &(~(maskLowBits<NBits>() << metaLogFloor(isolateLSB<T>(v))));
+  constexpr auto lowMask = lowestNBitsMask<NBits>();
+  return v &(~(lowMask << metaLogFloor(isolateLSB<T>(v))));
 }
 
+/// Isolates the block of N bits anchored at the LSB.
+/// isolateLSBits<2> applied to binary 00111100 is binary 00001100
 template<int NBits, typename T = uint64_t>
 constexpr auto isolateLSBits(T v) {
-  return v &(maskLowBits<NBits>() << metaLogFloor(isolateLSB<T>(v)));
+  constexpr auto lowMask = lowestNBitsMask<NBits>();
+  return v &(lowMask << metaLogFloor(isolateLSB<T>(v)));
 }
 
 template<int NBits, typename T = uint64_t>
