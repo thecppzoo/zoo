@@ -49,13 +49,13 @@ static_assert(0x210 == popcount<0>(0x320));
 static_assert(0x4321 == popcount<1>(0xF754));
 static_assert(0x50004 == popcount<3>(0x3E001122));
 
-static_assert(1 == msb_index<u64>(1ull<<1));
-static_assert(3 == msb_index<u64>(1ull<<3));
-static_assert(5 == msb_index<u64>(1ull<<5));
-static_assert(8 == msb_index<u64>(1ull<<8));
-static_assert(17 == msb_index<u64>(1ull<<17));
-static_assert(30 == msb_index<u64>(1ull<<30));
-static_assert(31 == msb_index<u64>(1ull<<31));
+static_assert(1 == msbIndex<u64>(1ull<<1));
+static_assert(3 == msbIndex<u64>(1ull<<3));
+static_assert(5 == msbIndex<u64>(1ull<<5));
+static_assert(8 == msbIndex<u64>(1ull<<8));
+static_assert(17 == msbIndex<u64>(1ull<<17));
+static_assert(30 == msbIndex<u64>(1ull<<30));
+static_assert(31 == msbIndex<u64>(1ull<<31));
 
 static_assert(0xAA == makeBitmask<2, u8>(0x2));
 static_assert(0x0808'0808ull == makeBitmask<8, u32>(0x8));
@@ -116,12 +116,12 @@ static_assert(0x0E0E'0E0E == u32(broadcast<8>(SWAR<8, u32>(0x0000'000E))));
 static_assert(0x6B6B'6B6B == u32(broadcast<8>(SWAR<8, u32>(0x0000'006B))));
 static_assert(0x0808'0808'0808'0808ull == u64(broadcast<8>(SWAR<8, u64>(0x0000'0000'0000'0008ull))));
 
-static_assert(2 == lsb_index(1<<1));
-static_assert(4 == lsb_index(1<<3));
-static_assert(6 == lsb_index(1<<5));
-static_assert(9 == lsb_index(1<<8));
-static_assert(18 == lsb_index(1<<17));
-static_assert(31 == lsb_index(1<<30));
+static_assert(2 == lsbIndex(1<<1));
+static_assert(4 == lsbIndex(1<<3));
+static_assert(6 == lsbIndex(1<<5));
+static_assert(9 == lsbIndex(1<<8));
+static_assert(18 == lsbIndex(1<<17));
+static_assert(31 == lsbIndex(1<<30));
 
 static_assert(0x80880008 == greaterEqual<3>(SWAR<4, uint32_t>(0x3245'1027)).value());
 static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x0123'4567)).value());
