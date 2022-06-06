@@ -100,6 +100,15 @@ static_assert(0xF8 == clearLSBits<2, u8>(0xFB));
 static_assert(0xF0 == clearLSBits<2, u8>(0xFC));
 static_assert(0xFC == clearLSBits<2, u8>(0xFF));
 
+static_assert(0x80 == clearLSBits<4, u8>(0xF8));
+static_assert(0xC0 == clearLSBits<4, u8>(0xF4));
+static_assert(0xE0 == clearLSBits<4, u8>(0xF2));
+static_assert(0xF0 == clearLSBits<4, u8>(0xF1));
+
+static_assert(0xF0 == clearLSBits<4, u8>(0xFF));
+static_assert(0xC0 == clearLSBits<4, u8>(0xFC));
+static_assert(0xE0 == clearLSBits<4, u8>(0xFA));
+
 static_assert(0x80 == isolateLSBits<2, u8>(0x80));
 static_assert(0xC0 == isolateLSBits<2, u8>(0xC0));
 static_assert(0x60 == isolateLSBits<2, u8>(0xE0));
@@ -129,56 +138,66 @@ static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x7654'3210)).valu
 static_assert(0x00000008 == greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).value());
 static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).value());
 
-static_assert(0x8000'0080 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(0x1000'0010), SWAR<4, u32>(0x0111'1101)).value());
-static_assert(0x8000'0080 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(0x4333'3343), SWAR<4, u32>(0x4444'4444)).value());
 
 // Unusual formatting for easy visual verification.
-static_assert(0x8888'8888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x0000'0000)).value());
-static_assert(0x0888'8888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x1111'1111)).value());
-static_assert(0x0088'8888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x2222'2222)).value());
-static_assert(0x0008'8888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x3333'3333)).value());
-static_assert(0x0000'8888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x4444'4444)).value());
-static_assert(0x0000'0888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x5555'5555)).value());
-static_assert(0x0000'0088 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x6666'6666)).value());
-static_assert(0x0000'0008 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0123'4567), SWAR<4, u32>(
-              0x7777'7777)).value());
+#define GE_MSB_TEST(left, right, result) static_assert(result== greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
-static_assert(0x8000'0000 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x0000'0000), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8800'0000 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x1111'1111), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8880'0000 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x2222'2222), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8888'0000 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x3333'3333), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8888'8000 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x4444'4444), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8888'8800 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x5555'5555), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8888'8880 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x6666'6666), SWAR<4, u32>(
-              0x0123'4567)).value());
-static_assert(0x8888'8888 == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(
-              0x7777'7777), SWAR<4, u32>(
-              0x0123'4567)).value());
+GE_MSB_TEST(0x1000'0010,
+            0x0111'1101,
+            0x8000'0080)
+GE_MSB_TEST(0x4333'3343,
+            0x4444'4444,
+            0x8000'0080)
+
+GE_MSB_TEST(0x0123'4567,
+            0x0000'0000,
+            0x8888'8888); 
+GE_MSB_TEST(0x0123'4567,
+            0x0000'0000,
+            0x8888'8888)
+GE_MSB_TEST(0x0123'4567,
+            0x1111'1111,
+            0x0888'8888)
+GE_MSB_TEST(0x0123'4567,
+            0x2222'2222,
+            0x0088'8888)
+GE_MSB_TEST(0x0123'4567,
+            0x3333'3333,
+            0x0008'8888)
+GE_MSB_TEST(0x0123'4567,
+            0x4444'4444,
+            0x0000'8888)
+GE_MSB_TEST(0x0123'4567,
+            0x5555'5555,
+            0x0000'0888)
+GE_MSB_TEST(0x0123'4567,
+            0x6666'6666,
+            0x0000'0088)
+GE_MSB_TEST(0x0123'4567,
+            0x7777'7777,
+            0x0000'0008)
+
+GE_MSB_TEST(0x0000'0000,
+            0x0123'4567,
+            0x8000'0000)
+GE_MSB_TEST(0x1111'1111,
+            0x0123'4567,
+            0x8800'0000)
+GE_MSB_TEST(0x2222'2222,
+            0x0123'4567,
+            0x8880'0000)
+GE_MSB_TEST(0x3333'3333,
+            0x0123'4567,
+            0x8888'0000)
+GE_MSB_TEST(0x4444'4444,
+            0x0123'4567,
+            0x8888'8000)
+GE_MSB_TEST(0x5555'5555,
+            0x0123'4567,
+            0x8888'8800)
+GE_MSB_TEST(0x6666'6666,
+            0x0123'4567,
+            0x8888'8880)
+GE_MSB_TEST(0x7777'7777,
+            0x0123'4567,
+            0x8888'8888)
