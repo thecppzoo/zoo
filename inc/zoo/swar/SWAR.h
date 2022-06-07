@@ -117,6 +117,11 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
     return __builtin_ctzll(v) + 1;
 }
 
+/// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
+/// of NBits width against a type T, and provides an abstraction for performing
+/// SIMD operations against that primitive type T treated as a SIMD register.
+/// SWAR operations are usually constant time, log(lane count) cost, or O(lane count) cost.
+/// Certain computaitonal workloads can be materially sped up using SWAR techniques.
 template<int NBits, typename T = uint64_t> struct SWAR {
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -196,6 +201,8 @@ constexpr auto isolateLSBits(T v) {
   return v &(lowMask << metaLogFloor(isolateLSB<T>(v)));
 }
 
+/// Broadcasts the value in the 0th lane of the SWAR to the entire SWAR.
+/// Precondition: 0th lane of |v| contains a value to broadcast, remainder of input SWAR zero.
 template<int NBits, typename T = uint64_t>
 constexpr auto broadcast(SWAR<NBits, T> v) {
   constexpr T Ones = makeBitmask<NBits, T>(SWAR<NBits, T>{1}.value());
