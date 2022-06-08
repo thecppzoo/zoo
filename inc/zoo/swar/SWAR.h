@@ -121,7 +121,7 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
 /// of NBits width against a type T, and provides an abstraction for performing
 /// SIMD operations against that primitive type T treated as a SIMD register.
 /// SWAR operations are usually constant time, log(lane count) cost, or O(lane count) cost.
-/// Certain computaitonal workloads can be materially sped up using SWAR techniques.
+/// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits, typename T = uint64_t> struct SWAR {
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -146,7 +146,7 @@ template<int NBits, typename T = uint64_t> struct SWAR {
     }
 
     /// The SWAR lane index that contains the MSB.  It is not the bit index of the MSB.
-    /// IE: 8 bit wide 32 bit SWAR: 0x0040'0000 will return 5, not 43.
+    /// IE: 4 bit wide 32 bit SWAR: 0x0040'0000 will return 5, not 22 (0 indexed).
     constexpr int top() const noexcept { return msbIndex(m_v) / NBits; }
     constexpr int lsbIndex() const noexcept { return __builtin_ctzll(m_v) / NBits; }
 
@@ -162,7 +162,8 @@ template<int NBits, typename T = uint64_t> constexpr auto horizontalEquality(SWA
   return left.m_v == right.m_v;
 }
 
-/// Isolating more than bits in type currently results in disaster.
+/// Isolating >= NBits in underlying integer type currently results in disaster.
+// TODO(scottbruceheart) Attempting to use binary not (~) results in negative shift warnings.
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
   return pattern & ((T(1)<<NBits)-1);
@@ -174,7 +175,7 @@ constexpr auto clearLSB(T v) {
   return v & (v - 1);
 }
 
-// Leaves on the lowest bit set, or all 1s for a 0 input.
+/// Leaves on the lowest bit set, or all 1s for a 0 input.
 template<typename T = uint64_t>
 constexpr auto isolateLSB(T v) {
   return v & ~clearLSB(v);
