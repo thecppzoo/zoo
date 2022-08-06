@@ -2,7 +2,7 @@
 
 /// \file Swar.h SWAR operations
 
-#include "zoo/swar/metaLog.h"
+#include "zoo/meta/log.h"
 
 #include <type_traits>
 
@@ -13,97 +13,14 @@ using u32 = uint32_t;
 using u16 = uint16_t;
 using u8 = uint8_t;
 
-/// Repeats the given pattern in the whole of the argument
-/// \tparam T the desired integral type
-/// \tparam Progression how big the pattern is
-/// \tparam Remaining how many more times to copy the pattern
-template<typename T, int Progression, int Remaining> struct BitmaskMaker {
-    constexpr static T repeat(T v) noexcept {
-        return
-            BitmaskMaker<T, Progression, Remaining - 1>::repeat(v | (v << Progression));
-    }
-};
-template<typename T, int P> struct BitmaskMaker<T, P, 0> {
-    constexpr static T repeat(T v) noexcept { return v; }
-};
-
-/// Front end to \c BitmaskMaker with the repeating count set to the whole size
-template<int size, typename T>
-constexpr T makeBitmask(T v) noexcept {
-    return BitmaskMaker<T, size, sizeof(T)*8/size>::repeat(v);
-}
-
-/// Core implementation details
-namespace detail {
-    template<int level>
-    constexpr auto popcountMask =
-        makeBitmask<1 << (level + 1)>(
-            BitmaskMaker<uint64_t, 1, (1 << level) - 1>::repeat(1)
-        );
-
-    static_assert(makeBitmask<2>(1ull) == popcountMask<0>);
-}
-
-template<int Bits> struct UInteger_impl;
-template<> struct UInteger_impl<8> { using type = uint8_t; };
-template<> struct UInteger_impl<16> { using type = uint16_t; };
-template<> struct UInteger_impl<32> { using type = uint32_t; };
-template<> struct UInteger_impl<64> { using type = uint64_t; };
-
-template<int Bits> using UInteger = typename UInteger_impl<Bits>::type;
-
-template<int Level>
-constexpr uint64_t popcount_logic(uint64_t arg) noexcept {
-    auto v = popcount_logic<Level - 1>(arg);
-    constexpr auto shifter = 1 << Level;
-    return
-        ((v >> shifter) & detail::popcountMask<Level>) +
-        (v & detail::popcountMask<Level>);
-}
-/// Hamming weight of each bit pair
-template<>
-constexpr uint64_t popcount_logic<0>(uint64_t v) noexcept {
-    // 00: 00; 00
-    // 01: 01; 01
-    // 10: 01; 01
-    // 11: 10; 10
-    return v - ((v >> 1) & detail::popcountMask<0>);
-}
-
-template<int Level>
-constexpr uint64_t popcount_builtin(uint64_t v) noexcept {
-    using UI = UInteger<1 << (Level + 3)>;
-    constexpr auto times = 8*sizeof(v);
-    uint64_t rv = 0;
-    for(auto n = times; n; ) {
-        n -= 8*sizeof(UI);
-        UI tmp = v >> n;
-        tmp = __builtin_popcountll(tmp);
-        rv |= uint64_t(tmp) << n;
-    }
-    return rv;
-}
-
-namespace detail {
-
-    template<bool> struct Selector_impl {
-        template<int Level>
-        constexpr static uint64_t execute(uint64_t v) noexcept {
-            return popcount_logic<Level>(v);
-        }
-    };
-    template<> struct Selector_impl<true> {
-        template<int Level>
-        constexpr static uint64_t execute(uint64_t v) noexcept {
-            return popcount_builtin<Level - 2>(v);
-        }
-    };
-
-}
-
-template<int Level>
+template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
-    return detail::Selector_impl<2 < Level>::template execute<Level>(a);
+    return
+        std::conditional_t<
+            (4 < LogNBits),
+            meta::PopcountIntrinsic<LogNBits>,
+            meta::PopcountLogic<LogNBits>
+        >::execute(a);
 }
 
 
@@ -191,7 +108,7 @@ constexpr auto lowestNBitsMask() {
 template<int NBits, typename T = uint64_t>
 constexpr auto clearLSBits(T v) {
   constexpr auto lowMask = lowestNBitsMask<NBits>();
-  return v &(~(lowMask << metaLogFloor(isolateLSB<T>(v))));
+  return v &(~(lowMask << meta::logFloor(isolateLSB<T>(v))));
 }
 
 /// Isolates the block of N bits anchored at the LSB.
@@ -199,14 +116,14 @@ constexpr auto clearLSBits(T v) {
 template<int NBits, typename T = uint64_t>
 constexpr auto isolateLSBits(T v) {
   constexpr auto lowMask = lowestNBitsMask<NBits>();
-  return v &(lowMask << metaLogFloor(isolateLSB<T>(v)));
+  return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
 }
 
 /// Broadcasts the value in the 0th lane of the SWAR to the entire SWAR.
 /// Precondition: 0th lane of |v| contains a value to broadcast, remainder of input SWAR zero.
 template<int NBits, typename T = uint64_t>
 constexpr auto broadcast(SWAR<NBits, T> v) {
-  constexpr T Ones = makeBitmask<NBits, T>(SWAR<NBits, T>{1}.value());
+  constexpr T Ones = meta::BitmaskMaker<T, 1, NBits>::value;
   return SWAR<NBits, T>(T(v) * Ones);
 }
 
@@ -248,14 +165,50 @@ template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T> greaterEqual(SWAR<NBits, T> v) noexcept {
     static_assert(1 < NBits, "Degenerated SWAR");
     //static_assert(metaLogCeiling(N) < NBits, "N is too big for this technique");  // ctzll isn't constexpr.
-    constexpr auto msbPos  = NBits - 1;
-    constexpr auto msb = T(1) << msbPos;
-    constexpr auto msbMask = makeBitmask<NBits, T>(msb);
-    constexpr auto subtraend = makeBitmask<NBits, T>(N);
+    constexpr auto msbPosition  = NBits - 1;
+    constexpr auto msb = T(1) << msbPosition;
+    constexpr auto msbMask = meta::BitmaskMaker<T, msb, NBits>::value;
+    constexpr auto subtraend = meta::BitmaskMaker<T, N, NBits>::value;
     auto adjusted = v.value() | msbMask;
     auto rv = adjusted - subtraend;
     rv &= msbMask;
     return BooleanSWAR<NBits, T>(rv);
 }
+
+/*
+This is just a draft implementation:
+1. The isolator needs pre-computing instead of adding 3 ops per iteration
+2. The update of the isolator is not needed in the last iteration
+3. Consider returning not the logarithm, but the biased by 1 (to support 0)
+ */
+template<int NBits, typename T>
+constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
+    constexpr auto LogNBits = meta::logFloor(NBits);
+    static_assert(NBits == (1 << LogNBits), "Logarithms of element width not power of two is un-implemented");
+    auto whole = v.value();
+    auto isolationMask = BooleanSWAR<NBits, T>::maskLaneMSB;
+    for(auto groupSize = 1; groupSize < NBits; groupSize <<= 1) {
+        auto shifted = whole >> groupSize;
+
+        // When shifting down a group to double the size of a group, the upper
+        // "groupSize" bits will come from the element above, mask them out
+        auto isolator = ~isolationMask;
+        auto withoutCrossing = shifted & isolator;
+        whole |= withoutCrossing;
+        isolationMask |= (isolationMask >> groupSize);
+    }
+    constexpr auto ones = meta::BitmaskMaker<T, 1, NBits>::value;
+    auto popcounts = meta::PopcountLogic<LogNBits, T>::execute(whole);
+    return SWAR<NBits, T>{popcounts - ones};
+}
+
+static_assert(
+    logarithmFloor(SWAR<8>{0x8040201008040201ull}).value() ==
+    0x0706050403020100ull
+);
+static_assert(
+    logarithmFloor(SWAR<8>{0xFF7F3F1F0F070301ull}).value() ==
+    0x0706050403020100ull
+);
 
 }}
