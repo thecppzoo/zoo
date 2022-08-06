@@ -1,4 +1,3 @@
-#include "zoo/swar/metaLog.h"
 #include "zoo/swar/SWAR.h"
 
 #include "catch2/catch.hpp"
@@ -8,7 +7,11 @@
 using namespace zoo;
 using namespace zoo::swar;
 
-#define HE(nbits, t, v0, v1) static_assert(horizontalEquality<nbits, t>(SWAR<nbits, t>(v0), SWAR<nbits, t>(makeBitmask<nbits, t>(v1))));
+#define HE(nbits, t, v0, v1) \
+    static_assert(horizontalEquality<nbits, t>(\
+        SWAR<nbits, t>(v0),\
+        SWAR<nbits, t>(meta::BitmaskMaker<t, v1, nbits>::value)\
+    ));
 HE(8, u64, 0x0808'0808'0808'0808, 0x8);
 HE(4, u64, 0x1111'1111'1111'1111, 0x1);
 HE(3, u64, 0xFFFF'FFFF'FFFF'FFFF, 0x7);
@@ -37,17 +40,22 @@ TEST_CASE(
     CHECK(i == isolate<11>(0xF800+i));
     CHECK(i == isolate<11>(0xFFF800+i));
   }
+    auto v = logarithmFloor(SWAR<8>{0xFF7F3F1F0F070301ull}).value();
+    CHECK(
+        v ==
+        0x07060504030201
+    );
 }
 
-static_assert(1 == popcount<4>(0x100ull));
-static_assert(1 == popcount<4>(0x010ull));
-static_assert(1 == popcount<4>(0x001ull));
-static_assert(4 == popcount<4>(0xF00ull));
-static_assert(8 == popcount<4>(0xFF0ull));
-static_assert(9 == popcount<4>(0xEEEull));
-static_assert(0x210 == popcount<0>(0x320));
-static_assert(0x4321 == popcount<1>(0xF754));
-static_assert(0x50004 == popcount<3>(0x3E001122));
+static_assert(1 == popcount<5>(0x100ull));
+static_assert(1 == popcount<5>(0x010ull));
+static_assert(1 == popcount<5>(0x001ull));
+static_assert(4 == popcount<5>(0xF00ull));
+static_assert(8 == popcount<5>(0xFF0ull));
+static_assert(9 == popcount<5>(0xEEEull));
+static_assert(0x210 == popcount<1>(0x320));
+static_assert(0x4321 == popcount<2>(0xF754));
+static_assert(0x50004 == popcount<4>(0x3E001122));
 
 static_assert(1 == msbIndex<u64>(1ull<<1));
 static_assert(3 == msbIndex<u64>(1ull<<3));
@@ -57,12 +65,16 @@ static_assert(17 == msbIndex<u64>(1ull<<17));
 static_assert(30 == msbIndex<u64>(1ull<<30));
 static_assert(31 == msbIndex<u64>(1ull<<31));
 
-static_assert(0xAA == makeBitmask<2, u8>(0x2));
-static_assert(0x0808'0808ull == makeBitmask<8, u32>(0x8));
-static_assert(0x0808'0808'0808'0808ull == makeBitmask<8, u64>(0x08ull));
-static_assert(0x0101'0101'0101'0101ull == makeBitmask<8, u64>(0x01ull));
-static_assert(0x0E0E'0E0E'0E0E'0E0Eull == makeBitmask<8, u64>(0x0Eull));
-static_assert(0x0303'0303'0303'0303ull == makeBitmask<8, u64>(0x03ull));
+namespace {
+using namespace zoo::meta;
+
+static_assert(0xAA == BitmaskMaker<u8, 2, 2>::value);
+static_assert(0x0808'0808ull == BitmaskMaker<u32, 8, 8>::value);
+static_assert(0x0808'0808'0808'0808ull == BitmaskMaker<u64, 0x08ull, 8>::value);
+static_assert(0x0101'0101'0101'0101ull == BitmaskMaker<u64, 0x01ull, 8>::value);
+static_assert(0x0E0E'0E0E'0E0E'0E0Eull == BitmaskMaker<u64, 0x0Eull, 8>::value);
+static_assert(0x0303'0303'0303'0303ull == BitmaskMaker<u64, 0x03ull, 8>::value);
+}
 
 static_assert(0x00 == clearLSB<u8>(0x80));
 static_assert(0x80 == clearLSB<u8>(0xC0));
