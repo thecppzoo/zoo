@@ -183,10 +183,23 @@ GE_MSB_TEST(0x7777'7777,
             0x8888'8888)
 
 using Lanes = SWARWithSubLanes<3,5,u32>;
+using S8u32 = SWAR<8, u32>;
+static constexpr inline u32 allF = broadcast<8>(S8u32(0x0000'00FFul)).value();
+static_assert(allF == Lanes(allF).value());
 
-static_assert(0xFFFF'FFE0 == u32(Lanes{broadcast<8>(SWAR<8, u32>(0x0000'00FF)).value()}.setSideL(0,0)));
+
+//static_assert(0xFFFF'FFFF, SWARWithSubLanes<3,5,u32>(0xFFFF'FFFF).value());
+
+TEST_CASE(
+    "Sub Lanes",
+    "[swar][swarlane]"
+) {
+  Lanes lane{allF};
+  CHECK(0xFFFF'FFE0 == lane.setSideL(0,0).value());
+}
+static_assert(allF == Lanes(allF).value());
+static_assert(0xFFFF'FFE0 == Lanes(allF).setSideL(0,0).value());
+
 //static_assert(0xFFFF'FFF8 == u32(Lanes(broadcast<8>(SWAR<8, u32>(0x0000'00FF))).setSideM(0,0)));
 //static_assert(0xFFFF'E0E0 == u32(Lanes(broadcast<8>(SWAR<8, u32>(0x0000'00FF))).setSideL(1,0)));
 //static_assert(0xFFFF'F8FF == u32(Lanes(broadcast<8>(SWAR<8, u32>(0x0000'00FF))).setSideM(1,0)));
-
-));

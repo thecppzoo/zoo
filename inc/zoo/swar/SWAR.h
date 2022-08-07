@@ -181,10 +181,14 @@ template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARWithS
   static constexpr inline auto LaneBits = NBitsSideL+NBitsSideM;
   static constexpr inline auto NSlots = Available * 8 / LaneBits;
 
+  SWARWithSubLanes() = default;
+  constexpr explicit SWARWithSubLanes(T v): m_v(v) {}
+  constexpr explicit operator T() const noexcept { return m_v; }
+
   // U is most significant bits slice, L is least significant bits slice.
   // 0x....U2L2U1L1 or UN|LN||...||U2|L2||U1|L1
   using SD = swar::SWAR<LaneBits, T>;
-  SD data_;
+  SD m_v;
 
   //constexpr T Ones = makeBitmask<NBits, T>(SWAR<NBits, T>{1}.value());
   static constexpr inline auto SideLOnes = makeBitmask<LaneBits, T>(SD{1}.value());
@@ -192,18 +196,20 @@ template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARWithS
   static constexpr inline auto SideLMask = makeBitmask<LaneBits, T>(SD{~(~0ull<<NBitsSideL)}.value());
   static constexpr inline auto SideMMask = makeBitmask<LaneBits, T>(SD{SideLMask^(~(~0ull<<LaneBits))}.value());
 
-  constexpr auto sideL() {
-    return data_ & SideLMask;
+  constexpr auto sideL() const {
+    return m_v & SideLMask;
   }
-  constexpr auto sideM() {
-    return data_ & SideMMask;
+  constexpr auto sideM() const {
+    return m_v & SideMMask;
   }
 
-  constexpr void setSideL(SD in, u8 pos) {
-    data_ =data_.set( pos, (data_.at(pos) & SideMMask) | in);
+  // Sets the lsb sublane 
+  constexpr auto setSideL(T in, u8 pos) const {
+    return m_v.set( pos, (m_v.at(pos) & SideMMask) | in);
   }
-  constexpr void setSideM(SD in, u8 pos) {
-    data_ = data_ .set(pos, (data_.at(pos) & SideLMask) | in);
+
+  constexpr auto setSideM(T in, u8 pos) const {
+    return m_v .set(pos, (m_v.at(pos) & SideLMask) | (in<<NBitsSideL));
   }
 
 };
