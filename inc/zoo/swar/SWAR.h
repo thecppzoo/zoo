@@ -125,6 +125,7 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
 /// SWAR operations are usually constant time, log(lane count) cost, or O(lane count) cost.
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits, typename T = uint64_t> struct SWAR {
+    static constexpr inline auto LaneCount = sizeof(T) * 8 / NBits;
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
@@ -175,7 +176,7 @@ template<int NBits, typename T = uint64_t> struct SWAR {
 // side a of a lane if side b is blitted out, and vice versa.  In the spirit of
 // separation of concerns, we provide a cut-lane-SWAR abstraction here.
 
-template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARDouble : SWAR<NBitsSideM+NBitsSideL, T> {
+template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARWithSubLanes : SWAR<NBitsSideM+NBitsSideL, T> {
   static constexpr inline auto Available = sizeof(T);
   static constexpr inline auto LaneBits = NBitsSideL+NBitsSideM;
   static constexpr inline auto NSlots = Available * 8 / LaneBits;
@@ -185,10 +186,11 @@ template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARDoubl
   using SD = swar::SWAR<LaneBits, T>;
   SD data_;
 
-  static constexpr inline auto SideLOnes = makeBitmask<LaneBits, T>(SD{1});
-  static constexpr inline auto SideMOnes = makeBitmask<LaneBits, T>(SD{1<<NBitsSideL});
-  static constexpr inline auto SideLMask = makeBitmask<LaneBits, T>(SD{~(~0ull<<NBitsSideL)});
-  static constexpr inline auto SideMMask = makeBitmask<LaneBits, T>(SD{SideLMask^(~(~0ull<<LaneBits))});
+  //constexpr T Ones = makeBitmask<NBits, T>(SWAR<NBits, T>{1}.value());
+  static constexpr inline auto SideLOnes = makeBitmask<LaneBits, T>(SD{1}.value());
+  static constexpr inline auto SideMOnes = makeBitmask<LaneBits, T>(SD{1<<NBitsSideL}.value());
+  static constexpr inline auto SideLMask = makeBitmask<LaneBits, T>(SD{~(~0ull<<NBitsSideL)}.value());
+  static constexpr inline auto SideMMask = makeBitmask<LaneBits, T>(SD{SideLMask^(~(~0ull<<LaneBits))}.value());
 
   constexpr auto sideL() {
     return data_ & SideLMask;
@@ -197,7 +199,16 @@ template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARDoubl
     return data_ & SideMMask;
   }
 
+  constexpr void setSideL(SD in, u8 pos) {
+    data_ =data_.set( pos, (data_.at(pos) & SideMMask) | in);
+  }
+  constexpr void setSideM(SD in, u8 pos) {
+    data_ = data_ .set(pos, (data_.at(pos) & SideLMask) | in);
+  }
+
 };
+
+
 
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t> constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
