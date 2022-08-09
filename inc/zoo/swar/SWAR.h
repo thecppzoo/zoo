@@ -6,6 +6,7 @@
 
 #include <type_traits>
 
+#include <iostream>
 
 
 namespace zoo { namespace swar {
@@ -182,34 +183,70 @@ template<int NBitsSideM, int NBitsSideL, typename T = uint64_t> struct SWARWithS
   static constexpr inline auto NSlots = Available * 8 / LaneBits;
 
   SWARWithSubLanes() = default;
-  constexpr explicit SWARWithSubLanes(T v): m_v(v) {}
-  constexpr explicit operator T() const noexcept { return m_v; }
+  constexpr explicit SWARWithSubLanes(T v) : SWAR<NBitsSideM+NBitsSideL, T>(v) {}
+  constexpr explicit operator T() const noexcept { return this->m_v; }
 
   // U is most significant bits slice, L is least significant bits slice.
   // 0x....U2L2U1L1 or UN|LN||...||U2|L2||U1|L1
+  using SL = SWARWithSubLanes<NBitsSideM, NBitsSideL, T>;
   using SD = swar::SWAR<LaneBits, T>;
-  SD m_v;
 
   //constexpr T Ones = makeBitmask<NBits, T>(SWAR<NBits, T>{1}.value());
   static constexpr inline auto SideLOnes = makeBitmask<LaneBits, T>(SD{1}.value());
   static constexpr inline auto SideMOnes = makeBitmask<LaneBits, T>(SD{1<<NBitsSideL}.value());
   static constexpr inline auto SideLMask = makeBitmask<LaneBits, T>(SD{~(~0ull<<NBitsSideL)}.value());
-  static constexpr inline auto SideMMask = makeBitmask<LaneBits, T>(SD{SideLMask^(~(~0ull<<LaneBits))}.value());
+  static constexpr inline auto SideMMask = ~SideLMask;
 
-  constexpr auto sideL() const {
-    return m_v & SideLMask;
+  constexpr auto sideL() const noexcept {
+    return this->m_v & SideLMask;
   }
-  constexpr auto sideM() const {
-    return m_v & SideMMask;
+  constexpr auto sideL(u32 pos) const noexcept {
+    constexpr auto filter = (T(1) << LaneBits) - 1;
+    const auto keep = (filter << (LaneBits * pos)) & SideLMask;
+    return this->m_v & keep;
+  }
+  constexpr auto sideLFlat(u32 pos) const noexcept {
+    return sideL(pos) >> (LaneBits*pos);
+  }
+  constexpr auto sideM() const noexcept {
+    return this->m_v & SideMMask;
+  }
+  constexpr auto sideM(u32 pos) const noexcept {
+    constexpr auto filter = (T(1) << LaneBits) - 1;
+    const auto keep = (filter << (LaneBits * pos)) & SideMMask;
+    return this->m_v & keep;
+  }
+  constexpr auto sideMFlat(u32 pos) const noexcept {
+    return sideM(pos) >> (LaneBits*pos)>> NBitsSideL;
   }
 
-  // Sets the lsb sublane 
-  constexpr auto setSideL(T in, u8 pos) const {
-    return m_v.set( pos, (m_v.at(pos) & SideMMask) | in);
+  // Sets the lsb sublane at |pos| with NBitsSideL of |in|
+  constexpr auto setSideL(T in, u8 pos) const noexcept {
+    constexpr auto filter = (T(1) << LaneBits) - 1;
+    const auto keep = ~(filter << (LaneBits * pos)) | SideMMask;
+    const auto rdyToInsert = this->m_v & keep;
+    const auto rval = rdyToInsert | ((in & SideLMask) << (LaneBits * pos));
+    //std::cerr << std::hex << "setSideL in " << in << " pos " << u32(pos) << " lmask " << SideLMask << " mmask " << SideMMask << " filter " << filter << " keep " << keep << " ins " << rdyToInsert << " rval " << rval 
+// << "\n" ;
+    return SL(rval);
+    //return SL(SL((this->m_v & keep)).value() | ((in & SideLMask) << (LaneBits * pos)));
+    //(in & SideMMask) << (LaneBits * pos)
+    //this->m_v & SideMMask
+    //return this->m_v.set( pos, 0); //(this->m_v.at(pos) & SideMMask) & in);
   }
+    //constexpr T at(int position) const noexcept {
+        //constexpr auto filter = (T(1) << LaneBits) - 1;
+        //return filter & (this->m_v >> (LaneBits * position));
 
-  constexpr auto setSideM(T in, u8 pos) const {
-    return m_v .set(pos, (m_v.at(pos) & SideLMask) | (in<<NBitsSideL));
+  constexpr auto setSideM(T in, u8 pos) const noexcept {
+    constexpr auto filter = (T(1) << LaneBits) - 1;
+    const auto keep = ~(filter << (LaneBits * pos)) | SideLMask;
+    const auto rdyToInsert = this->m_v & keep;
+    const auto insVal = (((in<<NBitsSideL) & SideMMask) << (LaneBits * pos));
+    const auto rval = rdyToInsert | insVal;
+    //std::cerr << std::hex << "setSideM in " << in << " pos " << u32(pos) << " lmask " << SideLMask << " mmask " << SideMMask << " filter " << filter << " keep " << keep << " ins " << rdyToInsert << " insval " << insVal << " rval " << rval 
+  // << "\n" ;
+    return SL(rval);
   }
 
 };

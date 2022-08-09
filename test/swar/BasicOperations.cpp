@@ -182,24 +182,58 @@ GE_MSB_TEST(0x7777'7777,
             0x0123'4567,
             0x8888'8888)
 
+// 3 bits on msb side, 5 bits on lsb side.
 using Lanes = SWARWithSubLanes<3,5,u32>;
 using S8u32 = SWAR<8, u32>;
 static constexpr inline u32 allF = broadcast<8>(S8u32(0x0000'00FFul)).value();
-static_assert(allF == Lanes(allF).value());
-
-
-//static_assert(0xFFFF'FFFF, SWARWithSubLanes<3,5,u32>(0xFFFF'FFFF).value());
 
 TEST_CASE(
     "Sub Lanes",
     "[swar][swarlane]"
 ) {
-  Lanes lane{allF};
+  Lanes lane(allF);
+  CHECK(0xFFFF'FFFF == lane.value());
   CHECK(0xFFFF'FFE0 == lane.setSideL(0,0).value());
-}
-static_assert(allF == Lanes(allF).value());
-static_assert(0xFFFF'FFE0 == Lanes(allF).setSideL(0,0).value());
+  CHECK(0xFFFF'FFE1 == lane.setSideL(1,0).value());
+  CHECK(0xFFFF'E0FF == lane.setSideL(0,1).value());
+  CHECK(0xFFFF'E1FF == lane.setSideL(1,1).value());
 
-//static_assert(0xFFFF'FFF8 == u32(Lanes(broadcast<8>(SWAR<8, u32>(0x0000'00FF))).setSideM(0,0)));
-//static_assert(0xFFFF'E0E0 == u32(Lanes(broadcast<8>(SWAR<8, u32>(0x0000'00FF))).setSideL(1,0)));
-//static_assert(0xFFFF'F8FF == u32(Lanes(broadcast<8>(SWAR<8, u32>(0x0000'00FF))).setSideM(1,0)));
+  CHECK(0xFFFF'FF1F == lane.setSideM(0,0).value());
+  CHECK(0xFFFF'FF3F == lane.setSideM(1,0).value());
+  CHECK(0xFFFF'1FFF == lane.setSideM(0,1).value());
+  CHECK(0xFFFF'3FFF == lane.setSideM(1,1).value());
+}
+
+static_assert(allF == Lanes(allF).value());
+static_assert(0xFFFF'FFFF == Lanes(allF).value());
+
+static_assert(0xFFFF'FFE0 == Lanes(allF).setSideL(0,0).value());
+static_assert(0xFFFF'FFE1 == Lanes(allF).setSideL(1,0).value());
+static_assert(0xFFFF'E0FF == Lanes(allF).setSideL(0,1).value());
+static_assert(0xFFFF'E1FF == Lanes(allF).setSideL(1,1).value());
+
+static_assert(0xFFE0'FFFF == Lanes(allF).setSideL(0,2).value());
+static_assert(0xFFE1'FFFF == Lanes(allF).setSideL(1,2).value());
+static_assert(0xE0FF'FFFF == Lanes(allF).setSideL(0,3).value());
+static_assert(0xE1FF'FFFF == Lanes(allF).setSideL(1,3).value());
+
+static_assert(0xFFFF'FF1F == Lanes(allF).setSideM(0,0).value());
+static_assert(0xFFFF'FF3F == Lanes(allF).setSideM(1,0).value());
+static_assert(0xFFFF'1FFF == Lanes(allF).setSideM(0,1).value());
+static_assert(0xFFFF'3FFF == Lanes(allF).setSideM(1,1).value());
+
+static_assert(0xFF1F'FFFF == Lanes(allF).setSideM(0,2).value());
+static_assert(0xFF3F'FFFF == Lanes(allF).setSideM(1,2).value());
+static_assert(0x1FFF'FFFF == Lanes(allF).setSideM(0,3).value());
+static_assert(0x3FFF'FFFF == Lanes(allF).setSideM(1,3).value());
+
+static_assert(0x0000'001F == Lanes(allF).sideL(0));
+static_assert(0x0000'1F00 == Lanes(allF).sideL(1));
+static_assert(0x001F'0000 == Lanes(allF).sideL(2));
+static_assert(0x1F00'0000 == Lanes(allF).sideL(3));
+
+static_assert(0x0000'00E0 == Lanes(allF).sideM(0));
+static_assert(0x0000'E000 == Lanes(allF).sideM(1));
+static_assert(0x00E0'0000 == Lanes(allF).sideM(2));
+static_assert(0xE000'0000 == Lanes(allF).sideM(3));
+

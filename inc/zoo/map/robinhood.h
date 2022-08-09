@@ -2,6 +2,9 @@
 
 #include "zoo/swar/SWAR.h"
 
+#include <cassert>
+#include <iomanip>
+#include <ios>
 #include <iostream>
 #include <vector>
 
@@ -25,55 +28,110 @@ constexpr auto cheapOkHash(u64 n) {
 
 // The naive method of keeping metadata.
 template<u8 PSLBits, u8 HashBits> struct StrawMetadata {
-  StrawMetadata(u32 sz) : psls_(sz), hashes_(sz) {}
+  StrawMetadata(u32 sz) : sz_(sz), psls_(sz), hashes_(sz) {}
+  u32 sz_;
   std::vector<u8> psls_;
   std::vector<u8> hashes_;
-
+  u32 size() const { return sz_; }
 };
 
 // Structure keeping PSLs in the low bits and Hash in the high bits (as we want
 // to cmp psl bits for cheap with known blitted out hash bits so their MSBs are
 // off.
-template<u8 PSLBits, u8 HashBits> struct RobinHoodMetadataBlock {
-  using SW = swar::SWARWithSubLanes<PSLBits, HashBits>; 
+template<u8 PSLBits, u8 HashBits, typename T> struct RobinHoodMetadataBlock {
+  using SW = swar::SWARWithSubLanes<PSLBits, HashBits, T>; 
+  static constexpr auto NSlots = SW::NSlots;
   SW m_; 
   constexpr auto PSLs() { return m_.sideL(); }
   constexpr auto Hashes() { return m_.sideM(); }
+  constexpr auto PSL(u32 pos) { return m_.sideLFlat(pos); }
+  constexpr auto Hash(u32 pos) { return m_.sideMFlat(pos); }
 };
 
-template<u8 PSLBits, u8 HashBits> struct RobinHoodMetadata {
-  using Block = RobinHoodMetadataBlock<PSLBits, HashBits>;
+template<u8 PSLBits, u8 HashBits, typename T> struct RobinHoodMetadata {
+  using Block = RobinHoodMetadataBlock<PSLBits, HashBits, T>;
+  using SW = swar::SWARWithSubLanes<PSLBits, HashBits, T>; 
   std::vector<Block> blocks_;
+  u32 sz_ = 0;
+ 
+  void setValue(u32 psl, u32 hash, u32 idx) {
+    const auto vecpos = idx / Block::NSlots;
+    const auto lane = idx % Block::NSlots;
+    std::cerr << "setValue idx " << idx << " psl " << psl << " hash " << hash << "\n";
+    auto preblock = blocks_[vecpos].m_.value();
+    auto setPSL = blocks_[vecpos].m_.setSideL(psl, lane).value();
+    auto setHash = blocks_[vecpos].m_.setSideM(hash, lane).value();
+    std::cerr << std::hex << std::setw(16) << std::setfill('0')<< "setValue pre " << preblock << " setPSL " << setPSL << " setHash " << setHash << " " << (setHash | setPSL) << "\n";
+    blocks_[vecpos].m_ = SW{setHash | setPSL};
+  }
+  constexpr auto PSL(u32 idx) { 
+    const auto vecpos = idx / Block::NSlots;
+    const auto lane = idx % Block::NSlots;
+    return blocks_[vecpos].sideL(lane);
+  }
+  constexpr auto Hash(u32 idx) { 
+    const auto vecpos = idx / Block::NSlots;
+    const auto lane = idx % Block::NSlots;
+    return blocks_[vecpos].sideM(lane); 
+  }
 };
+
+template<u8 PSLBits, u8 HashBits, typename T>
+void dumpRealMeta(const RobinHoodMetadata<PSLBits, HashBits, T> & actual) {
+  std::cerr << "rh meta sz " << actual.sz_ << " blocks: ";
+  for (auto block : actual.blocks_) {
+    std::cerr << std::hex << std::setfill('0') << std::setw(16) << block.m_.value() << " - ";
+  }
+  std::cerr << "\n";
+}
 
 // These two functions are for testing: If they are correct, then any table
 // under test can be converted to a completely independent implementation to
 // verify any operation.
 
-template<u8 PSLBits, u8 HashBits>
-RobinHoodMetadata<PSLBits, HashBits> strawToReal(const StrawMetadata<PSLBits, HashBits>& straw) {
-  RobinHoodMetadata<PSLBits, HashBits> actual;
-  
-  auto sz = straw.psls_.size();
-  actual.blocks_.resize(sz/RobinHoodMetadata<PSLBits, HashBits>::LaneCount);
-  for (auto idx = 0 ; idx < sz; ++idx) {
-    auto lane = idx / RobinHoodMetadata<PSLBits, HashBits>::LaneCount;
-    auto psl =straw.psls_[idx]; 
-    auto h = straw.hashes_[idx];
-    actual.blocks_[idx/RobinHoodMetadata<PSLBits, HashBits>::LaneCount].setSideL(psl, lane);
-    actual.blocks_[idx/RobinHoodMetadata<PSLBits, HashBits>::LaneCount].setSideM(h, lane);
-  }
+template<u8 PSLBits, u8 HashBits, typename T>
+RobinHoodMetadata<PSLBits, HashBits, T> strawToReal(const StrawMetadata<PSLBits, HashBits>& straw) {
+  using RHM = RobinHoodMetadata<PSLBits, HashBits, T>; 
 
+  RobinHoodMetadata<PSLBits, HashBits, T> actual;
+  auto sz = straw.psls_.size();
+  actual.sz_=straw.sz_;
+  assert(sz == straw.sz_);
+  u32 actualBlocks = sz/RobinHoodMetadata<PSLBits, HashBits, T>::Block::NSlots + 1;
+  actual.blocks_.resize(actualBlocks);
+  u32 count = 0;
+  std::cerr << "strawToReal actualBlocks " << actualBlocks << " strawsize " << sz << "\n";
+  for (auto idx = 0 ; idx < sz; ++idx) {
+    u32 psl = straw.psls_[idx]; 
+    u32 h = straw.hashes_[idx];
+    actual.setValue(psl, h, idx);
+    std::cerr << "strawToReal count " << count << " idx " << idx << " psl " << psl << " hash " << h << "\n";
+    count ++;
+  }
+  for (auto block : actual.blocks_) {
+    std::cerr <<std::hex<< actual.blocks_[0].m_.value() << "\n";
+  }
+  dumpRealMeta(actual);
   return actual;
 }
 
-template<u8 PSLBits, u8 HashBits>
-StrawMetadata<PSLBits, HashBits> realToStraw(const RobinHoodMetadata<PSLBits, HashBits> & actual) {
-  StrawMetadata<PSLBits, HashBits> straw;
+
+template<u8 PSLBits, u8 HashBits, typename T>
+StrawMetadata<PSLBits, HashBits> realToStraw(const RobinHoodMetadata<PSLBits, HashBits, T> & actual) {
+  constexpr auto lanecount = RobinHoodMetadata<PSLBits, HashBits, T>::Block::NSlots;
+  StrawMetadata<PSLBits, HashBits> straw(actual.sz_);
+  straw.sz_ = actual.sz_;
+  u32 count = 0;
   for (auto block : actual.blocks_) {
-    for (auto inner = 0 ; inner < RobinHoodMetadata<PSLBits, HashBits>::LaneCount;inner++) {
-    straw.psls_.push_back(block.PSLs[inner]);
-    straw.hashes.push_back(block.Hashes[inner]);
+    std::cerr << "Block \n";
+    for (auto inner = 0; inner < lanecount ;inner++) {
+      const u32 psl  =block.PSL(inner);
+      const u32 hash =block.Hash(inner);
+      std::cerr << "realToStraw count " << count << " psl " << psl << " hash " << hash << "\n";
+      straw.psls_[count] = psl;
+      straw.hashes_[count] = hash;
+      if (count == actual.sz_) break;
+      count ++;
     }
   }
   return straw;
