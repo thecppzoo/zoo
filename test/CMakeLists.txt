@@ -48,6 +48,7 @@ set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
 set(
     ZOO_TEST_SOURCES
     ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
+    ${SWAR_SOURCES} 
     ${MISCELLANEA_SOURCES}
 )
 
