@@ -40,15 +40,19 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
 /// SWAR operations are usually constant time, log(lane count) cost, or O(lane count) cost.
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits, typename T = uint64_t> struct SWAR {
+    static constexpr inline auto LaneCount = sizeof(T) * 8 / NBits;
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
 
     constexpr T value() const noexcept { return m_v; }
 
-    constexpr SWAR operator|(SWAR o) const noexcept { return SWAR(m_v | o.m_v); }
-    constexpr SWAR operator&(SWAR o) const noexcept { return SWAR(m_v & o.m_v); }
-    constexpr SWAR operator^(SWAR o) const noexcept { return SWAR(m_v ^ o.m_v); }
+    constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
+    #define SWAR_BINARY_OPERATORS_X_LIST \
+      X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+    #define X(rt,op) constexpr rt operator op (rt o) const noexcept { return rt (m_v op o.m_v); };
+    SWAR_BINARY_OPERATORS_X_LIST
+    #undef X
 
     constexpr T at(int position) const noexcept {
         constexpr auto filter = (T(1) << NBits) - 1;
@@ -74,57 +78,152 @@ template<int NBits, typename T = uint64_t> struct SWAR {
     T m_v;
 };
 
+// SWAR is a useful abstraction for performing computations in lanes overlaid
+// over any given integral type.
+// Doing additions, subtractions, and compares via SWAR techniques requires an
+// extra bit per lane be available past the lane size, _or_ knowledge that both
+// of your MSBs are set 0 (leaving space for the operation).  Similarly, doing
+// multiplications via SWAR techniques require double bits per lane (unless you
+// can bind your inputs at half lane size).
+// This leads to a useful technique (which we use in the robin hood table)
+// where we interleave two related small bit count integers inside of a lane of
+// swar.  More generally, this is useful because it sometimes allows fast
+// operations on side "a" of some lane if side "b" is blitted out, and vice
+// versa.  In the spirit of separation of concerns, we provide a cut-lane-SWAR
+// abstraction here.
+
+template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSubLanes : SWAR<NBitsMost+NBitsLeast, T> {
+    static constexpr inline auto Available = sizeof(T);
+    static constexpr inline auto LaneBits = NBitsLeast+NBitsMost;
+    static constexpr inline auto NSlots = Available * 8 / LaneBits;
+
+    SWARWithSubLanes() = default;
+    constexpr explicit SWARWithSubLanes(T v) : SWAR<NBitsMost+NBitsLeast, T>(v) {}
+    constexpr explicit operator T() const noexcept { return this->m_v; }
+
+    // M is most significant bits slice, L is least significant bits slice.
+    // 0x....M2L2M1L1 or MN|LN||...||M2|L2||M1|L1
+    using SL = SWARWithSubLanes<NBitsMost, NBitsLeast, T>;
+    using Base = swar::SWAR<LaneBits, T>;
+
+    //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
+    static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value;
+    static constexpr inline auto MostOnes = meta::BitmaskMaker<T, Base{1<<NBitsLeast}.value(), LaneBits>::value;
+    static constexpr inline auto LeastMask = meta::BitmaskMaker<T, Base{~(~0ull<<NBitsLeast)}.value(), LaneBits>::value;
+    static constexpr inline auto MostMask = ~LeastMask;
+
+    constexpr auto least() const noexcept {
+        return this->m_v & LeastMask;
+    }
+
+    // Returns only the least significant bits at specified position.
+    constexpr auto least(u32 pos) const noexcept {
+        constexpr auto filter = (T(1) << LaneBits) - 1;
+        const auto keep = (filter << (LaneBits * pos)) & LeastMask;
+        return this->m_v & keep;
+    }
+
+    // Returns only the least significant bits at specified position, 'decoded' to their integer value.
+    constexpr auto leastFlat(u32 pos) const noexcept {
+        return least(pos) >> (LaneBits*pos);
+    }
+
+    constexpr auto most() const noexcept {
+        return this->m_v & MostMask;
+    }
+
+    // Returns only the most significant bits at specified position.
+    constexpr auto most(u32 pos) const noexcept {
+        constexpr auto filter = (T(1) << LaneBits) - 1;
+        const auto keep = (filter << (LaneBits * pos)) & MostMask;
+        return this->m_v & keep;
+    }
+
+    // Returns only the most significant bits at specified position, 'decoded' to their integer value.
+    constexpr auto mostFlat(u32 pos) const noexcept {
+        return most(pos) >> (LaneBits*pos)>> NBitsLeast;
+    }
+
+    // Sets the lsb sublane at |pos| with least significant NBitsLeast of |in|
+    constexpr auto least(T in, int pos) const noexcept {
+        constexpr auto filter = (T(1) << LaneBits) - 1;
+        const auto keep = ~(filter << (LaneBits * pos)) | MostMask;
+        const auto rdyToInsert = this->m_v & keep;
+        const auto rval = rdyToInsert | ((in & LeastMask) << (LaneBits * pos));
+        return SL(rval);
+    }
+
+    // Sets the msb sublane at |pos| with least significant NBitsMost of |in|
+    constexpr auto most(T in, int pos) const noexcept {
+        constexpr auto filter = (T(1) << LaneBits) - 1;
+        const auto keep = ~(filter << (LaneBits * pos)) | LeastMask;
+        const auto rdyToInsert = this->m_v & keep;
+        const auto insVal = (((in<<NBitsLeast) & MostMask) << (LaneBits * pos));
+        const auto rval = rdyToInsert | insVal;
+        return SL(rval);
+    }
+};
+
+
+
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t> constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
-  return left.m_v == right.m_v;
+    return left.m_v == right.m_v;
 }
 
 /// Isolating >= NBits in underlying integer type currently results in disaster.
 // TODO(scottbruceheart) Attempting to use binary not (~) results in negative shift warnings.
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
-  return pattern & ((T(1)<<NBits)-1);
+    return pattern & ((T(1)<<NBits)-1);
 }
 
-/// Clears the lowest bit set in type T
+/// Clears the least bit set in type T
 template<typename T = uint64_t>
 constexpr auto clearLSB(T v) {
-  return v & (v - 1);
+    return v & (v - 1);
 }
 
-/// Leaves on the lowest bit set, or all 1s for a 0 input.
+/// Leaves on the least bit set, or all 1s for a 0 input.
 template<typename T = uint64_t>
 constexpr auto isolateLSB(T v) {
-  return v & ~clearLSB(v);
+    return v & ~clearLSB(v);
 }
 
 template<int NBits, typename T = uint64_t>
-constexpr auto lowestNBitsMask() {
-  return (T(1)<<NBits)-1;
+constexpr auto leastNBitsMask() {
+    return (T(1)<<NBits)-1;
+  //return ~((~T(0))<<NBits);
+}
+
+template<int NBits, uint64_t T>
+constexpr auto leastNBitsMask() {
+  // return (u64(1)<<NBits)-1;
+    return ~((0ull)<<NBits);
 }
 
 /// Clears the block of N bits anchored at the LSB.
 /// clearLSBits<3> applied to binary 00111100 is binary 00100000
 template<int NBits, typename T = uint64_t>
 constexpr auto clearLSBits(T v) {
-  constexpr auto lowMask = lowestNBitsMask<NBits>();
-  return v &(~(lowMask << meta::logFloor(isolateLSB<T>(v))));
+    constexpr auto lowMask = leastNBitsMask<NBits>();
+    return v &(~(lowMask << meta::logFloor(isolateLSB<T>(v))));
 }
 
 /// Isolates the block of N bits anchored at the LSB.
 /// isolateLSBits<2> applied to binary 00111100 is binary 00001100
 template<int NBits, typename T = uint64_t>
 constexpr auto isolateLSBits(T v) {
-  constexpr auto lowMask = lowestNBitsMask<NBits>();
-  return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
+    constexpr auto lowMask = leastNBitsMask<NBits>();
+    return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
 }
 
 /// Broadcasts the value in the 0th lane of the SWAR to the entire SWAR.
 /// Precondition: 0th lane of |v| contains a value to broadcast, remainder of input SWAR zero.
 template<int NBits, typename T = uint64_t>
 constexpr auto broadcast(SWAR<NBits, T> v) {
-  constexpr T Ones = meta::BitmaskMaker<T, 1, NBits>::value;
-  return SWAR<NBits, T>(T(v) * Ones);
+    constexpr T Ones = meta::BitmaskMaker<T, 1, NBits>::value;
+    return SWAR<NBits, T>(T(v) * Ones);
 }
 
 /// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
@@ -164,7 +263,7 @@ constexpr BooleanSWAR<NBits, T> greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<N
 template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T> greaterEqual(SWAR<NBits, T> v) noexcept {
     static_assert(1 < NBits, "Degenerated SWAR");
-    //static_assert(metaLogCeiling(N) < NBits, "N is too big for this technique");  // ctzll isn't constexpr.
+    //static_assert(meta::logCeiling(N) < NBits, "N is too big for this technique");  // ctzll isn't constexpr.
     constexpr auto msbPosition  = NBits - 1;
     constexpr auto msb = T(1) << msbPosition;
     constexpr auto msbMask = meta::BitmaskMaker<T, msb, NBits>::value;
