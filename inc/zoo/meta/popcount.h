@@ -24,10 +24,10 @@ template<> struct UInteger_impl<32> { using type = uint32_t; };
 template<> struct UInteger_impl<64> { using type = uint64_t; };
 
 template<typename> constexpr int BitWidthLog = 0;
-template<> constexpr int BitWidthLog<uint8_t> = 3;
-template<> constexpr int BitWidthLog<uint16_t> = 4;
-template<> constexpr int BitWidthLog<uint32_t> = 5;
-template<> constexpr int BitWidthLog<uint64_t> = 6;
+template<> constexpr inline int BitWidthLog<uint8_t> = 3;
+template<> constexpr inline int BitWidthLog<uint16_t> = 4;
+template<> constexpr inline int BitWidthLog<uint32_t> = 5;
+template<> constexpr inline int BitWidthLog<uint64_t> = 6;
 
 } // detail
 
