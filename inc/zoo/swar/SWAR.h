@@ -216,10 +216,6 @@ constexpr T mostNBitsMask() {
   return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
 }
 
-template<int NBits, typename T = uint64_t>
-constexpr auto mostNBitsMask() {
-  return (~T(0))<<(sizeof(T)*8-NBits);
-}
 
 /// Clears the block of N bits anchored at the LSB.
 /// clearLSBits<3> applied to binary 00111100 is binary 00100000
