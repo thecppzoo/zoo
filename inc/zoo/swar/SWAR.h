@@ -192,12 +192,18 @@ constexpr auto isolateLSB(T v) {
 
 template<int NBits, typename T>
 constexpr auto leastNBitsMask() {
-    return (T(1)<<NBits)-1;
+    return (T(1ull)<<NBits)-1;
 }
 
 template<int NBits, uint64_t T>
 constexpr auto leastNBitsMask() {
     return ~((0ull)<<NBits);
+}
+
+
+template<int NBits, typename T = uint64_t>
+constexpr T mostNBitsMask() {
+  return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
 }
 
 /// Clears the block of N bits anchored at the LSB.
