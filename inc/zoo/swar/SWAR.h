@@ -40,7 +40,7 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
 /// SWAR operations are usually constant time, log(lane count) cost, or O(lane count) cost.
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits, typename T = uint64_t> struct SWAR {
-    static constexpr inline auto LaneCount = sizeof(T) * 8 / NBits;
+    static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
@@ -190,15 +190,13 @@ constexpr auto isolateLSB(T v) {
     return v & ~clearLSB(v);
 }
 
-template<int NBits, typename T = uint64_t>
+template<int NBits, typename T>
 constexpr auto leastNBitsMask() {
     return (T(1)<<NBits)-1;
-  //return ~((~T(0))<<NBits);
 }
 
 template<int NBits, uint64_t T>
 constexpr auto leastNBitsMask() {
-  // return (u64(1)<<NBits)-1;
     return ~((0ull)<<NBits);
 }
 
@@ -206,7 +204,7 @@ constexpr auto leastNBitsMask() {
 /// clearLSBits<3> applied to binary 00111100 is binary 00100000
 template<int NBits, typename T = uint64_t>
 constexpr auto clearLSBits(T v) {
-    constexpr auto lowMask = leastNBitsMask<NBits>();
+    constexpr auto lowMask = leastNBitsMask<NBits, T>();
     return v &(~(lowMask << meta::logFloor(isolateLSB<T>(v))));
 }
 
@@ -214,7 +212,7 @@ constexpr auto clearLSBits(T v) {
 /// isolateLSBits<2> applied to binary 00111100 is binary 00001100
 template<int NBits, typename T = uint64_t>
 constexpr auto isolateLSBits(T v) {
-    constexpr auto lowMask = leastNBitsMask<NBits>();
+    constexpr auto lowMask = leastNBitsMask<NBits, T>();
     return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
 }
 
