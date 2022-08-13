@@ -144,6 +144,16 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
         return most(pos) >> (LaneBits*pos)>> NBitsLeast;
     }
 
+    // Blits most sig bits into least significant bits. Experimental.
+    constexpr auto flattenMostToLeast(u32 pos) const noexcept {
+        return (this->m_v >> NBitsLeast) & LeastMask;
+    }
+
+    // Blits least sig bits into most significant bits. Experimental.
+    constexpr auto promoteLeastToMost(u32 pos) const noexcept {
+        return (this->m_v << NBitsMost) & MostMask;
+    }
+
     // Sets the lsb sublane at |pos| with least significant NBitsLeast of |in|
     constexpr auto least(T in, int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
