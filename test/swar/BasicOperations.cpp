@@ -25,26 +25,21 @@ TEST_CASE(
     "Isolate",
     "[swar]"
 ) {
-  for (auto i = 0; i < 63; ++i) { 
-    CHECK(i == isolate<8>(i));
-    CHECK(i == isolate<8>(0xFF00+i));
-    CHECK(i == isolate<8>(0xFFFF00+i));
-  }
-  for (auto i = 0; i < 31; ++i) { 
-    CHECK(i == isolate<7>(i));
-    CHECK(i == isolate<7>(0xFF00+i));
-    CHECK(i == isolate<7>(0xFFFF00+i));
-  }
-  for (auto i = 0; i < 31; ++i) { 
-    CHECK(i == isolate<11>(i));
-    CHECK(i == isolate<11>(0xF800+i));
-    CHECK(i == isolate<11>(0xFFF800+i));
-  }
-    auto v = logarithmFloor(SWAR<8>{0xFF7F3F1F0F070301ull}).value();
-    CHECK(
-        v ==
-        0x07060504030201
-    );
+    for (auto i = 0; i < 63; ++i) { 
+      CHECK(i == isolate<8>(i));
+      CHECK(i == isolate<8>(0xFF00+i));
+      CHECK(i == isolate<8>(0xFFFF00+i));
+    }
+    for (auto i = 0; i < 31; ++i) { 
+      CHECK(i == isolate<7>(i));
+      CHECK(i == isolate<7>(0xFF00+i));
+      CHECK(i == isolate<7>(0xFFFF00+i));
+    }
+    for (auto i = 0; i < 31; ++i) { 
+      CHECK(i == isolate<11>(i));
+      CHECK(i == isolate<11>(0xF800+i));
+      CHECK(i == isolate<11>(0xFFF800+i));
+    }
 }
 
 static_assert(1 == popcount<5>(0x100ull));
@@ -92,10 +87,37 @@ static_assert(0x20 == isolateLSB<u8>(0xE0));
 static_assert(0x40 == isolateLSB<u8>(0xC0));
 static_assert(0x80 == isolateLSB<u8>(0x80));
 
-static_assert(0x01 == lowestNBitsMask<1, u8>());
-static_assert(0x03 == lowestNBitsMask<2, u8>());
-static_assert(0x07 == lowestNBitsMask<3, u8>());
-static_assert(0x0F == lowestNBitsMask<4, u8>());
+static_assert(0x80u == mostNBitsMask<1, u8>());
+static_assert(0xC0u == mostNBitsMask<2, u8>());
+static_assert(0xE0u == mostNBitsMask<3, u8>());
+static_assert(0xF0u == mostNBitsMask<4, u8>());
+static_assert(0xF8u == mostNBitsMask<5, u8>());
+static_assert(0xFCu == mostNBitsMask<6, u8>());
+
+static_assert(0x8000'0000ul == mostNBitsMask<1, u32>());
+static_assert(0xC000'0000ul == mostNBitsMask<2, u32>());
+static_assert(0xE000'0000ul == mostNBitsMask<3, u32>());
+static_assert(0xF000'0000ul == mostNBitsMask<4, u32>());
+static_assert(0xF800'0000ul == mostNBitsMask<5, u32>());
+static_assert(0xFC00'0000ul == mostNBitsMask<6, u32>());
+
+static_assert(0x01u == leastNBitsMask<1, u8>());
+static_assert(0x03u == leastNBitsMask<2, u8>());
+static_assert(0x07u == leastNBitsMask<3, u8>());
+static_assert(0x0Fu == leastNBitsMask<4, u8>());
+static_assert(0x1Fu == leastNBitsMask<5, u8>());
+
+static_assert(0x0000'01ul == leastNBitsMask<1, u32>());
+static_assert(0x0000'03ul == leastNBitsMask<2, u32>());
+static_assert(0x0000'07ul == leastNBitsMask<3, u32>());
+static_assert(0x0000'0Ful == leastNBitsMask<4, u32>());
+static_assert(0x0000'1Ful == leastNBitsMask<5, u32>());
+
+static_assert(0x01ull == leastNBitsMask<1, u64>());
+static_assert(0x03ull == leastNBitsMask<2, u64>());
+static_assert(0x07ull == leastNBitsMask<3, u64>());
+static_assert(0x0Full == leastNBitsMask<4, u64>());
+static_assert(0x1Full == leastNBitsMask<5, u64>());
 
 static_assert(0xB == isolate<4>(0x1337'BDBC'2448'ACABull));
 static_assert(0xAB == isolate<8>(0x1337'BDBC'2448'ACABull));
@@ -180,3 +202,45 @@ GE_MSB_TEST(0x0000'0000,
 GE_MSB_TEST(0x7777'7777,
             0x0123'4567,
             0x8888'8888)
+
+// 3 bits on msb side, 5 bits on lsb side.
+using Lanes = SWARWithSubLanes<3,5,u32>;
+using S8u32 = SWAR<8, u32>;
+static constexpr inline u32 allF = broadcast<8>(S8u32(0x0000'00FFul)).value();
+
+static_assert(allF == Lanes(allF).value());
+static_assert(0xFFFF'FFFF == Lanes(allF).value());
+
+static_assert(0xFFFF'FFE0 == Lanes(allF).least(0,0).value());
+static_assert(0xFFFF'FFE1 == Lanes(allF).least(1,0).value());
+static_assert(0xFFFF'E0FF == Lanes(allF).least(0,1).value());
+static_assert(0xFFFF'E1FF == Lanes(allF).least(1,1).value());
+
+static_assert(0xFFE0'FFFF == Lanes(allF).least(0,2).value());
+static_assert(0xFFE1'FFFF == Lanes(allF).least(1,2).value());
+static_assert(0xE0FF'FFFF == Lanes(allF).least(0,3).value());
+static_assert(0xE1FF'FFFF == Lanes(allF).least(1,3).value());
+
+static_assert(0xFFFF'FF1F == Lanes(allF).most(0,0).value());
+static_assert(0xFFFF'FF3F == Lanes(allF).most(1,0).value());
+static_assert(0xFFFF'1FFF == Lanes(allF).most(0,1).value());
+static_assert(0xFFFF'3FFF == Lanes(allF).most(1,1).value());
+
+static_assert(0xFF1F'FFFF == Lanes(allF).most(0,2).value());
+static_assert(0xFF3F'FFFF == Lanes(allF).most(1,2).value());
+static_assert(0x1FFF'FFFF == Lanes(allF).most(0,3).value());
+static_assert(0x3FFF'FFFF == Lanes(allF).most(1,3).value());
+
+static_assert(0x1F1F'1F1F == Lanes(allF).least());
+static_assert(0xE0E0'E0E0 == Lanes(allF).most());
+
+static_assert(0x0000'001F == Lanes(allF).least(0));
+static_assert(0x0000'1F00 == Lanes(allF).least(1));
+static_assert(0x001F'0000 == Lanes(allF).least(2));
+static_assert(0x1F00'0000 == Lanes(allF).least(3));
+
+static_assert(0x0000'00E0 == Lanes(allF).most(0));
+static_assert(0x0000'E000 == Lanes(allF).most(1));
+static_assert(0x00E0'0000 == Lanes(allF).most(2));
+static_assert(0xE000'0000 == Lanes(allF).most(3));
+
