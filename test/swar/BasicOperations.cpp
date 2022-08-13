@@ -87,17 +87,31 @@ static_assert(0x20 == isolateLSB<u8>(0xE0));
 static_assert(0x40 == isolateLSB<u8>(0xC0));
 static_assert(0x80 == isolateLSB<u8>(0x80));
 
-static_assert(0x01 == leastNBitsMask<1, u8>());
-static_assert(0x03 == leastNBitsMask<2, u8>());
-static_assert(0x07 == leastNBitsMask<3, u8>());
-static_assert(0x0F == leastNBitsMask<4, u8>());
-static_assert(0x1F == leastNBitsMask<5, u8>());
+static_assert(0x80u == mostNBitsMask<1, u8>());
+static_assert(0xC0u == mostNBitsMask<2, u8>());
+static_assert(0xE0u == mostNBitsMask<3, u8>());
+static_assert(0xF0u == mostNBitsMask<4, u8>());
+static_assert(0xF8u == mostNBitsMask<5, u8>());
+static_assert(0xFCu == mostNBitsMask<6, u8>());
 
-static_assert(0x01ul == leastNBitsMask<1, u32>());
-static_assert(0x03ul == leastNBitsMask<2, u32>());
-static_assert(0x07ul == leastNBitsMask<3, u32>());
-static_assert(0x0Ful == leastNBitsMask<4, u32>());
-static_assert(0x1Ful == leastNBitsMask<5, u32>());
+static_assert(0x8000'0000ul == mostNBitsMask<1, u32>());
+static_assert(0xC000'0000ul == mostNBitsMask<2, u32>());
+static_assert(0xE000'0000ul == mostNBitsMask<3, u32>());
+static_assert(0xF000'0000ul == mostNBitsMask<4, u32>());
+static_assert(0xF800'0000ul == mostNBitsMask<5, u32>());
+static_assert(0xFC00'0000ul == mostNBitsMask<6, u32>());
+
+static_assert(0x01u == leastNBitsMask<1, u8>());
+static_assert(0x03u == leastNBitsMask<2, u8>());
+static_assert(0x07u == leastNBitsMask<3, u8>());
+static_assert(0x0Fu == leastNBitsMask<4, u8>());
+static_assert(0x1Fu == leastNBitsMask<5, u8>());
+
+static_assert(0x0000'01ul == leastNBitsMask<1, u32>());
+static_assert(0x0000'03ul == leastNBitsMask<2, u32>());
+static_assert(0x0000'07ul == leastNBitsMask<3, u32>());
+static_assert(0x0000'0Ful == leastNBitsMask<4, u32>());
+static_assert(0x0000'1Ful == leastNBitsMask<5, u32>());
 
 static_assert(0x01ull == leastNBitsMask<1, u64>());
 static_assert(0x03ull == leastNBitsMask<2, u64>());
