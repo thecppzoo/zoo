@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zoo/swar/SWAR.h"
+#include "zoo/map/RobinHood_util.h"
 
 #include <vector>
 
@@ -12,15 +13,6 @@ using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
 using u8 = uint8_t;
-
-template<int NBits>
-constexpr auto cheapOkHash(u64 n) {
-    constexpr auto shift = (NBits * ((64 / NBits)-1));
-    constexpr u64 allOnes = meta::BitmaskMaker<u64, 1, NBits>::value;
-    auto temporary = allOnes * n;
-    auto higestNBits = temporary >> shift;
-    return (0 == (64 % NBits)) ? higestNBits : swar::isolate<NBits, u64>(higestNBits);
-}
 
 // The naive method of keeping metadata.
 // TODO(sbruce) actually have correct widths of psl/hash for direct comparison
@@ -35,36 +27,7 @@ struct StrawMetadata {
     auto Hash(u32 pos) const { return hashes_[pos]; }
 };
 
-template<typename Key>auto fibhash(Key k) noexcept {
-    constexpr auto FibonacciGoldenRatioReciprocal64 = 11400714819323198485ull;
-    constexpr auto FibonacciGoldenRatioReciprocal32 = 2654435769u;
-    if constexpr(sizeof(Key) == 8) {
-        return k * FibonacciGoldenRatioReciprocal64;
-    } else if constexpr(sizeof(Key) == 4){
-        return k * 2654435769u;
-    }
-    return 1;
-}
-
-template<typename Key, int NBits> auto badmix(Key k) noexcept {
-  constexpr Key allOnes = meta::BitmaskMaker<Key, 1, sizeof(Key)>::value;
-  constexpr Key mostSigNBits = swar::mostNBitsMask<NBits, Key>();
-  auto tmp = k * allOnes;
-  
-  auto mostSigBits = tmp >> mostSigNBits;
-  return mostSigBits >> (sizeof(Key) - NBits);
-}
-
-template<typename Key>auto reducedhash(Key k) noexcept {
-  return 1;
-}
-
-template<typename Key>auto slotFromKey(Key k) noexcept {
-  return 1;
-}
-
 template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
-  
   template <typename KeyCheck>
   bool exists(Key k, KeyCheck kc) {
     return findSlot(k, kc).second;
@@ -74,8 +37,8 @@ template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
   // found.
   template <typename KeyCheck>
   std::pair<int, bool> findSlot(Key k, KeyCheck kc) {
-      u32 hashbits = reducedhash(k);
-      u32 slot = slotFromKey<u32>(k);
+      u32 hashbits = reducedhashUnitary(k);
+      u32 slot = slotFromKeyUnitary<u32>(k);
       auto psl = 0;
       while (true) {
         ++psl;  // bias psl by one, convenient to do it here
@@ -99,8 +62,8 @@ template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
 
     template <typename KeyCheck> 
     std::pair<int, bool> insert(Key k, KeyCheck kc) {
-        u32 hashbits = reducedhash(k);
-        u32 slot = slotFromKey<u32>(k);
+        u32 hashbits = reducedhashUnitary(k);
+        u32 slot = slotFromKeyUnitary<u32>(k);
         auto slotFind = findSlot(k, kc);
         if (slotFind.second) {
             return {slotFind.first, false};  // already in
