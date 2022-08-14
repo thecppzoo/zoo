@@ -39,8 +39,10 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
 /// SIMD operations against that primitive type T treated as a SIMD register.
 /// SWAR operations are usually constant time, log(lane count) cost, or O(lane count) cost.
 /// Certain computational workloads can be materially sped up using SWAR techniques.
-template<int NBits, typename T = uint64_t> struct SWAR {
+template<int NBits_, typename T = uint64_t> struct SWAR {
+    constexpr static inline auto NBits = NBits_;
     static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
+
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
