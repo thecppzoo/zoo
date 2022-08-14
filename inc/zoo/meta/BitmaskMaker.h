@@ -40,8 +40,21 @@ struct BitmaskMaker {
         >::value;
 };
 
+/// Provides TopBlit to clear any garbage bits at the top of a bitmask made by BitmaskMaker
+template<typename T, int CurrentSize>
+struct BitmaskMakerClearTop {
+    // To ensure 0s above CurrentSize
+    constexpr static T Eight = 8;
+    constexpr static T Zero = 0;
+    constexpr static T BitCount = sizeof(T)*Eight;
+    constexpr static T LeastBitKeepCount = BitCount - BitCount % CurrentSize;
+    constexpr static T BitMod = BitCount % CurrentSize;
+    constexpr static T TopBlit = (BitMod == 0) ? ~(T(0)) : ((T(1) << LeastBitKeepCount) -1);
+};
+
+static_assert(0xFF == BitmaskMaker<uint8_t, 0x7, 3>::value);
 static_assert(0xF0F0 == BitmaskMaker<uint16_t, 0xF0, 8>::value);
-static_assert(0xEDFEDFED == BitmaskMaker<uint32_t, 0xFED, 12>::value);
+static_assert(0xEDFE'DFED == BitmaskMaker<uint32_t, 0xFED, 12>::value);
 
 }} // zoo::meta
 

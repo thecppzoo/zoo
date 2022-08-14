@@ -7,19 +7,31 @@
 using namespace zoo;
 using namespace zoo::swar;
 
+TEST_CASE(
+    "Bitmasking",
+    "[swar]"
+) {
 #define HE(nbits, t, v0, v1) \
-    static_assert(horizontalEquality<nbits, t>(\
+    CHECK(horizontalEquality<nbits, t>(\
         SWAR<nbits, t>(v0),\
         SWAR<nbits, t>(meta::BitmaskMaker<t, v1, nbits>::value)\
-    ));
+    ));\
+    CHECK(\
+        SWAR<nbits, t>(v0).value() ==\
+        SWAR<nbits, t>(meta::BitmaskMaker<t, v1, nbits>::value).value());
+
 HE(8, u64, 0x0808'0808'0808'0808, 0x8);
 HE(4, u64, 0x1111'1111'1111'1111, 0x1);
 HE(3, u64, 0xFFFF'FFFF'FFFF'FFFF, 0x7);
+HE(12, u64, 0xFFFF'FFFF'FFFF'FFFF, 0xFFF);
+HE(33, u64, 0x0000'0001'FFFF'FFFF, 0x1'FFFF'FFFF);
 HE(8, u32, 0x0808'0808, 0x8);
 HE(8, u16, 0x0808, 0x8);
+HE(7, u8, 0x7F, 0x7F);
 HE(3, u8, 0xFF, 0x7);
 HE(2, u8, 0xAA, 0x2);
 #undef HE
+}
 
 TEST_CASE(
     "Isolate",
@@ -41,6 +53,19 @@ TEST_CASE(
       CHECK(i == isolate<11>(0xFFF800+i));
     }
 }
+
+// Bitmasks.
+static_assert(0xFF == zoo::meta::BitmaskMaker<uint8_t, 0x7, 3>::value);
+static_assert(0x92 == zoo::meta::BitmaskMaker<uint8_t, 0x2, 3>::value);
+static_assert(0x3F == (zoo::meta::BitmaskMaker<uint8_t, 0x7, 3>::value & zoo::meta::BitmaskMakerClearTop<uint8_t, 3>::TopBlit));
+static_assert(0x12 == (zoo::meta::BitmaskMaker<uint8_t, 0x2, 3>::value & zoo::meta::BitmaskMakerClearTop<uint8_t, 3>::TopBlit));
+static_assert(0x00FE'DFED == (
+    zoo::meta::BitmaskMaker<uint32_t, 0xFED, 12>::value  &
+    zoo::meta::BitmaskMakerClearTop<uint32_t, 12>::TopBlit));
+static_assert(0x0FFF'FFFF'FFFF'FFFF == (
+    zoo::meta::BitmaskMaker<u64, 0xFFF, 12>::value & 
+    zoo::meta::BitmaskMakerClearTop<u64, 12>::TopBlit));
+
 
 static_assert(1 == popcount<5>(0x100ull));
 static_assert(1 == popcount<5>(0x010ull));
@@ -202,6 +227,116 @@ GE_MSB_TEST(0x0000'0000,
 GE_MSB_TEST(0x7777'7777,
             0x0123'4567,
             0x8888'8888)
+
+// Unusual formatting for easy visual verification.
+using Sub22u32 = SWARWithSubLanes<2,2,u32>;
+using SWAR4u32 = SWAR<4,u32>;
+using SWAR12u32 = SWAR<12,u32>;
+#define GE_LEAST_TEST(left, right, result) static_assert(result == greaterEqualLeast<2,2, u32>(Sub22u32(left), Sub22u32(right)).value());
+
+GE_LEAST_TEST(0x1000'0010,
+              0x0111'1101,
+              0x8000'0080)
+GE_LEAST_TEST(0x0000'0000,
+              0x0000'0000,
+              0x8888'8888)
+GE_LEAST_TEST(0x1111'1111,
+              0x1111'1111,
+              0x8888'8888)
+// We only compare least significant lanes
+GE_LEAST_TEST(0x8484'2151,
+              0x8448'1215,
+              0x8888'8088)
+GE_LEAST_TEST(0x0011'2233,
+              0x4859'56EF,
+              0x8888'8888)
+
+#define GE_MOST_TEST(left, right, result) static_assert(result == greaterEqualMost<2,2, u32>(Sub22u32(left), Sub22u32(right)).value());
+
+GE_MOST_TEST(0x0000'0000,
+             0x0000'0000,
+             0x8888'8888)
+GE_MOST_TEST(0x1111'1111,
+             0x1111'1111,
+             0x8888'8888)
+GE_MOST_TEST(0x2211'3330,
+             0x2121'1233,
+             0x8888'8888)
+GE_MOST_TEST(0x8945'1111,
+             0x1111'8945,
+             0x8888'0000)
+GE_MOST_TEST(0x4000'0040,
+             0x4111'1141,
+             0x8888'8888)
+
+#define GE_LEAST_VS_MSBOFF_TEST(left, right) static_assert( \
+    greaterEqual_MSB_off<4, u32>(SWAR4u32(Sub22u32(left).least()), SWAR4u32(Sub22u32(right).least())).value() ==  \
+    greaterEqualLeast<2,2, u32>(Sub22u32(left), Sub22u32(right)).value());
+
+GE_LEAST_VS_MSBOFF_TEST(0x1000'0010,
+                        0x0111'1101)
+GE_LEAST_VS_MSBOFF_TEST(0x0000'0000,
+                        0x0000'0000)
+GE_LEAST_VS_MSBOFF_TEST(0x8484'2151,
+                        0x8448'1215)
+GE_LEAST_VS_MSBOFF_TEST(0x0011'2233,
+                        0x4859'56EF)
+
+#define GE_LEAST_BLIT(left, right, result) CHECK(result == greaterEqual_laneblit<4, u32>(SWAR4u32(left), SWAR4u32(right)).value());
+
+TEST_CASE(
+    "LaneBlit4",
+    "[swar]"
+) {
+
+GE_LEAST_BLIT(0x1234'5678,
+              0x1111'1111,
+              0x8888'8888)
+
+GE_LEAST_BLIT(0x888C'0000,
+              0x44C8'0000,
+              0x8808'8888)
+
+GE_LEAST_BLIT(0x8800'0021,
+              0x4432'2100,
+              0x8800'0088)
+
+GE_LEAST_BLIT(0x1248'1111,
+              0x1111'1248,
+              0x8888'8000)
+
+GE_LEAST_BLIT(0xEF44'44FE,
+              0xFE44'44EF,
+              0x0888'8880)
+}
+
+#define GE_LEAST_BLIT12(left, right, result) CHECK(result == greaterEqual_laneblit<12, u32>(SWAR12u32(left), SWAR12u32(right)).value());
+
+TEST_CASE(
+    "LaneBlit12",
+    "[swar]"
+) {
+
+GE_LEAST_BLIT12(0x1234'5678,
+                0x1111'1111,
+                0x0080'0800)
+
+GE_LEAST_BLIT12(0x888C'0000,
+                0x44C8'0000,
+                0x0000'0800)
+
+GE_LEAST_BLIT12(0x8800'0121,
+                0x4432'2084,
+                0x0000'0800)
+
+GE_LEAST_BLIT12(0x1248'1111,
+                0x1111'1248,
+                0x0080'0000)
+
+GE_LEAST_BLIT12(0xEF44'44FE,
+                0xFE44'44EF,
+                0x0080'0800)
+}
 
 // 3 bits on msb side, 5 bits on lsb side.
 using Lanes = SWARWithSubLanes<3,5,u32>;
