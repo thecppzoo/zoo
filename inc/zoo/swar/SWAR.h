@@ -96,19 +96,21 @@ struct SWAR {
 // versa.  In the spirit of separation of concerns, we provide a cut-lane-SWAR
 // abstraction here.
 
-template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSubLanes : SWAR<NBitsMost+NBitsLeast, T> {
+template<int NBitsMost, int NBitsLeast, typename T = uint64_t>
+struct SWARWithSubLanes: SWAR<NBitsMost+NBitsLeast, T> {
+    using Base = SWAR<NBitsMost + NBitsLeast, T>;
     static constexpr inline auto Available = sizeof(T);
     static constexpr inline auto LaneBits = NBitsLeast+NBitsMost;
     static constexpr inline auto NSlots = Available * 8 / LaneBits;
 
-    SWARWithSubLanes() = default;
-    constexpr explicit SWARWithSubLanes(T v) : SWAR<NBitsMost+NBitsLeast, T>(v) {}
-    constexpr explicit operator T() const noexcept { return this->m_v; }
+    using Base::Base;
+    constexpr SWARWithSubLanes(T most, T least) noexcept:
+        Base((most << NBitsLeast) | least)
+    {}
 
     // M is most significant bits slice, L is least significant bits slice.
     // 0x....M2L2M1L1 or MN|LN||...||M2|L2||M1|L1
     using SL = SWARWithSubLanes<NBitsMost, NBitsLeast, T>;
-    using Base = swar::SWAR<LaneBits, T>;
 
     //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
     static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value;
