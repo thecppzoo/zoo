@@ -108,6 +108,7 @@ struct SWARWithSubLanes: SWAR<NBitsMost+NBitsLeast, T> {
     constexpr SWARWithSubLanes(T most, T least) noexcept:
         Base((most << NBitsLeast) | least)
     {}
+    constexpr SWARWithSubLanes(Base b) noexcept: Base(b) {}
 
     // M is most significant bits slice, L is least significant bits slice.
     // 0x....M2L2M1L1 or MN|LN||...||M2|L2||M1|L1
