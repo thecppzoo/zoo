@@ -121,18 +121,18 @@ struct SWARWithSubLanes: SWAR<NBitsMost+NBitsLeast, T> {
     static constexpr inline auto MostMask = ~LeastMask;
 
     constexpr auto least() const noexcept {
-        return this->m_v & LeastMask;
+        return SL{this->m_v & LeastMask};
     }
 
     // Returns only the least significant bits at specified position.
-    constexpr auto least(u32 pos) const noexcept {
+    constexpr auto least(int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
         const auto keep = (filter << (LaneBits * pos)) & LeastMask;
         return this->m_v & keep;
     }
 
     // Returns only the least significant bits at specified position, 'decoded' to their integer value.
-    constexpr auto leastFlat(u32 pos) const noexcept {
+    constexpr auto leastFlat(int pos) const noexcept {
         return least(pos) >> (LaneBits*pos);
     }
 
@@ -141,24 +141,24 @@ struct SWARWithSubLanes: SWAR<NBitsMost+NBitsLeast, T> {
     }
 
     // Returns only the most significant bits at specified position.
-    constexpr auto most(u32 pos) const noexcept {
+    constexpr auto most(int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
         const auto keep = (filter << (LaneBits * pos)) & MostMask;
         return this->m_v & keep;
     }
 
     // Returns only the most significant bits at specified position, 'decoded' to their integer value.
-    constexpr auto mostFlat(u32 pos) const noexcept {
+    constexpr auto mostFlat(int pos) const noexcept {
         return most(pos) >> (LaneBits*pos)>> NBitsLeast;
     }
 
     // Blits most sig bits into least significant bits. Experimental.
-    constexpr auto flattenMostToLeast(u32 pos) const noexcept {
+    constexpr auto flattenMostToLeast(int pos) const noexcept {
         return (this->m_v >> NBitsLeast) & LeastMask;
     }
 
     // Blits least sig bits into most significant bits. Experimental.
-    constexpr auto promoteLeastToMost(u32 pos) const noexcept {
+    constexpr auto promoteLeastToMost(int pos) const noexcept {
         return (this->m_v << NBitsMost) & MostMask;
     }
 
@@ -367,9 +367,27 @@ equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
     not differents(a1, a2);
 }
 
+template<int NB, typename T>
+constexpr BooleanSWAR<NB, T>
+booleans(SWAR<NB, T> arg) noexcept {
+    return not greaterEqual(SWAR<NB, T>{0}, arg);
+}
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
+    booleans(a1 ^ a2);
+}
+
+template<int NBits, typename T>
+constexpr auto
+equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
+    not differents(a1, a2);
+}
+
 /*
 This is just a draft implementation:
-1. The isolator needs pre-computing instead of adding 3 ops per iteration
+b1. The isolator needs pre-computing instead of adding 3 ops per iteration
 2. The update of the isolator is not needed in the last iteration
 3. Consider returning not the logarithm, but the biased by 1 (to support 0)
  */
