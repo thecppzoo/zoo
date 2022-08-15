@@ -231,7 +231,7 @@ static_assert(0xFF3F'FFFF == Lanes(allF).most(1,2).value());
 static_assert(0x1FFF'FFFF == Lanes(allF).most(0,3).value());
 static_assert(0x3FFF'FFFF == Lanes(allF).most(1,3).value());
 
-static_assert(0x1F1F'1F1F == Lanes(allF).least());
+static_assert(0x1F1F'1F1F == Lanes(allF).least().value());
 static_assert(0xE0E0'E0E0 == Lanes(allF).most());
 
 static_assert(0x0000'001F == Lanes(allF).least(0));
