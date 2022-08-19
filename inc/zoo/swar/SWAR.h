@@ -107,12 +107,21 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
     using Base = swar::SWAR<LaneBits, T>;
 
     //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
-    static constexpr inline auto TopBlit = meta::BitmaskMakerClearTop<T, LaneBits>::TopBlit;
-    static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value & TopBlit;
-    static constexpr inline auto MostOnes = meta::BitmaskMaker<T, Base{1<<NBitsLeast}.value(), LaneBits>::value & TopBlit;
-    static constexpr inline auto MostMostOnes = meta::BitmaskMaker<T, Base{1<<(LaneBits-1)}.value(), LaneBits>::value & TopBlit;
-    static constexpr inline auto LeastMask = meta::BitmaskMaker<T, Base{~(~0ull<<NBitsLeast)}.value(), LaneBits>::value & TopBlit;
-    static constexpr inline auto MostMask = ~LeastMask & TopBlit;
+    static constexpr inline auto TopBlit =
+        meta::BitmaskMakerClearTop<T, LaneBits>::TopBlit;
+    static constexpr inline auto LeastOnes =
+        meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value & TopBlit;
+    static constexpr inline auto MostOnes =
+        meta::BitmaskMaker<T, Base{1<<NBitsLeast}.value(), LaneBits>::value &
+        TopBlit;
+    static constexpr inline auto MostMostOnes =
+        meta::BitmaskMaker<T, Base{1<<(LaneBits-1)}.value(), LaneBits>::value &
+        TopBlit;
+    static constexpr inline auto LeastMask =
+        meta::BitmaskMaker<T, Base{~(~0ull<<NBitsLeast)}.value(), LaneBits>::value &
+        TopBlit;
+    static constexpr inline auto MostMask =
+        ~LeastMask & TopBlit;
 
     constexpr auto least() const noexcept {
         return this->m_v & LeastMask;

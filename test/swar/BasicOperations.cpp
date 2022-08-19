@@ -57,8 +57,12 @@ TEST_CASE(
 // Bitmasks.
 static_assert(0xFF == zoo::meta::BitmaskMaker<uint8_t, 0x7, 3>::value);
 static_assert(0x92 == zoo::meta::BitmaskMaker<uint8_t, 0x2, 3>::value);
-static_assert(0x3F == (zoo::meta::BitmaskMaker<uint8_t, 0x7, 3>::value & zoo::meta::BitmaskMakerClearTop<uint8_t, 3>::TopBlit));
-static_assert(0x12 == (zoo::meta::BitmaskMaker<uint8_t, 0x2, 3>::value & zoo::meta::BitmaskMakerClearTop<uint8_t, 3>::TopBlit));
+static_assert(0x3F == 
+    (zoo::meta::BitmaskMaker<uint8_t, 0x7, 3>::value &
+     zoo::meta::BitmaskMakerClearTop<uint8_t, 3>::TopBlit));
+static_assert(0x12 == 
+    (zoo::meta::BitmaskMaker<uint8_t, 0x2, 3>::value &
+     zoo::meta::BitmaskMakerClearTop<uint8_t, 3>::TopBlit));
 static_assert(0x00FE'DFED == (
     zoo::meta::BitmaskMaker<uint32_t, 0xFED, 12>::value  &
     zoo::meta::BitmaskMakerClearTop<uint32_t, 12>::TopBlit));
@@ -182,7 +186,8 @@ static_assert(0x0808'0808 == u32(broadcast<8>(SWAR<8, u32>(0x0000'0008))));
 static_assert(0x0B0B'0B0B == u32(broadcast<8>(SWAR<8, u32>(0x0000'000B))));
 static_assert(0x0E0E'0E0E == u32(broadcast<8>(SWAR<8, u32>(0x0000'000E))));
 static_assert(0x6B6B'6B6B == u32(broadcast<8>(SWAR<8, u32>(0x0000'006B))));
-static_assert(0x0808'0808'0808'0808ull == u64(broadcast<8>(SWAR<8, u64>(0x0000'0000'0000'0008ull))));
+static_assert(0x0808'0808'0808'0808ull ==
+    u64(broadcast<8>(SWAR<8, u64>(0x0000'0000'0000'0008ull))));
 
 static_assert(2 == lsbIndex(1<<1));
 static_assert(4 == lsbIndex(1<<3));
@@ -199,7 +204,8 @@ static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).valu
 
 
 // Unusual formatting for easy visual verification.
-#define GE_MSB_TEST(left, right, result) static_assert(result== greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
+#define GE_MSB_TEST(left, right, result) static_assert(result == \
+    greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
 GE_MSB_TEST(0x1000'0010,
             0x0111'1101,
@@ -251,7 +257,8 @@ GE_LEAST_TEST(0x0011'2233,
               0x4859'56EF,
               0x8888'8888)
 
-#define GE_MOST_TEST(left, right, result) static_assert(result == greaterEqualMost<2,2, u32>(Sub22u32(left), Sub22u32(right)).value());
+#define GE_MOST_TEST(left, right, result) static_assert(result == \
+    greaterEqualMost<2,2, u32>(Sub22u32(left), Sub22u32(right)).value());
 
 GE_MOST_TEST(0x0000'0000,
              0x0000'0000,
@@ -270,7 +277,8 @@ GE_MOST_TEST(0x4000'0040,
              0x8888'8888)
 
 #define GE_LEAST_VS_MSBOFF_TEST(left, right) static_assert( \
-    greaterEqual_MSB_off<4, u32>(SWAR4u32(Sub22u32(left).least()), SWAR4u32(Sub22u32(right).least())).value() ==  \
+    greaterEqual_MSB_off<4, u32>(SWAR4u32(Sub22u32(left).least()), \
+        SWAR4u32(Sub22u32(right).least())).value() ==  \
     greaterEqualLeast<2,2, u32>(Sub22u32(left), Sub22u32(right)).value());
 
 GE_LEAST_VS_MSBOFF_TEST(0x1000'0010,
@@ -282,7 +290,8 @@ GE_LEAST_VS_MSBOFF_TEST(0x8484'2151,
 GE_LEAST_VS_MSBOFF_TEST(0x0011'2233,
                         0x4859'56EF)
 
-#define GE_LEAST_BLIT(left, right, result) CHECK(result == greaterEqual_laneblit<4, u32>(SWAR4u32(left), SWAR4u32(right)).value());
+#define GE_LEAST_BLIT(left, right, result) CHECK(result == \
+    greaterEqual_laneblit<4, u32>(SWAR4u32(left), SWAR4u32(right)).value());
 
 TEST_CASE(
     "LaneBlit4",
@@ -310,7 +319,8 @@ GE_LEAST_BLIT(0xEF44'44FE,
               0x0888'8880)
 }
 
-#define GE_LEAST_BLIT12(left, right, result) CHECK(result == greaterEqual_laneblit<12, u32>(SWAR12u32(left), SWAR12u32(right)).value());
+#define GE_LEAST_BLIT12(left, right, result) CHECK(result == \
+    greaterEqual_laneblit<12, u32>(SWAR12u32(left), SWAR12u32(right)).value());
 
 TEST_CASE(
     "LaneBlit12",
