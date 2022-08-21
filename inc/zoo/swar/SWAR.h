@@ -107,10 +107,21 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
     using Base = swar::SWAR<LaneBits, T>;
 
     //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
-    static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value;
-    static constexpr inline auto MostOnes = meta::BitmaskMaker<T, Base{1<<NBitsLeast}.value(), LaneBits>::value;
-    static constexpr inline auto LeastMask = meta::BitmaskMaker<T, Base{~(~0ull<<NBitsLeast)}.value(), LaneBits>::value;
-    static constexpr inline auto MostMask = ~LeastMask;
+    static constexpr inline auto TopBlit =
+        meta::BitmaskMakerClearTop<T, LaneBits>::TopBlit;
+    static constexpr inline auto LeastOnes =
+        meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value & TopBlit;
+    static constexpr inline auto MostOnes =
+        meta::BitmaskMaker<T, Base{1<<NBitsLeast}.value(), LaneBits>::value &
+        TopBlit;
+    static constexpr inline auto MostMostOnes =
+        meta::BitmaskMaker<T, Base{1<<(LaneBits-1)}.value(), LaneBits>::value &
+        TopBlit;
+    static constexpr inline auto LeastMask =
+        meta::BitmaskMaker<T, Base{~(~0ull<<NBitsLeast)}.value(), LaneBits>::value &
+        TopBlit;
+    static constexpr inline auto MostMask =
+        ~LeastMask & TopBlit;
 
     constexpr auto least() const noexcept {
         return this->m_v & LeastMask;
@@ -144,13 +155,13 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
         return most(pos) >> (LaneBits*pos)>> NBitsLeast;
     }
 
-    // Blits most sig bits into least significant bits. Experimental.
-    constexpr auto flattenMostToLeast(u32 pos) const noexcept {
+    // Shifts most sig bits into least significant bits. Experimental.
+    constexpr auto flattenMostToLeast() const noexcept {
         return (this->m_v >> NBitsLeast) & LeastMask;
     }
 
-    // Blits least sig bits into most significant bits. Experimental.
-    constexpr auto promoteLeastToMost(u32 pos) const noexcept {
+    // Shifts least sig bits into most significant bits. Experimental.
+    constexpr auto promoteLeastToMost() const noexcept {
         return (this->m_v << NBitsMost) & MostMask;
     }
 
@@ -266,8 +277,43 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
 };
 
+// Only works for NBits <= sizeof(T)*8/2
 template<int NBits, typename T>
-constexpr BooleanSWAR<NBits, T> greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
+constexpr BooleanSWAR<NBits, T> greaterEqual_laneblit(
+        SWAR<NBits, T> left, 
+        SWAR<NBits, T> right) noexcept {
+    // Think of blitting out alternate lanes, then shifting them down to the
+    // least significant bits of a swar with double-width lanes, then doing an
+    // msb-off subtract as usual, then shifting the least bits boolean compare
+    // result down to their original lane, then blitting them back together.
+    constexpr auto DoubleNBits = NBits * 2;
+    constexpr auto MLMSB = BooleanSWAR<NBits, T>::maskLaneMSB;
+    constexpr auto DoubleMLMSB = BooleanSWAR<DoubleNBits, T>::maskLaneMSB;
+    constexpr auto MaskPattern = leastNBitsMask<NBits, T>() << NBits;
+    constexpr auto MostHalfMask =
+        meta::BitmaskMaker<T, MaskPattern, DoubleNBits>::value;
+    constexpr auto LeastHalfMask = ~MostHalfMask;
+
+    const auto leastHalfLeft = left.value() & LeastHalfMask;
+    const auto leastHalfRight = right.value() & LeastHalfMask;
+    const auto highHalfLeft = (left.value() & MostHalfMask) >> NBits;
+    const auto highHalfRight = (right.value() & MostHalfMask) >> NBits;
+    const auto leastHalfCompareShifted =
+        ((leastHalfLeft | DoubleMLMSB) - leastHalfRight) & DoubleMLMSB;
+    // results are in high bits, so shift result of least compare down.
+    const auto leastHalfCompare = leastHalfCompareShifted >> NBits;
+
+    // Most half has to shift down to compare safely
+    const auto highHalfCompareShifted =
+        ((highHalfLeft | DoubleMLMSB) - highHalfRight) & DoubleMLMSB;
+    const auto highHalfCompare = highHalfCompareShifted;
+    const auto final = highHalfCompare | leastHalfCompare;
+    return BooleanSWAR<NBits, T>{ final};
+}
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T> greaterEqual_MSB_off(
+        SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
     constexpr auto MLMSB = BooleanSWAR<NBits, T>::maskLaneMSB;
     // TODO(scottbruceheart) operator- and others on SWAR to avoid using .value here.
     return SWAR<NBits, T>{
@@ -275,10 +321,12 @@ constexpr BooleanSWAR<NBits, T> greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<N
     };
 }
 
+
 template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T> greaterEqual(SWAR<NBits, T> v) noexcept {
     static_assert(1 < NBits, "Degenerated SWAR");
-    //static_assert(meta::logCeiling(N) < NBits, "N is too big for this technique");  // ctzll isn't constexpr.
+    // ctzll isn't constexpr.
+    //static_assert(meta::logCeiling(N) < NBits, "N is too big for this technique");
     constexpr auto msbPosition  = NBits - 1;
     constexpr auto msb = T(1) << msbPosition;
     constexpr auto msbMask = meta::BitmaskMaker<T, msb, NBits>::value;
@@ -289,6 +337,30 @@ constexpr BooleanSWAR<NBits, T> greaterEqual(SWAR<NBits, T> v) noexcept {
     return BooleanSWAR<NBits, T>(rv);
 }
 
+template<int NBitsMost, int NBitsLeast, typename T = uint64_t>
+constexpr BooleanSWAR<NBitsMost + NBitsLeast, T> greaterEqualLeast(
+    SWARWithSubLanes<NBitsMost, NBitsLeast, T> left, 
+    SWARWithSubLanes<NBitsMost, NBitsLeast, T> right) noexcept {
+    using Sub = SWARWithSubLanes<NBitsMost, NBitsLeast, T>; 
+    constexpr auto MLMSB = BooleanSWAR<NBitsMost+NBitsLeast, T>::maskLaneMSB;
+    // Using the sublane abstraction allows direct subtract comparison between
+    // left and right, as we are certain msb will be off once we call 'least'.
+    // Set the most sig bit to 1 to make the subtract carry work.
+    return BooleanSWAR<NBitsMost+NBitsLeast,T>(
+        ((left.least() | Sub::MostMostOnes) - right.least()) & MLMSB);
+}
+
+// Only correct when NBitsMost >= NBitsLeast. Not 100% tested.
+template<int NBitsMost, int NBitsLeast, typename T = uint64_t>
+constexpr BooleanSWAR<NBitsMost + NBitsLeast, T> greaterEqualMost(
+    SWARWithSubLanes<NBitsMost, NBitsLeast, T> left, 
+    SWARWithSubLanes<NBitsMost, NBitsLeast, T> right) noexcept {
+    return greaterEqualLeast<NBitsMost, NBitsLeast, T>(
+        SWARWithSubLanes<NBitsMost, NBitsLeast, T>(left.flattenMostToLeast()), 
+        SWARWithSubLanes<NBitsMost, NBitsLeast, T>(right.flattenMostToLeast()));
+}
+
+
 /*
 This is just a draft implementation:
 1. The isolator needs pre-computing instead of adding 3 ops per iteration
@@ -298,7 +370,8 @@ This is just a draft implementation:
 template<int NBits, typename T>
 constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
     constexpr auto LogNBits = meta::logFloor(NBits);
-    static_assert(NBits == (1 << LogNBits), "Logarithms of element width not power of two is un-implemented");
+    static_assert(NBits == (1 << LogNBits),
+        "Logarithms of element width not power of two is un-implemented");
     auto whole = v.value();
     auto isolationMask = BooleanSWAR<NBits, T>::maskLaneMSB;
     for(auto groupSize = 1; groupSize < NBits; groupSize <<= 1) {

@@ -40,8 +40,27 @@ struct BitmaskMaker {
         >::value;
 };
 
+/// Provides TopBlit mask to clear any garbage bits at the top of a bitmask
+/// made by BitmaskMaker.
+/// \tparam T the desired integral type
+/// \tparam PatternBitCount the width of the pattern, repeating. So 32 bits
+///   with a 12 bit PatternBitCount results in a TopBlit with 6 bit top clear.
+template<typename T, int PatternBitCount>
+struct BitmaskMakerClearTop {
+    constexpr static T BitCount = sizeof(T)*8;
+    constexpr static T BitCountRemainder = BitCount % PatternBitCount;
+    constexpr static T LeastBitsKeepCount =
+        BitCount - BitCount % PatternBitCount;
+    constexpr static T BitMod = BitCount % PatternBitCount;
+    constexpr static T TopBlit = 
+        BitMod == 0 ? 
+            ~(T(0)) :
+            ((T(1) << LeastBitsKeepCount) -1);
+};
+
+static_assert(0xFF == BitmaskMaker<uint8_t, 0x7, 3>::value);
 static_assert(0xF0F0 == BitmaskMaker<uint16_t, 0xF0, 8>::value);
-static_assert(0xEDFEDFED == BitmaskMaker<uint32_t, 0xFED, 12>::value);
+static_assert(0xEDFE'DFED == BitmaskMaker<uint32_t, 0xFED, 12>::value);
 
 }} // zoo::meta
 
