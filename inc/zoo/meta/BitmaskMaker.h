@@ -40,15 +40,22 @@ struct BitmaskMaker {
         >::value;
 };
 
-/// Provides TopBlit to clear any garbage bits at the top of a bitmask made by
-//BitmaskMaker
-template<typename T, int CurrentSize>
+/// Provides TopBlit mask to clear any garbage bits at the top of a bitmask
+/// made by BitmaskMaker.
+/// \tparam T the desired integral type
+/// \tparam PatternBitCount the width of the pattern, repeating. So 32 bits
+///   with a 12 bit PatternBitCount results in a TopBlit with 6 bit top clear.
+template<typename T, int PatternBitCount>
 struct BitmaskMakerClearTop {
     constexpr static T BitCount = sizeof(T)*8;
-    constexpr static T LeastBitKeepCount = BitCount - BitCount % CurrentSize;
-    constexpr static T BitMod = BitCount % CurrentSize;
-    constexpr static T TopBlit = (BitMod == 0) ? ~(T(0)) :
-        ((T(1) << LeastBitKeepCount) -1);
+    constexpr static T BitCountRemainder = BitCount % PatternBitCount;
+    constexpr static T LeastBitsKeepCount =
+        BitCount - BitCount % PatternBitCount;
+    constexpr static T BitMod = BitCount % PatternBitCount;
+    constexpr static T TopBlit = 
+        BitMod == 0 ? 
+            ~(T(0)) :
+            ((T(1) << LeastBitsKeepCount) -1);
 };
 
 static_assert(0xFF == BitmaskMaker<uint8_t, 0x7, 3>::value);
