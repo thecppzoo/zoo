@@ -3,7 +3,40 @@
 
 #include "zoo/swar/SWAR.h"
 
-namespace zoo { namespace swar {
+namespace zoo {
+
+namespace swar {
+
+template<typename T>
+struct GeneratorFromPointer {
+        T *p_;
+
+    constexpr T &operator*() noexcept { return *p_; }
+    constexpr GeneratorFromPointer operator++() noexcept { return {++p_}; }
+};
+
+template<typename T, int MisalignmentBits>
+struct MisalignedGenerator {
+    T *base_;
+    constexpr static auto Width = sizeof(T) * 8;
+
+    constexpr T operator*() noexcept {
+        auto firstPart = base_[0];
+        auto secondPart = base_[1];
+            // how to make sure the "logical" shift right is used, regardless
+            // of the signedness of T?
+            // I'd prefer to not use std::make_unsigned_t, since how do we
+            // "make unsigned" user types?
+        auto firstPartLowered = firstPart >> MisalignmentBits;
+        auto secondPartRaised = secondPart << (Width - MisalignmentBits);
+        return firstPartLowered | secondPartRaised;
+    }
+
+    constexpr MisalignedGenerator operator++() noexcept { return {++base_}; }
+};
+
+template<typename T>
+struct MisalignedGenerator<T, 0>: GeneratorFromPointer<T> {};
 
 namespace rh {
 
@@ -16,13 +49,6 @@ struct RH {
 
         constexpr auto PSLs() const noexcept { return this->least(); }
         constexpr auto Hashes() const noexcept { return this->most(); }
-    };
-
-    struct PointerAsProvider {
-        Metadata *p_;
-
-        constexpr Metadata &operator*() noexcept { return *p_; }
-        constexpr PointerAsProvider operator++() noexcept { return {++p_}; }
     };
 
     constexpr static inline auto Width = Metadata::NBits;
@@ -126,6 +152,10 @@ struct RH {
         auto needleWithPotentialPSLs = makeNeedle(startingPSL, hoistedHash);
         return potentialMatches(needleWithPotentialPSLs, provider);
     }
+
+    /*auto find(U hoistedHash) const noexcept {
+        PointerAsProvider pap =
+    }*/
 };
 
 } // rh
