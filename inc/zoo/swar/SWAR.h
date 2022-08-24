@@ -52,9 +52,16 @@ struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
 
-    constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
+    #define SWAR_UNARY_OPERATORS_X_LIST \
+        X(SWAR, ~)
+    //constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
     #define SWAR_BINARY_OPERATORS_X_LIST \
-      X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+
+    #define X(rt, op) constexpr rt operator op() const noexcept { return rt(op m_v); }
+    SWAR_UNARY_OPERATORS_X_LIST
+    #undef X
+
     #define X(rt,op) constexpr rt operator op (rt o) const noexcept { return rt (m_v op o.m_v); };
     SWAR_BINARY_OPERATORS_X_LIST
     #undef X
@@ -268,6 +275,8 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr BooleanSWAR operator not() const noexcept {
         return MaskLaneMSB ^ *this;
     }
+
+    constexpr operator bool() const noexcept { return this->m_v; }
  private:
     constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept:
         SWAR<NBits, T>(initializer)
@@ -296,9 +305,11 @@ constantIsGreaterEqual(SWAR<NBits, T> subtrahend) noexcept {
     static_assert(1 < NBits, "Degenerated SWAR");
     constexpr auto MSB_Position  = NBits - 1;
     constexpr auto MSB = T(1) << MSB_Position;
-    constexpr auto MSB_Mask = meta::BitmaskMaker<T, MSB, NBits>::value;
-    constexpr auto Minuend = meta::BitmaskMaker<T, N, NBits>::value;
-    constexpr auto N_MSB = MSB & Minuend;
+    constexpr auto MSB_Mask =
+        SWAR<NBits, T>{meta::BitmaskMaker<T, MSB, NBits>::value};
+    constexpr auto Minuend =
+        SWAR<NBits, T>{meta::BitmaskMaker<T, N, NBits>::value};
+    constexpr auto N_MSB = MSB & N;
 
     auto subtrahendWithMSB_on = MSB_Mask & subtrahend;
     auto subtrahendWithMSB_off = ~subtrahendWithMSB_on;
@@ -316,6 +327,7 @@ constantIsGreaterEqual(SWAR<NBits, T> subtrahend) noexcept {
         auto merged =
             subtrahendWithMSB_off & // the minuend MSBs are off
             leastSignificantComparison;
+        return MSB_Mask & merged;
     }
 }
 
@@ -350,39 +362,21 @@ greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
 }
 
 template<int NB, typename T>
-constexpr BooleanSWAR<NB, T>
+constexpr auto
 booleans(SWAR<NB, T> arg) noexcept {
     return not constantIsGreaterEqual<0>(arg);
 }
 
 template<int NBits, typename T>
-constexpr BooleanSWAR<NBits, T>
+constexpr auto
 differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    booleans(a1 ^ a2);
+    return booleans(a1 ^ a2);
 }
 
 template<int NBits, typename T>
 constexpr auto
 equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    not differents(a1, a2);
-}
-
-template<int NB, typename T>
-constexpr BooleanSWAR<NB, T>
-booleans(SWAR<NB, T> arg) noexcept {
-    return not greaterEqual(SWAR<NB, T>{0}, arg);
-}
-
-template<int NBits, typename T>
-constexpr BooleanSWAR<NBits, T>
-differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    booleans(a1 ^ a2);
-}
-
-template<int NBits, typename T>
-constexpr auto
-equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    not differents(a1, a2);
+    return not differents(a1, a2);
 }
 
 /*

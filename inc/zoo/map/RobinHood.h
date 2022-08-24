@@ -69,13 +69,14 @@ struct RH {
         auto haystackStrictlyRichers =
             // !(needlePSLs >= haystackPSLs) <=> haystackPSLs < needlePSLs
             not greaterEqual_MSB_off(needlePSLs, haystackPSLs);
-            // BTW, the reason to have encoded the PSLs is in the least
+            // BTW, the reason to have encoded the PSLs in the least
             // significant bits is to be able to call the cheaper version
             // _MSB_off here
 
         if(!haystackStrictlyRichers) {
             // The search could continue, but there could be potential matches
-            return { 0, sames, MatchResult::PotentialMatches };
+            // from this SWAR
+            return { 0, sames };
         }
         // Performance wise, this test is profitable because the search
         // has reached finality:
@@ -123,7 +124,7 @@ struct RH {
         U startingPSL, U hoistedHash, Provider provider
     ) {
         auto needleWithPotentialPSLs = makeNeedle(startingPSL, hoistedHash);
-        return potentialMatch(needleWithPotentialPSLs, provider);
+        return potentialMatches(needleWithPotentialPSLs, provider);
     }
 };
 
