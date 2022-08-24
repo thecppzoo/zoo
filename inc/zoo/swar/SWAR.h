@@ -41,6 +41,10 @@ template<typename T> constexpr typename std::make_unsigned<T>::type lsbIndex(T v
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits, typename T = uint64_t> struct SWAR {
     static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
+    constexpr static T BitMod = sizeof(T)*8 % NBits;
+    constexpr static T ValidBitsCount = sizeof(T)*8 - BitMod;
+    constexpr static T AllOnes = (BitMod == 0) ? ~(T(0)) : ((T(1) << ValidBitsCount) -1);
+
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
@@ -221,7 +225,6 @@ constexpr auto leastNBitsMask() {
     return ~((0ull)<<NBits);
 }
 
-
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
   return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
@@ -267,17 +270,76 @@ struct BooleanSWAR: SWAR<NBits, T> {
     /// A logical NOT in this circumstance _only_ flips the MSB of each lane.  This operation is
     /// not ones or twos complement.
     constexpr BooleanSWAR operator not() const noexcept {
-        return maskLaneMSB ^ *this;
+        return BooleanSWAR<NBits, T>{maskLaneMSB ^ this->value()};
     }
- private:
     constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept: SWAR<NBits, T>(initializer) {}
+ private:
 
     template<int NB, typename TT> friend
     constexpr BooleanSWAR<NB, TT> greaterEqual_MSB_off(SWAR<NB, TT> left, SWAR<NB, TT> right) noexcept;
-
+    template<int NB, typename TT> friend
+    constexpr BooleanSWAR<NBits, TT> greaterEqualZeroLeft(SWAR<NB, TT> right) noexcept;
 };
 
-// Only works for NBits <= sizeof(T)*8/2
+template<int NRight, int NBits, typename T>
+constexpr BooleanSWAR<NBits, T> greaterEqual(SWAR<NBits, T> left) noexcept {
+    static_assert(1 < NBits, "Degenerated SWAR");
+    //static_assert(meta::logCeiling(NRight) < NBits, "NRight is too big for this technique");  // ctzll isn't constexpr.
+    constexpr auto msbPosition  = NBits - 1;
+    constexpr auto msb = T(1) << msbPosition;
+    constexpr auto msbMask = meta::BitmaskMaker<T, msb, NBits>::value;
+    constexpr auto subtraend = meta::BitmaskMaker<T, NRight, NBits>::value;
+    auto adjusted = left.value() | msbMask;
+    auto rv = adjusted - subtraend;
+    rv &= msbMask;
+    return BooleanSWAR<NBits, T>(rv);
+}
+
+template<int NBits, typename T> 
+constexpr BooleanSWAR<NBits, T> greaterEqualZeroLeft(SWAR<NBits, T> right) noexcept {
+    constexpr auto MLMSB = SWAR<NBits, T>{BooleanSWAR<NBits, T>::maskLaneMSB};
+    auto leftMSB = 0;
+    auto rightMSB = right & MLMSB;
+     
+    // left MSB always off:
+    //   Right MSB on, false.
+    //   Right MSB off, greaterEqual_MSB_off which is...
+    //       (((leftmsboff.value() | MLMSB) - rightmsboff.value()) & MLMSB)
+    //       or (((0 | MLMSB) - rightmsboff)) & MLMSB)
+    //       or (MLMSB - rightmsboff) & MLMSB
+    // TODO(scottbruceheart) operator- and others on SWAR to avoid using .value here.
+    //
+    const auto rightMSBoff = right ^ rightMSB;
+    return ((MLMSB - rightMSBoff) & MLMSB)
+       & ~rightMSB;
+}
+
+template<int NB, typename T> constexpr
+BooleanSWAR<NB, T> booleans(SWAR<NB, T> raw) noexcept {
+  return not greaterEqualZeroLeft(raw);
+}
+
+// Differents becuase "differences of lanes in boolean bits"
+template<int NB, typename T> constexpr
+BooleanSWAR<NB, T> differents(SWAR<NB, T> left, SWAR<NB, T> right) noexcept {
+    return booleans(left ^ right);
+}
+
+template<int NB, typename T> constexpr
+BooleanSWAR<NB, T> equals(SWAR<NB, T> left, SWAR<NB, T> right) noexcept {
+    return not differents(left, right);
+}
+
+template<int NB, typename T> constexpr
+BooleanSWAR<NB, T> differents_MSB_off(SWAR<NB, T> left, SWAR<NB, T> right) noexcept {
+    return not greaterEqualZeroLeft(left ^ right);
+}
+
+template<int NB, typename T> constexpr
+BooleanSWAR<NB, T> equals_MSB_off(SWAR<NB, T> left, SWAR<NB, T> right) noexcept {
+    return not differents_MSB_off(left, right);
+}
+
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T> greaterEqual_laneblit(
         SWAR<NBits, T> left, 
@@ -319,22 +381,6 @@ constexpr BooleanSWAR<NBits, T> greaterEqual_MSB_off(
     return SWAR<NBits, T>{
         (((left.value() | MLMSB) - right.value()) & MLMSB)
     };
-}
-
-
-template<int N, int NBits, typename T>
-constexpr BooleanSWAR<NBits, T> greaterEqual(SWAR<NBits, T> v) noexcept {
-    static_assert(1 < NBits, "Degenerated SWAR");
-    // ctzll isn't constexpr.
-    //static_assert(meta::logCeiling(N) < NBits, "N is too big for this technique");
-    constexpr auto msbPosition  = NBits - 1;
-    constexpr auto msb = T(1) << msbPosition;
-    constexpr auto msbMask = meta::BitmaskMaker<T, msb, NBits>::value;
-    constexpr auto subtraend = meta::BitmaskMaker<T, N, NBits>::value;
-    auto adjusted = v.value() | msbMask;
-    auto rv = adjusted - subtraend;
-    rv &= msbMask;
-    return BooleanSWAR<NBits, T>(rv);
 }
 
 template<int NBitsMost, int NBitsLeast, typename T = uint64_t>

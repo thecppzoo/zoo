@@ -202,6 +202,8 @@ static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x7654'3210)).valu
 static_assert(0x00000008 == greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).value());
 static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).value());
 
+static_assert(0x80000000 == greaterEqualZeroLeft(SWAR<4, uint32_t>(0x0123'4567)).value());
+static_assert(0x00000008 == greaterEqualZeroLeft(SWAR<4, uint32_t>(0x7654'3210)).value());
 
 // Unusual formatting for easy visual verification.
 #define GE_MSB_TEST(left, right, result) static_assert(result == \
@@ -388,4 +390,3 @@ static_assert(0x0000'00E0 == Lanes(allF).most(0));
 static_assert(0x0000'E000 == Lanes(allF).most(1));
 static_assert(0x00E0'0000 == Lanes(allF).most(2));
 static_assert(0xE000'0000 == Lanes(allF).most(3));
-
