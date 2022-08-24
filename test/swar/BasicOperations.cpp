@@ -166,12 +166,14 @@ static_assert(9 == lsbIndex(1<<8));
 static_assert(18 == lsbIndex(1<<17));
 static_assert(31 == lsbIndex(1<<30));
 
+/*
+These tests were not catching errors known to have been present
 static_assert(0x80880008 == greaterEqual<3>(SWAR<4, uint32_t>(0x3245'1027)).value());
 static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x0123'4567)).value());
 static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x7654'3210)).value());
 static_assert(0x00000008 == greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).value());
 static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).value());
-
+*/
 
 // Unusual formatting for easy visual verification.
 #define GE_MSB_TEST(left, right, result) static_assert(result== greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
