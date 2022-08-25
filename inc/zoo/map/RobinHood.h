@@ -2,9 +2,18 @@
 #define ZOO_ROBINHOOD_H
 
 #include "zoo/swar/SWAR.h"
+#include "zoo/AlignedStorage.h"
+
+#ifndef ZOO_CONFIG_DEEP_ASSERTIONS
+    #define ZOO_CONFIG_DEEP_ASSERTIONS 0
+#endif
 
 #include <tuple>
 #include <array>
+
+#if ZOO_CONFIG_DEEP_ASSERTIONS
+    #include <assert>
+#endif
 
 namespace zoo {
 
@@ -71,24 +80,32 @@ struct MisalignedGenerator_Dynamic {
 
 namespace rh {
 
+namespace impl {
+
+/// \todo decide on whether to rename this?
+template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
+struct Metadata: swar::SWARWithSubLanes<HashBits, PSL_Bits, U> {
+    using Base = swar::SWARWithSubLanes<HashBits, PSL_Bits, U>;
+    using Base::Base;
+
+    constexpr auto PSLs() const noexcept { return this->least(); }
+    constexpr auto Hashes() const noexcept { return this->most(); }
+};
+
+template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
+struct MatchResult {
+    U deadline;
+    Metadata<PSL_Bits, HashBits, U> potentialMatches;
+};
+
+}
+
 template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
 struct RH_Backend {
-    /// \todo decide on whether to rename this?
-    struct Metadata: swar::SWARWithSubLanes<HashBits, PSL_Bits, U> {
-        using Base = swar::SWARWithSubLanes<HashBits, PSL_Bits, U>;
-        using Base::Base;
-
-        constexpr auto PSLs() const noexcept { return this->least(); }
-        constexpr auto Hashes() const noexcept { return this->most(); }
-    };
+    using Metadata = impl::Metadata<PSL_Bits, HashBits, U>;
 
     constexpr static inline auto Width = Metadata::NBits;
     Metadata *md_;
-
-    struct MatchResult {
-        U deadline;
-        Metadata potentialMatches;
-    };
 
     /*! \brief SWAR check for a potential match
     The invariant in Robin Hood is that the element being looked for, the "needle", is "richer"
@@ -112,7 +129,8 @@ struct RH_Backend {
     they intercept to be large enough that the branch prediction penalty of the entropy introduced is
     overcompensated.
     */
-    constexpr static MatchResult potentialMatches(
+    constexpr static impl::MatchResult<PSL_Bits, HashBits>
+    potentialMatches(
         Metadata needle, Metadata haystack
     ) noexcept {
         // We need to determine if there are potential matches to consider
@@ -297,6 +315,63 @@ constexpr auto fibonacciIndexModulo(T index) {
         GoldenRatioReciprocals[meta::detail::BitWidthLog<T> - 3];
     return index * MagicalConstant;
 }
+
+
+template<
+    typename K,
+    typename MV,
+    size_t RequestedSize,
+    int PSL_Bits, int HashBits, typename U = std::uint64_t
+>
+struct RH_Frontend_WithSkarupkeTail {
+    using Backend = RH_Backend<PSL_Bits, HashBits, U>;
+    using MD = typename Backend::Metadata;
+
+    constexpr static inline auto WithTail =
+        RequestedSize +
+        (1 << PSL_Bits) - 1 // the Skarupke tail
+    ;
+    constexpr static inline auto SWARCount =
+        (
+            WithTail +
+            MD::NSlots - 1 // to calculate the ceiling rounding
+        ) / MD::NSlots
+    ;
+    constexpr static inline auto SlotCount = SWARCount * MD::NSlots;
+
+    std::array<MD, SWARCount> md_;
+    zoo::AlignedStorageFor<K> keys_[SlotCount];
+    zoo::AlignedStorageFor<MV> mappedValues_[SlotCount];
+    size_t elementCount_;
+
+    RH_Frontend_WithSkarupkeTail() noexcept: elementCount_(0) {
+        for(auto &mde: md_) { mde = MD{0}; }
+    }
+
+    ~RH_Frontend_WithSkarupkeTail() {
+        #if ZOO_CONFIG_DEEP_ASSERTIONS
+            size_t destroyedCount = 0;
+        #endif
+        while(size_t ndx = 0) {
+            auto PSLs = md_[ndx].PSLs();
+            auto occupied = booleans(PSLs);
+            if(!occupied) { ++ndx; continue; }
+            auto baseIndex = ndx * MD::NSlots;
+            while(occupied) {
+                auto subIndex = occupied.lsbIndex();
+                auto index = baseIndex + subIndex;
+                mappedValues_[index].template destroy<MV>();
+                keys_[index].template destroy<K>();
+                #if ZOO_CONFIG_DEEP_ASSERTIONS
+                    ++destroyedCount;
+                #endif
+            }
+        }
+        #if ZOO_CONFIG_DEEP_ASSERTIONS
+            assert(destroyedCount == elementCount_);
+        #endif
+    }
+};
 
 } // rh
 

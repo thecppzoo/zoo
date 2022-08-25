@@ -18,6 +18,14 @@ auto blue(int sPSL, int hh, int key, int homeIndex) {
         );
 }
 
+auto instantiateFrontEndDefConst() {
+    return new zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 1024, 5, 3>;
+}
+
+auto instantiateFED(zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 1024, 5, 3> *ptr) {
+    delete ptr;
+}
+
 
 static_assert(
     0xE9E8E7E6E5E4E3E2ull == RHC::makeNeedle(1, 7).value()
