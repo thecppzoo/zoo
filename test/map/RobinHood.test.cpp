@@ -18,12 +18,19 @@ auto blue(int sPSL, int hh, int key, int homeIndex) {
         );
 }
 
+using FrontendExample =
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 1024, 5, 3>;
+
 auto instantiateFrontEndDefConst() {
-    return new zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 1024, 5, 3>;
+    return new FrontendExample;
 }
 
-auto instantiateFED(zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 1024, 5, 3> *ptr) {
+auto instantiateFED(FrontendExample *ptr) {
     delete ptr;
+}
+
+auto instantiateFind(int v, FrontendExample &f) {
+    return f.find(v);
 }
 
 

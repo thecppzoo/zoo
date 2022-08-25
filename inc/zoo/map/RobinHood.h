@@ -10,6 +10,7 @@
 
 #include <tuple>
 #include <array>
+#include <functional>
 
 #if ZOO_CONFIG_DEEP_ASSERTIONS
     #include <assert>
@@ -312,16 +313,26 @@ constexpr auto fibonacciIndexModulo(T index) {
             11400714819323198485ull,
         };
     constexpr T MagicalConstant =
-        GoldenRatioReciprocals[meta::detail::BitWidthLog<T> - 3];
+        T(GoldenRatioReciprocals[meta::logFloor(sizeof(T)) - 3]);
     return index * MagicalConstant;
 }
 
+template<size_t Size, typename T>
+constexpr auto lemireModuloReductionAlternative(T input) noexcept {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    static_assert(Size < (1ull << 32));
+    auto halved = uint32_t(input);
+    return Size * input >> 32;
+}
 
 template<
     typename K,
     typename MV,
     size_t RequestedSize,
-    int PSL_Bits, int HashBits, typename U = std::uint64_t
+    int PSL_Bits, int HashBits,
+    typename Hash = std::hash<K>,
+    typename KE = std::equal_to<K>,
+    typename U = std::uint64_t
 >
 struct RH_Frontend_WithSkarupkeTail {
     using Backend = RH_Backend<PSL_Bits, HashBits, U>;
@@ -330,6 +341,7 @@ struct RH_Frontend_WithSkarupkeTail {
     constexpr static inline auto WithTail =
         RequestedSize +
         (1 << PSL_Bits) - 1 // the Skarupke tail
+        // also note it is desirable to have an odd number of elements
     ;
     constexpr static inline auto SWARCount =
         (
@@ -340,8 +352,10 @@ struct RH_Frontend_WithSkarupkeTail {
     constexpr static inline auto SlotCount = SWARCount * MD::NSlots;
 
     std::array<MD, SWARCount> md_;
-    zoo::AlignedStorageFor<K> keys_[SlotCount];
-    zoo::AlignedStorageFor<MV> mappedValues_[SlotCount];
+    using value_type = std::pair<K, MV>;
+
+    /// \todo Scatter key and value in a flavor
+    std::array<zoo::AlignedStorageFor<value_type>, SlotCount> values_;
     size_t elementCount_;
 
     RH_Frontend_WithSkarupkeTail() noexcept: elementCount_(0) {
@@ -352,16 +366,15 @@ struct RH_Frontend_WithSkarupkeTail {
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             size_t destroyedCount = 0;
         #endif
-        while(size_t ndx = 0) {
+        for(size_t ndx = SlotCount; ndx--; ) {
             auto PSLs = md_[ndx].PSLs();
             auto occupied = booleans(PSLs);
-            if(!occupied) { ++ndx; continue; }
+            if(!occupied) { continue; }
             auto baseIndex = ndx * MD::NSlots;
             while(occupied) {
                 auto subIndex = occupied.lsbIndex();
                 auto index = baseIndex + subIndex;
-                mappedValues_[index].template destroy<MV>();
-                keys_[index].template destroy<K>();
+                values_[index].template destroy<value_type>();
                 #if ZOO_CONFIG_DEEP_ASSERTIONS
                     ++destroyedCount;
                 #endif
@@ -370,6 +383,25 @@ struct RH_Frontend_WithSkarupkeTail {
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             assert(destroyedCount == elementCount_);
         #endif
+    }
+
+    auto find(const K &k) const noexcept {
+        auto keyChecker =
+            [thy = this, &k](size_t ndx) noexcept {
+                return KE{}(thy->values_[ndx].template as<value_type>()->first, k);
+            };
+        auto hashCode = Hash{}(k);
+        auto fibonacciScrambled = fibonacciIndexModulo(hashCode);
+        auto homeIndex =
+            lemireModuloReductionAlternative<RequestedSize>(fibonacciScrambled);
+        auto hoisted = hashReducer<HashBits>(hashCode);
+        auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
+        Backend be{thy->md_.data()};
+        auto [found, index] =
+            be.findMisaligned_assumesSkarupkeTail(
+                hoisted, homeIndex, keyChecker
+            );
+        return found ? values_.data() + index : values_.end();
     }
 };
 
