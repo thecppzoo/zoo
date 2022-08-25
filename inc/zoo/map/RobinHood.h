@@ -4,6 +4,7 @@
 #include "zoo/swar/SWAR.h"
 
 #include <tuple>
+#include <array>
 
 namespace zoo {
 
@@ -71,7 +72,7 @@ struct MisalignedGenerator_Dynamic {
 namespace rh {
 
 template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
-struct RH {
+struct RH_Backend {
     /// \todo decide on whether to rename this?
     struct Metadata: swar::SWARWithSubLanes<HashBits, PSL_Bits, U> {
         using Base = swar::SWARWithSubLanes<HashBits, PSL_Bits, U>;
@@ -269,6 +270,33 @@ struct RH {
         }
     }
 };
+
+template<int NBits, typename U>
+constexpr auto hashReducer(U n) noexcept {
+    constexpr auto Shift = (NBits * ((sizeof(U)*8 / NBits) - 1));
+    constexpr auto AllOnes = meta::BitmaskMaker<U, 1, NBits>::value;
+    auto temporary = AllOnes * n;
+    auto higestNBits = temporary >> Shift;
+    return
+        (0 == (64 % NBits)) ?
+            higestNBits :
+            swar::isolate<NBits>(higestNBits);
+}
+
+
+template<typename T>
+constexpr auto fibonacciIndexModulo(T index) {
+    constexpr std::array<uint64_t, 4>
+        GoldenRatioReciprocals = {
+            159,
+            40503,
+            2654435769,
+            11400714819323198485ull,
+        };
+    constexpr T MagicalConstant =
+        GoldenRatioReciprocals[meta::detail::BitWidthLog<T> - 3];
+    return index * MagicalConstant;
+}
 
 } // rh
 

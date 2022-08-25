@@ -3,7 +3,7 @@
 #include <catch2/catch.hpp>
 
 // Robin Hood, canonical test
-using RHC = zoo::rh::RH<5, 3>;
+using RHC = zoo::rh::RH_Backend<5, 3>;
 
 int *collectionOfKeys;
 RHC::Metadata *md;
