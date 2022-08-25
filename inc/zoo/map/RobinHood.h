@@ -3,13 +3,15 @@
 
 #include "zoo/swar/SWAR.h"
 
+#include <tuple>
+
 namespace zoo {
 
 namespace swar {
 
 template<typename T>
 struct GeneratorFromPointer {
-        T *p_;
+    T *p_;
 
     constexpr T &operator*() noexcept { return *p_; }
     constexpr GeneratorFromPointer operator++() noexcept { return {++p_}; }
@@ -27,9 +29,9 @@ struct MisalignedGenerator {
             // of the signedness of T?
             // I'd prefer to not use std::make_unsigned_t, since how do we
             // "make unsigned" user types?
-        auto firstPartLowered = firstPart >> MisalignmentBits;
-        auto secondPartRaised = secondPart << (Width - MisalignmentBits);
-        return firstPartLowered | secondPartRaised;
+        auto firstPartLowered = firstPart.value() >> MisalignmentBits;
+        auto secondPartRaised = secondPart.value() << (Width - MisalignmentBits);
+        return T{firstPartLowered | secondPartRaised};
     }
 
     constexpr MisalignedGenerator operator++() noexcept { return {++base_}; }
@@ -37,6 +39,34 @@ struct MisalignedGenerator {
 
 template<typename T>
 struct MisalignedGenerator<T, 0>: GeneratorFromPointer<T> {};
+
+template<typename T>
+struct MisalignedGenerator_Dynamic {
+    constexpr static auto Width = sizeof(T) * 8;
+    T *base_;
+
+    int misalignmentFirst, misalignmentSecond;
+
+    MisalignedGenerator_Dynamic(T *base, int ma):
+        base_(base),
+        misalignmentFirst(ma), misalignmentSecond(Width - ma)
+    {}
+    
+
+    constexpr T operator*() noexcept {
+        auto firstPart = base_[0];
+        auto secondPart = base_[1];
+            // how to make sure the "logical" shift right is used, regardless
+            // of the signedness of T?
+            // I'd prefer to not use std::make_unsigned_t, since how do we
+            // "make unsigned" user types?
+        auto firstPartLowered = firstPart.value() >> misalignmentFirst;
+        auto secondPartRaised = secondPart.value() << misalignmentSecond;
+        return T{firstPartLowered | secondPartRaised};
+    }
+
+    constexpr MisalignedGenerator_Dynamic operator++() noexcept { ++base_; return *this; }
+};
 
 namespace rh {
 
@@ -81,12 +111,9 @@ struct RH {
     they intercept to be large enough that the branch prediction penalty of the entropy introduced is
     overcompensated.
     */
-    template<typename Provider>
     constexpr static MatchResult potentialMatches(
-        Metadata needle, Provider haystackProvider
+        Metadata needle, Metadata haystack
     ) noexcept {
-        auto haystack = *haystackProvider;
-
         // We need to determine if there are potential matches to consider
         auto sames = equals(needle, haystack);
 
@@ -145,17 +172,96 @@ struct RH {
         return startingPSLmadePotentialPSLs;
     }
 
-    template<typename Provider>
-    constexpr static auto startMatch(
-        U startingPSL, U hoistedHash, Provider provider
-    ) {
-        auto needleWithPotentialPSLs = makeNeedle(startingPSL, hoistedHash);
-        return potentialMatches(needleWithPotentialPSLs, provider);
+    template<int Misalignment, typename KeyComparer>
+    constexpr static auto
+    unalignedFind(
+        U hoistedHash,
+        Metadata *base,
+        int homeIndex,
+        const KeyComparer &kc
+    ) noexcept {
+        constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
+        constexpr auto Progression = Metadata{Ones * Ones};
+
+        MisalignedGenerator<Metadata, 8*Misalignment> p{base};
+        auto index = homeIndex;
+        auto needle = makeNeedle(0, hoistedHash);
+        for(;;) {
+            auto result = potentialMatches(needle, *p);
+            auto positives = result.potentialMatches;
+            auto deadline = result.deadline;
+            while(positives.value()) {
+                auto matchSubIndex = positives.lsbIndex();
+                auto matchIndex = index + matchSubIndex;
+                if(kc(matchIndex)) {
+                    return std::tuple(true, matchIndex);
+                }
+                positives = Metadata{clearLSB(positives.value())};
+            }
+            if(deadline) {
+                auto position = index + Metadata{deadline}.lsbIndex();
+                return std::tuple(false, position);
+            }
+            // Skarupke's tail allows us to not have to worry about the end
+            // of the metadata
+            ++p;
+            index += Metadata::NSlots;
+            needle = needle + Progression;
+        }
+    }
+        
+    template<typename KeyComparer>
+    constexpr auto find(U hh, int index, const KeyComparer &kc) const noexcept {
+        auto misalignment = index % Metadata::NSlots;
+        auto baseIndex = index / Metadata::NSlots;
+        auto base = this->md_ + baseIndex;
+        switch(misalignment) {
+            case 0: return unalignedFind<0>(hh, base, index, kc);
+            case 1: return unalignedFind<1>(hh, base, index, kc);
+            case 2: return unalignedFind<2>(hh, base, index, kc);
+            case 3: return unalignedFind<3>(hh, base, index, kc);
+            case 4: return unalignedFind<4>(hh, base, index, kc);
+            case 5: return unalignedFind<5>(hh, base, index, kc);
+            case 6: return unalignedFind<6>(hh, base, index, kc);
+            case 7: return unalignedFind<7>(hh, base, index, kc);
+        }
+        __builtin_unreachable();
     }
 
-    /*auto find(U hoistedHash) const noexcept {
-        PointerAsProvider pap =
-    }*/
+    template<typename KeyComparer>
+    constexpr auto find2(U hoistedHash, int homeIndex, const KeyComparer &kc) const noexcept {
+        auto misalignment = homeIndex % Metadata::NSlots;
+        auto baseIndex = homeIndex / Metadata::NSlots;
+        auto base = this->md_ + baseIndex;
+
+        constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
+        constexpr auto Progression = Metadata{Ones * Ones};
+        MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
+        auto index = homeIndex;
+        auto needle = makeNeedle(0, hoistedHash);
+        for(;;) {
+            auto result = potentialMatches(needle, *p);
+            auto positives = result.potentialMatches;
+            auto deadline = result.deadline;
+            while(positives.value()) {
+                auto matchSubIndex = positives.lsbIndex();
+                auto matchIndex = index + matchSubIndex;
+                if(kc(matchIndex)) {
+                    return std::tuple(true, matchIndex);
+                }
+                positives = Metadata{clearLSB(positives.value())};
+            }
+            if(deadline) {
+                auto position = index + Metadata{deadline}.lsbIndex();
+                return std::tuple(false, position);
+            }
+            // Skarupke's tail allows us to not have to worry about the end
+            // of the metadata
+            ++p;
+            index += Metadata::NSlots;
+            needle = needle + Progression;
+        }
+    }
 };
 
 } // rh

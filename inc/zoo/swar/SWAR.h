@@ -190,7 +190,6 @@ struct SWARWithSubLanes: SWAR<NBitsMost+NBitsLeast, T> {
 };
 
 
-
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
 constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
