@@ -3,7 +3,7 @@
 #include <catch2/catch.hpp>
 
 // Robin Hood, canonical test
-using RHC = zoo::swar::rh::RH<5, 3>;
+using RHC = zoo::rh::RH<5, 3>;
 
 int *collectionOfKeys;
 RHC::Metadata *md;
@@ -11,7 +11,7 @@ RHC::Metadata *md;
 auto blue(int sPSL, int hh, int key, int homeIndex) {
     RHC fromPointer{md};
     auto r =
-        fromPointer.find2(
+        fromPointer.findMisaligned_assumesSkarupkeTail(
             hh,
             homeIndex,
             [&](int matchIndex) { return collectionOfKeys[matchIndex] == key; }

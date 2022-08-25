@@ -7,8 +7,6 @@
 
 namespace zoo {
 
-namespace swar {
-
 template<typename T>
 struct GeneratorFromPointer {
     T *p_;
@@ -65,7 +63,9 @@ struct MisalignedGenerator_Dynamic {
         return T{firstPartLowered | secondPartRaised};
     }
 
-    constexpr MisalignedGenerator_Dynamic operator++() noexcept { ++base_; return *this; }
+    constexpr MisalignedGenerator_Dynamic operator++() noexcept {
+        ++base_; return *this;
+    }
 };
 
 namespace rh {
@@ -73,8 +73,8 @@ namespace rh {
 template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
 struct RH {
     /// \todo decide on whether to rename this?
-    struct Metadata: SWARWithSubLanes<HashBits, PSL_Bits, U> {
-        using Base = SWARWithSubLanes<HashBits, PSL_Bits, U>;
+    struct Metadata: swar::SWARWithSubLanes<HashBits, PSL_Bits, U> {
+        using Base = swar::SWARWithSubLanes<HashBits, PSL_Bits, U>;
         using Base::Base;
 
         constexpr auto PSLs() const noexcept { return this->least(); }
@@ -146,7 +146,7 @@ struct RH {
         auto haystackRichersAsNumber = haystackStrictlyRichers.value();
         // because we make the assumption of LITTLE ENDIAN byte ordering,
         // we're interested in the elements up to the first haystack-richer
-        auto deadline = isolateLSB(haystackRichersAsNumber);
+        auto deadline = swar::isolateLSB(haystackRichersAsNumber);
         // to analize before the deadline, "maskify" it.  Remember, the
         // deadline element itself can't be a potential match, it does
         // not need preservation
@@ -211,7 +211,10 @@ struct RH {
     }
         
     template<typename KeyComparer>
-    constexpr auto find(U hh, int index, const KeyComparer &kc) const noexcept {
+    constexpr auto
+    findThroughIndirectJump(
+        U hh, int index, const KeyComparer &kc
+    ) const noexcept {
         auto misalignment = index % Metadata::NSlots;
         auto baseIndex = index / Metadata::NSlots;
         auto base = this->md_ + baseIndex;
@@ -229,7 +232,10 @@ struct RH {
     }
 
     template<typename KeyComparer>
-    constexpr auto find2(U hoistedHash, int homeIndex, const KeyComparer &kc) const noexcept {
+    constexpr auto
+    findMisaligned_assumesSkarupkeTail(
+        U hoistedHash, int homeIndex, const KeyComparer &kc
+    ) const noexcept {
         auto misalignment = homeIndex % Metadata::NSlots;
         auto baseIndex = homeIndex / Metadata::NSlots;
         auto base = this->md_ + baseIndex;
@@ -249,7 +255,7 @@ struct RH {
                 if(kc(matchIndex)) {
                     return std::tuple(true, matchIndex);
                 }
-                positives = Metadata{clearLSB(positives.value())};
+                positives = Metadata{swar::clearLSB(positives.value())};
             }
             if(deadline) {
                 auto position = index + Metadata{deadline}.lsbIndex();
@@ -266,6 +272,6 @@ struct RH {
 
 } // rh
 
-}} // swar, zoo
+} // swar, zoo
 
 #endif
