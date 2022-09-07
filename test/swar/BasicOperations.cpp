@@ -25,17 +25,17 @@ TEST_CASE(
     "Isolate",
     "[swar]"
 ) {
-    for (auto i = 0; i < 63; ++i) { 
+    for (auto i = 0; i < 63; ++i) {
       CHECK(i == isolate<8>(i));
       CHECK(i == isolate<8>(0xFF00+i));
       CHECK(i == isolate<8>(0xFFFF00+i));
     }
-    for (auto i = 0; i < 31; ++i) { 
+    for (auto i = 0; i < 31; ++i) {
       CHECK(i == isolate<7>(i));
       CHECK(i == isolate<7>(0xFF00+i));
       CHECK(i == isolate<7>(0xFFFF00+i));
     }
-    for (auto i = 0; i < 31; ++i) { 
+    for (auto i = 0; i < 31; ++i) {
       CHECK(i == isolate<11>(i));
       CHECK(i == isolate<11>(0xF800+i));
       CHECK(i == isolate<11>(0xFFF800+i));
