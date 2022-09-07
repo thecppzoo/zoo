@@ -45,7 +45,7 @@ set(
 )
 set(
     MAP_SOURCES
-    map/BasicMap.cpp
+    map/BasicMap.cpp map/RobinHood.test.cpp
 )
 set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
 set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)

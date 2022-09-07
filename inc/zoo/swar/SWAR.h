@@ -45,15 +45,23 @@ template<int NBits_, typename T = uint64_t>
 struct SWAR {
     constexpr static inline auto NBits = NBits_;
     static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
+
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
 
     constexpr T value() const noexcept { return m_v; }
 
-    constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
+    #define SWAR_UNARY_OPERATORS_X_LIST \
+        X(SWAR, ~)
+    //constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
     #define SWAR_BINARY_OPERATORS_X_LIST \
-      X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+
+    #define X(rt, op) constexpr rt operator op() const noexcept { return rt(op m_v); }
+    SWAR_UNARY_OPERATORS_X_LIST
+    #undef X
+
     #define X(rt,op) constexpr rt operator op (rt o) const noexcept { return rt (m_v op o.m_v); };
     SWAR_BINARY_OPERATORS_X_LIST
     #undef X
@@ -96,19 +104,22 @@ struct SWAR {
 // versa.  In the spirit of separation of concerns, we provide a cut-lane-SWAR
 // abstraction here.
 
-template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSubLanes : SWAR<NBitsMost+NBitsLeast, T> {
+template<int NBitsMost, int NBitsLeast, typename T = uint64_t>
+struct SWARWithSubLanes: SWAR<NBitsMost+NBitsLeast, T> {
+    using Base = SWAR<NBitsMost + NBitsLeast, T>;
     static constexpr inline auto Available = sizeof(T);
     static constexpr inline auto LaneBits = NBitsLeast+NBitsMost;
     static constexpr inline auto NSlots = Available * 8 / LaneBits;
 
-    SWARWithSubLanes() = default;
-    constexpr explicit SWARWithSubLanes(T v) : SWAR<NBitsMost+NBitsLeast, T>(v) {}
-    constexpr explicit operator T() const noexcept { return this->m_v; }
+    using Base::Base;
+    constexpr SWARWithSubLanes(T most, T least) noexcept:
+        Base((most << NBitsLeast) | least)
+    {}
+    constexpr SWARWithSubLanes(Base b) noexcept: Base(b) {}
 
     // M is most significant bits slice, L is least significant bits slice.
     // 0x....M2L2M1L1 or MN|LN||...||M2|L2||M1|L1
     using SL = SWARWithSubLanes<NBitsMost, NBitsLeast, T>;
-    using Base = swar::SWAR<LaneBits, T>;
 
     //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
     static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value;
@@ -117,18 +128,18 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
     static constexpr inline auto MostMask = ~LeastMask;
 
     constexpr auto least() const noexcept {
-        return this->m_v & LeastMask;
+        return SL{this->m_v & LeastMask};
     }
 
     // Returns only the least significant bits at specified position.
-    constexpr auto least(u32 pos) const noexcept {
+    constexpr auto least(int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
         const auto keep = (filter << (LaneBits * pos)) & LeastMask;
         return this->m_v & keep;
     }
 
     // Returns only the least significant bits at specified position, 'decoded' to their integer value.
-    constexpr auto leastFlat(u32 pos) const noexcept {
+    constexpr auto leastFlat(int pos) const noexcept {
         return least(pos) >> (LaneBits*pos);
     }
 
@@ -137,24 +148,24 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
     }
 
     // Returns only the most significant bits at specified position.
-    constexpr auto most(u32 pos) const noexcept {
+    constexpr auto most(int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
         const auto keep = (filter << (LaneBits * pos)) & MostMask;
         return this->m_v & keep;
     }
 
     // Returns only the most significant bits at specified position, 'decoded' to their integer value.
-    constexpr auto mostFlat(u32 pos) const noexcept {
+    constexpr auto mostFlat(int pos) const noexcept {
         return most(pos) >> (LaneBits*pos)>> NBitsLeast;
     }
 
     // Blits most sig bits into least significant bits. Experimental.
-    constexpr auto flattenMostToLeast(u32 pos) const noexcept {
+    constexpr auto flattenMostToLeast(int pos) const noexcept {
         return (this->m_v >> NBitsLeast) & LeastMask;
     }
 
     // Blits least sig bits into most significant bits. Experimental.
-    constexpr auto promoteLeastToMost(u32 pos) const noexcept {
+    constexpr auto promoteLeastToMost(int pos) const noexcept {
         return (this->m_v << NBitsMost) & MostMask;
     }
 
@@ -177,7 +188,6 @@ template<int NBitsMost, int NBitsLeast, typename T = uint64_t> struct SWARWithSu
         return SL(rval);
     }
 };
-
 
 
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
@@ -264,6 +274,8 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr BooleanSWAR operator not() const noexcept {
         return MaskLaneMSB ^ *this;
     }
+
+    constexpr operator bool() const noexcept { return this->m_v; }
  private:
     constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept:
         SWAR<NBits, T>(initializer)
@@ -292,9 +304,11 @@ constantIsGreaterEqual(SWAR<NBits, T> subtrahend) noexcept {
     static_assert(1 < NBits, "Degenerated SWAR");
     constexpr auto MSB_Position  = NBits - 1;
     constexpr auto MSB = T(1) << MSB_Position;
-    constexpr auto MSB_Mask = meta::BitmaskMaker<T, MSB, NBits>::value;
-    constexpr auto Minuend = meta::BitmaskMaker<T, N, NBits>::value;
-    constexpr auto N_MSB = MSB & Minuend;
+    constexpr auto MSB_Mask =
+        SWAR<NBits, T>{meta::BitmaskMaker<T, MSB, NBits>::value};
+    constexpr auto Minuend =
+        SWAR<NBits, T>{meta::BitmaskMaker<T, N, NBits>::value};
+    constexpr auto N_MSB = MSB & N;
 
     auto subtrahendWithMSB_on = MSB_Mask & subtrahend;
     auto subtrahendWithMSB_off = ~subtrahendWithMSB_on;
@@ -312,6 +326,7 @@ constantIsGreaterEqual(SWAR<NBits, T> subtrahend) noexcept {
         auto merged =
             subtrahendWithMSB_off & // the minuend MSBs are off
             leastSignificantComparison;
+        return MSB_Mask & merged;
     }
 }
 
@@ -346,26 +361,26 @@ greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
 }
 
 template<int NB, typename T>
-constexpr BooleanSWAR<NB, T>
+constexpr auto
 booleans(SWAR<NB, T> arg) noexcept {
     return not constantIsGreaterEqual<0>(arg);
 }
 
 template<int NBits, typename T>
-constexpr BooleanSWAR<NBits, T>
+constexpr auto
 differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    booleans(a1 ^ a2);
+    return booleans(a1 ^ a2);
 }
 
 template<int NBits, typename T>
 constexpr auto
 equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    not differents(a1, a2);
+    return not differents(a1, a2);
 }
 
 /*
 This is just a draft implementation:
-1. The isolator needs pre-computing instead of adding 3 ops per iteration
+b1. The isolator needs pre-computing instead of adding 3 ops per iteration
 2. The update of the isolator is not needed in the last iteration
 3. Consider returning not the logarithm, but the biased by 1 (to support 0)
  */

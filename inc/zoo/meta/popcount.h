@@ -23,6 +23,8 @@ template<> struct UInteger_impl<16> { using type = uint16_t; };
 template<> struct UInteger_impl<32> { using type = uint32_t; };
 template<> struct UInteger_impl<64> { using type = uint64_t; };
 
+// unfortunately this does not work since unsigned long long is not
+// the same type as unsigned long, but may have the same size!
 template<typename> constexpr int BitWidthLog = 0;
 template<> constexpr inline int BitWidthLog<uint8_t> = 3;
 template<> constexpr inline int BitWidthLog<uint16_t> = 4;
