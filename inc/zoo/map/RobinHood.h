@@ -38,12 +38,12 @@ struct RH_Backend {
     1. A cheap SWAR check of hoisted hashes
     2. If there are still potential matches (now also the hoisted hashes), fall back to non-SWAR,
     or iterative and expensive "deep equality" test for each potential match, outside of this function
-    
+
     The above makes it very important to detect the first case in which the PSL is greater equal to the needle.
     We call this the "deadline".
     Because we assume the LITTLE ENDIAN byte ordering, the first element would be the least significant
     non-false Boolean SWAR.
-    
+
     Note about performance:
     Every "early exit" faces a big justification hurdle, the proportion of cases
     they intercept to be large enough that the branch prediction penalty of the entropy introduced is
@@ -99,7 +99,7 @@ struct RH_Backend {
     }
 
     /*! \brief converts the given starting PSL and reduced hash code into a SWAR-ready needle
-    
+
     The given needle would have a PSL as the starting (PSL + 1) in the first slot, the "+ 1" is because
     the count starts at 1, in this way, a haystack PSL of 0 is always "richer"
     */
@@ -151,7 +151,7 @@ struct RH_Backend {
 
         }
     }
-        
+
     template<typename KeyComparer>
     constexpr auto
     findThroughIndirectJump(
@@ -216,7 +216,32 @@ struct RH_Backend {
             // TODO psl overflow must be checked.
         }
     }
+};
 
+template<typename K, typename MV>
+struct KeyValuePairWrapper {
+    using type = std::pair<K, MV>;
+    AlignedStorageFor<type> pair_;
+
+    template<typename... Initializers>
+    void build(Initializers &&...izers)
+        noexcept(noexcept(pair_.template build<type>(std::forward<Initializers>(izers)...)))
+    {
+        pair_.template build<type>(std::forward<Initializers>(izers)...);
+    }
+
+    template<typename RHS>
+    KeyValuePairWrapper &operator=(RHS &&rhs)
+        noexcept(noexcept(std::declval<type &>() = std::forward<RHS>(rhs)))
+    {
+        *pair_.template as<type>() = std::forward<RHS>(rhs);
+        return *this;
+    }
+
+    void destroy() noexcept { pair_.template destroy<type>(); }
+
+    auto &value() noexcept { return *this->pair_.template as<type>(); }
+    const auto &value() const noexcept { return const_cast<KeyValuePairWrapper *>(this)->value(); }
 };
 
 template<typename K, typename MV>
@@ -360,7 +385,7 @@ struct RH_Frontend_WithSkarupkeTail {
             // deadline is true, swarIndex (but not `index`), intraIndex is set
             // mdp points to the haystack that gave the deadline
             // needle is correct
-            
+
             // Make a backup for making the new needle since we will change
             // this in the eviction
             auto mdBackup = *mdp;
@@ -398,7 +423,7 @@ struct RH_Frontend_WithSkarupkeTail {
 
             // now, where should the evicted element go to?
             // assemble a new needle
-            
+
             // Constants relevant for the rest
             constexpr auto Ones = meta::BitmaskMaker<U, 1, MD::NBits>::value;
                 // | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
