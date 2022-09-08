@@ -39,7 +39,8 @@ struct MisalignedGenerator {
             // I'd prefer to not use std::make_unsigned_t, since how do we
             // "make unsigned" user types?
         auto firstPartLowered = firstPart.value() >> MisalignmentBits;
-        auto secondPartRaised = secondPart.value() << (Width - MisalignmentBits);
+        auto secondPartRaised =
+            secondPart.value() << (Width - MisalignmentBits);
         return T{firstPartLowered | secondPartRaised};
     }
 
@@ -262,31 +263,41 @@ struct RH_Backend {
 
         constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
         constexpr auto Progression = Metadata{Ones * Ones};
+        constexpr auto AllNSlots =
+            Metadata{meta::BitmaskMaker<U, Metadata::NSlots, Width>::value};
         MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
         auto index = homeIndex;
         auto needle = makeNeedle(0, hoistedHash);
         for(;;) {
             auto result = potentialMatches(needle, *p);
             auto positives = result.potentialMatches;
-            auto deadline = result.deadline;
             while(positives.value()) {
                 auto matchSubIndex = positives.lsbIndex();
                 auto matchIndex = index + matchSubIndex;
                 if(kc(matchIndex)) {
-                    return std::tuple(true, matchIndex);
+                    return std::tuple(matchIndex, U(0), Metadata(0));
                 }
                 positives = Metadata{swar::clearLSB(positives.value())};
             }
+            auto deadline = result.deadline;
             if(deadline) {
                 auto position = index + Metadata{deadline}.lsbIndex();
-                return std::tuple(false, position);
+                return std::tuple(position, deadline, Metadata(needle));
             }
             // Skarupke's tail allows us to not have to worry about the end
             // of the metadata
             ++p;
             index += Metadata::NSlots;
-            needle = needle + Progression;
+            needle = needle + AllNSlots;
         }
+    }
+
+    template<typename Inserter>
+    constexpr auto
+    evictionChain(Inserter, int index) {
+        auto baseIndex = index / Metadata::Lanes;
+        constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
+        constexpr auto Progression = Metadata{Ones * Ones};
     }
 };
 
@@ -325,6 +336,32 @@ constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     return Size * input >> 32;
 }
 
+template<typename K, typename MV>
+struct KeyValuePairWrapper {
+    using type = std::pair<K, MV>;
+    AlignedStorageFor<type> pair_;
+
+    template<typename... Initializers>
+    void build(Initializers &&...izers)
+        noexcept(noexcept(pair_.template build<type>(std::forward<Initializers>(izers)...)))
+    {
+        pair_.template build<type>(std::forward<Initializers>(izers)...);
+    }
+
+    template<typename RHS>
+    KeyValuePairWrapper &operator=(RHS &&rhs)
+        noexcept(noexcept(std::declval<type &>() = std::forward<RHS>(rhs)))
+    {
+        *pair_.template as<type>() = std::forward<RHS>(rhs);
+        return *this;
+    }
+
+    void destroy() noexcept { pair_.template destroy<type>(); }
+
+    auto &value() noexcept { return *this->pair_.template as<type>(); }
+    const auto &value() const noexcept { return const_cast<KeyValuePairWrapper *>(this)->value(); }
+};
+
 template<
     typename K,
     typename MV,
@@ -355,7 +392,7 @@ struct RH_Frontend_WithSkarupkeTail {
     using value_type = std::pair<K, MV>;
 
     /// \todo Scatter key and value in a flavor
-    std::array<zoo::AlignedStorageFor<value_type>, SlotCount> values_;
+    std::array<KeyValuePairWrapper<K, MV>, SlotCount> values_;
     size_t elementCount_;
 
     RH_Frontend_WithSkarupkeTail() noexcept: elementCount_(0) {
@@ -374,7 +411,7 @@ struct RH_Frontend_WithSkarupkeTail {
             while(occupied) {
                 auto subIndex = occupied.lsbIndex();
                 auto index = baseIndex + subIndex;
-                values_[index].template destroy<value_type>();
+                values_[index].destroy();
                 #if ZOO_CONFIG_DEEP_ASSERTIONS
                     ++destroyedCount;
                 #endif
@@ -385,23 +422,126 @@ struct RH_Frontend_WithSkarupkeTail {
         #endif
     }
 
-    auto find(const K &k) const noexcept {
-        auto keyChecker =
-            [thy = this, &k](size_t ndx) noexcept {
-                return KE{}(thy->values_[ndx].template as<value_type>()->first, k);
-            };
+    auto findParameters(const K &k) const noexcept {
         auto hashCode = Hash{}(k);
         auto fibonacciScrambled = fibonacciIndexModulo(hashCode);
         auto homeIndex =
             lemireModuloReductionAlternative<RequestedSize>(fibonacciScrambled);
         auto hoisted = hashReducer<HashBits>(hashCode);
+        return
+            std::tuple{
+                hoisted,
+                homeIndex,
+                [thy = this, &k](size_t ndx) noexcept {
+                    return KE{}(thy->values_[ndx].value().first, k);
+                }
+            };
+    }
+
+    auto find(const K &k) const noexcept {
+        auto [hoisted, homeIndex, keyChecker] = findParameters(k);
         auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
         Backend be{thy->md_.data()};
-        auto [found, index] =
+        auto [index, deadline, dontcare] =
             be.findMisaligned_assumesSkarupkeTail(
                 hoisted, homeIndex, keyChecker
             );
-        return found ? values_.data() + index : values_.end();
+        return deadline ? values_.end() : values_.data() + index;
+    }
+
+    auto insert(const K &k, const MV &mv) {
+        auto [hoisted, homeIndex, kc] = findParameters(k);
+        auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
+        Backend be{thy->md_.data()};
+        auto [iT, deadlineT, needleT] =
+            be.findMisaligned_assumesSkarupkeTail(hoisted, homeIndex, kc);
+        auto index = iT;
+        auto deadline = deadlineT;
+        auto needle = needleT;
+        if(!deadline) { return std::pair{values_.data() + index, false}; }
+
+        // Do the chain of relocations
+
+        auto swarIndex = index / MD::Lanes;
+        auto intraIndex = index % MD::Lanes;
+        auto mdp = this->md_.data() + swarIndex;
+        constexpr auto MaxRelocations = 64;
+        std::array<std::size_t, MaxRelocations> relocations;
+        auto relocationsCount = 0;
+        auto needlePSLs = needle.PSLs();
+        for(;;) {
+            auto evictedPSL = mdp->at(intraIndex);
+            if(0 == evictedPSL) { // end of eviction chain!
+                assignMetadataElement(deadline, needle, mdp);
+                if(0 == relocationsCount) { // direct build of a new value
+                    values_[index].build(std::pair{k, mv});
+                    return std::pair{values_.data() + index, true};
+                }
+                // do the pair relocations
+                while(relocationsCount--) {
+                    auto fromIndex = relocations[relocationsCount];
+                    values_[index].value() =
+                        std::move(values_[fromIndex].value());
+                    index = fromIndex;
+                }
+                values_[index].value() = std::pair(k, mv);
+                return std::pair{values_.data() + index, true};
+            }
+            // evict the "deadline" element:
+            // find a new place for it.
+
+            // for this search, we need to make a search needle with only
+            // the PSL being evicted.
+            // The 
+            // We can fill the lower part of the search
+            
+            auto mdBackup = *mdp;
+            // replace it with the needle (insertion to metadata)
+            assignMetadataElement(deadline, needle, mdp);
+            // "push" the index of the element that will be evicted
+            relocations[relocationsCount++] = index;
+            // now, where should the evicted element go to?
+            // assemble a new needle
+            constexpr auto Ones = meta::BitmaskMaker<U, 1, MD::NBits>::value;
+            constexpr auto ProgressionFromOne = MD(Ones * Ones);
+            constexpr auto ProgressionFromZero =
+                MD(ProgressionFromOne - MD(Ones));
+            constexpr auto ProgressionFromNLanes =
+                ProgressionFromZero +
+                MD(meta::BitmaskMaker<U, MD::Lanes, MD::NBits>::value);
+            auto broadcastedEvictedPSL = broadcast(MD(evictedPSL));
+            auto evictedPSLWithProgressionFromZero =
+                broadcastedEvictedPSL + ProgressionFromZero;
+            needle =
+                MD(
+                    evictedPSLWithProgressionFromZero.value() <<
+                        MD::NBits * intraIndex
+                ); // zeroes make the new needle
+                    // "richer" in all elements lower than the deadline
+                    // because of the progression starts with 0
+                    // the "deadline" element will have equal PSL, not
+                    // "poorer".
+            // find the place for the new needle, without checking the keys.
+            auto haystackPSLs = mdBackup.PSLs();
+            // haystack < needle => !(haystack >= needle)
+            auto breaksRobinHood =
+                not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
+            while(!breaksRobinHood) {
+                // no place for the evicted element found in this swar.
+                ++mdp;
+            }
+            
+        }
+    }
+
+    static void
+    assignMetadataElement(U deadline, MD needle, MD *haystack) noexcept {
+        auto deadlineAsElementWithValue1 = deadline >> (MD::NBits - 1);
+        auto deadlineElementLowBitsOn = deadline - deadlineAsElementWithValue1;
+        auto deadlineElementBlitMask = MD(deadline | deadlineElementLowBitsOn);
+        *haystack =
+            (*haystack & ~deadlineElementBlitMask) |
+            (needle & deadlineElementBlitMask);
     }
 };
 
