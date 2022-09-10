@@ -244,32 +244,6 @@ struct KeyValuePairWrapper {
     const auto &value() const noexcept { return const_cast<KeyValuePairWrapper *>(this)->value(); }
 };
 
-template<typename K, typename MV>
-struct KeyValuePairWrapper {
-    using type = std::pair<K, MV>;
-    AlignedStorageFor<type> pair_;
-
-    template<typename... Initializers>
-    void build(Initializers &&...izers)
-        noexcept(noexcept(pair_.template build<type>(std::forward<Initializers>(izers)...)))
-    {
-        pair_.template build<type>(std::forward<Initializers>(izers)...);
-    }
-
-    template<typename RHS>
-    KeyValuePairWrapper &operator=(RHS &&rhs)
-        noexcept(noexcept(std::declval<type &>() = std::forward<RHS>(rhs)))
-    {
-        *pair_.template as<type>() = std::forward<RHS>(rhs);
-        return *this;
-    }
-
-    void destroy() noexcept { pair_.template destroy<type>(); }
-
-    auto &value() noexcept { return *this->pair_.template as<type>(); }
-    const auto &value() const noexcept { return const_cast<KeyValuePairWrapper *>(this)->value(); }
-};
-
 template<
     typename K,
     typename MV,
