@@ -450,7 +450,8 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     auto insert(const K &k, const MV &mv) {
-        auto [hoisted, homeIndex, kc] = findParameters(k);
+        auto [hoistedT, homeIndex, kc] = findParameters(k);
+        auto hoisted = hoistedT;
         auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
         Backend be{thy->md_.data()};
         auto [iT, deadlineT, needleT] =
@@ -461,6 +462,8 @@ struct RH_Frontend_WithSkarupkeTail {
         if(!deadline) { return std::pair{values_.data() + index, false}; }
 
         // Do the chain of relocations
+        // From this point onward, the hashes don't matter except for the
+        // updates to the metadata, the relocations
 
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
@@ -470,7 +473,12 @@ struct RH_Frontend_WithSkarupkeTail {
         auto relocationsCount = 0;
         auto needlePSLs = needle.PSLs();
         for(;;) {
-            auto evictedPSL = mdp->at(intraIndex);
+            // Loop invariant:
+            // deadline is true, swarIndex (but not `index`), intraIndex is set
+            // mdp points to the haystack that gave the deadline
+            // needle is correct
+            auto mdBackup = *mdp;
+            auto evictedPSL = mdBackup.PSLs().at(intraIndex);
             if(0 == evictedPSL) { // end of eviction chain!
                 assignMetadataElement(deadline, needle, mdp);
                 if(0 == relocationsCount) { // direct build of a new value
@@ -488,49 +496,94 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             // evict the "deadline" element:
-            // find a new place for it.
+            // first, insert the current needle in its place (the needle stole)
+            // make it the new needle.
+            // find the place for it: when Robin Hood breaks again.
 
             // for this search, we need to make a search needle with only
             // the PSL being evicted.
-            // The 
-            // We can fill the lower part of the search
-            
-            auto mdBackup = *mdp;
-            // replace it with the needle (insertion to metadata)
+
+            // The needle stole the entry: replace it with the needle
             assignMetadataElement(deadline, needle, mdp);
+            // now the needle will be the old metadata entry
+            needle = mdBackup;
             // "push" the index of the element that will be evicted
             relocations[relocationsCount++] = index;
+
             // now, where should the evicted element go to?
             // assemble a new needle
+            
+            // Constants relevant for the rest
             constexpr auto Ones = meta::BitmaskMaker<U, 1, MD::NBits>::value;
+                // | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
             constexpr auto ProgressionFromOne = MD(Ones * Ones);
+                // | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
             constexpr auto ProgressionFromZero =
                 MD(ProgressionFromOne - MD(Ones));
-            constexpr auto ProgressionFromNLanes =
-                ProgressionFromZero +
+                // | 0 | 1 | 2 | 3 | ...       | 7 |
+            constexpr auto BroadcastSWAR_ElementCount =
                 MD(meta::BitmaskMaker<U, MD::Lanes, MD::NBits>::value);
+                // | 8 | 8 | 8 | 8 | ...       | 8 |
+            constexpr auto SWARIterationAddendumBase =
+                ProgressionFromZero + BroadcastSWAR_ElementCount;
+                // | 8 | 9 | ...               | 15 |
+
             auto broadcastedEvictedPSL = broadcast(MD(evictedPSL));
             auto evictedPSLWithProgressionFromZero =
                 broadcastedEvictedPSL + ProgressionFromZero;
-            needle =
-                MD(
-                    evictedPSLWithProgressionFromZero.value() <<
-                        MD::NBits * intraIndex
-                ); // zeroes make the new needle
+                // | ePSL+0 | ePSL+1 | ePSL+2 | ePSL+3 | ... | ePSL+7 |
+            needlePSLs =
+                evictedPSLWithProgressionFromZero.shiftLanesLeft(intraIndex);
+                    // zeroes make the new needle
                     // "richer" in all elements lower than the deadline
                     // because of the progression starts with 0
                     // the "deadline" element will have equal PSL, not
                     // "poorer".
+                // assuming the deadline happened in the index 2:
+                // needlePSLs = |    0   |   0    | ePSL   | ePSL+1 | ... | ePSL+5 |
             // find the place for the new needle, without checking the keys.
             auto haystackPSLs = mdBackup.PSLs();
             // haystack < needle => !(haystack >= needle)
             auto breaksRobinHood =
                 not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
-            while(!breaksRobinHood) {
+            if(!breaksRobinHood) {
                 // no place for the evicted element found in this swar.
-                ++mdp;
+                // increment the PSLs in the needle to check the next haystack
+
+                // for the next swar, we will want (continuing the assumption
+                // of the deadline happening at index 2)
+                // | ePSL+6 | ePSL+7 | ePSL+8 | ePSL+9 | ... | ePSL+13 |
+                // from evictedPSLWithProgressionFromZero,
+                // shift "right" NLanes - intraIndex (keep the last two lanes):
+                // | ePSL+6 | ePSL+7 | 0 | ... | 0 |
+                auto lowerPart =
+                    evictedPSLWithProgressionFromZero.
+                        shiftLanesRight(MD::Lanes - intraIndex);
+                // the other part, of +8 onwards, is
+                // ProgressionFromZero + BroadcastElementCount, shifted:
+                //    | 0 | 1 | 2 | 3 | ...       | 7 |
+                // +  | 8 | 8 | 8 | 8 | ...       | 8 |
+                // == | 8 | 9 | ...               | 15 |
+                // shifted two lanes:
+                //    | 0 | 0 | 8 | 9 | ...       | 13 |
+                auto topAdd =
+                    (ProgressionFromZero + BroadcastSWAR_ElementCount).
+                        shiftLanesLeft(intraIndex);
+                needlePSLs = needlePSLs + lowerPart + topAdd;
+                for(;;) { // hunt for the next deadline
+                    ++swarIndex;
+                        // should the maintenance of `index` be replaced
+                        // with pointer arithmetic on mdp?
+                    ++mdp;
+                    haystackPSLs = mdp->PSLs();
+                    breaksRobinHood =
+                        not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
+                    if(breaksRobinHood) { break; }
+                    needlePSLs = needlePSLs + BroadcastSWAR_ElementCount;
+                }
             }
-            
+            deadline = isolateLSB(breaksRobinHood);
+            intraIndex = breaksRobinHood.lsbIndex();
         }
     }
 

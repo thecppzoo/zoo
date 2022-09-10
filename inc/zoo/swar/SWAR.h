@@ -92,6 +92,14 @@ struct SWAR {
         return SWAR((m_v & ~elementMask) | (value << (index * NBits)));
     }
 
+    constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
+        return SWAR(value() << (NBits * laneCount));
+    }
+
+    constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
+        return SWAR(value() >> (NBits * laneCount));
+    }
+
     T m_v;
 };
 
