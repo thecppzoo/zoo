@@ -146,11 +146,12 @@ struct RH_Backend {
             // significant bits is to be able to call the cheaper version
             // _MSB_off here
 
-        if(!haystackStrictlyRichers) {
-            // The search could continue, but there could be potential matches
-            // from this SWAR
-            return { 0, sames };
-        }
+        // We could branch on 'all haystack slots are poorer than needle', but
+        // branches are expensive and nondeterministic, so we think that simply
+        // doing the computation is better, as all other instructions here are
+        // very simple.
+        //if(!haystackStrictlyRichers) { return { 0, sames }; }
+
         // Performance wise, this test is profitable because the search
         // has reached finality:
         // There is a haystack element richer than the potential PSL of the
@@ -167,9 +168,9 @@ struct RH_Backend {
         // because we make the assumption of LITTLE ENDIAN byte ordering,
         // we're interested in the elements up to the first haystack-richer
         auto deadline = swar::isolateLSB(haystackRichersAsNumber);
-        // to analize before the deadline, "maskify" it.  Remember, the
+        // to analyze before the deadline, "maskify" it.  Remember, the
         // deadline element itself can't be a potential match, it does
-        // not need preservation
+        // not need preservation.
         auto deadlineMaskified = Metadata{deadline - 1};
         auto beforeDeadlineMatches = sames & deadlineMaskified;
         return {
@@ -227,6 +228,7 @@ struct RH_Backend {
             ++p;
             index += Metadata::NSlots;
             needle = needle + Progression;
+
         }
     }
         
@@ -262,6 +264,7 @@ struct RH_Backend {
 
         constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
         constexpr auto Progression = Metadata{Ones * Ones};
+        constexpr auto SlotCountAsSwar = Metadata{Ones * Metadata::NSlots};
         MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
         auto index = homeIndex;
         auto needle = makeNeedle(0, hoistedHash);
@@ -272,6 +275,9 @@ struct RH_Backend {
             while(positives.value()) {
                 auto matchSubIndex = positives.lsbIndex();
                 auto matchIndex = index + matchSubIndex;
+                // Possible specialist optimization to kick off all possible
+                // matches to an array (like chaining evict) and check them
+                // later.
                 if(kc(matchIndex)) {
                     return std::tuple(true, matchIndex);
                 }
@@ -285,7 +291,8 @@ struct RH_Backend {
             // of the metadata
             ++p;
             index += Metadata::NSlots;
-            needle = needle + Progression;
+            // TODO psl overflow must be checked.
+            needle = needle + SlotCountAsSwar;
         }
     }
 };
