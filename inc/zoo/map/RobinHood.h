@@ -471,12 +471,15 @@ struct RH_Frontend_WithSkarupkeTail {
         constexpr auto MaxRelocations = 64;
         std::array<std::size_t, MaxRelocations> relocations;
         auto relocationsCount = 0;
-        auto needlePSLs = needle.PSLs();
+        //auto needlePSLs = needle.PSLs();
         for(;;) {
             // Loop invariant:
             // deadline is true, swarIndex (but not `index`), intraIndex is set
             // mdp points to the haystack that gave the deadline
             // needle is correct
+            
+            // Make a backup for making the new needle since we will change
+            // this in the eviction
             auto mdBackup = *mdp;
             auto evictedPSL = mdBackup.PSLs().at(intraIndex);
             if(0 == evictedPSL) { // end of eviction chain!
@@ -532,7 +535,7 @@ struct RH_Frontend_WithSkarupkeTail {
             auto evictedPSLWithProgressionFromZero =
                 broadcastedEvictedPSL + ProgressionFromZero;
                 // | ePSL+0 | ePSL+1 | ePSL+2 | ePSL+3 | ... | ePSL+7 |
-            needlePSLs =
+            auto needlePSLs =
                 evictedPSLWithProgressionFromZero.shiftLanesLeft(intraIndex);
                     // zeroes make the new needle
                     // "richer" in all elements lower than the deadline
