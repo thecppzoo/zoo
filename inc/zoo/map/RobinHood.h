@@ -1,9 +1,8 @@
 #ifndef ZOO_ROBINHOOD_H
 #define ZOO_ROBINHOOD_H
 
-#include "zoo/swar/SWAR.h"
-#include "zoo/AlignedStorage.h"
 #include "zoo/map/RobinHoodUtil.h"
+#include "zoo/AlignedStorage.h"
 
 #ifndef ZOO_CONFIG_DEEP_ASSERTIONS
     #define ZOO_CONFIG_DEEP_ASSERTIONS 0

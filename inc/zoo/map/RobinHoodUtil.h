@@ -3,8 +3,7 @@
 #include "zoo/swar/SWAR.h"
 
 #include <array>
-#include <cassert>
-#include <vector>
+#include <cstddef>
 
 namespace zoo {
 
