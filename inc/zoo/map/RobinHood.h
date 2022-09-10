@@ -279,13 +279,6 @@ struct RH_Backend {
         }
     }
 
-    template<typename Inserter>
-    constexpr auto
-    evictionChain(Inserter, int index) {
-        auto baseIndex = index / Metadata::Lanes;
-        constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
-        constexpr auto Progression = Metadata{Ones * Ones};
-    }
 };
 
 template<int NBits, typename U>
