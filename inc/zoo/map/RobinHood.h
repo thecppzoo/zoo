@@ -49,7 +49,7 @@ struct RH_Backend {
     they intercept to be large enough that the branch prediction penalty of the entropy introduced is
     overcompensated.
     */
-    constexpr static impl::MatchResult<PSL_Bits, HashBits>
+    constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
     potentialMatches(
         Metadata needle, Metadata haystack
     ) noexcept {
@@ -122,6 +122,7 @@ struct RH_Backend {
     ) noexcept {
         constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
         constexpr auto Progression = Metadata{Ones * Ones};
+        constexpr auto SlotCountAsSwar = Metadata{Ones * Metadata::NSlots};
 
         MisalignedGenerator<Metadata, 8*Misalignment> p{base};
         auto index = homeIndex;
@@ -146,7 +147,7 @@ struct RH_Backend {
             // of the metadata
             ++p;
             index += Metadata::NSlots;
-            needle = needle + Progression;
+            needle = needle + SlotCountAsSwar;
 
         }
     }
