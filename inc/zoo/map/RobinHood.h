@@ -77,14 +77,15 @@ struct RH_Backend {
         // We need to determine if there are potential matches to consider
         auto sames = equals(needle, haystack);
         auto deadline = firstInvariantBreakage(needle, haystack);
-        // to analyze before the deadline, "maskify" it.  Remember, the
-        // deadline element itself can't be a potential match, it does
-        // not need preservation.
-        auto deadlineMaskified = deadline - 1;
-        auto beforeDeadlineMatches = sames.value() & deadlineMaskified;
+        // In a valid haystack, the PSLs can grow at most by 1 per entry.
+        // If a PSL is richer than the needle in any place, because the
+        // needle, by construction, always grows at least by 1 per entry,
+        // then the PSL won't be equal again.
+        // There is no need to filter potential matches using the deadline
+        // as previous versions of the code did.
         return {
             deadline,
-            Metadata{beforeDeadlineMatches}
+            sames
         };
     }
 

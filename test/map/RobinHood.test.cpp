@@ -88,8 +88,6 @@ TEST_CASE("RobinHood potentialMatches", "[api][mapping][swar][robin-hood]") {
     auto missHaystack = RH35u32::Metadata{0x0707'0707u};
     auto m2 = RH35u32::potentialMatches(needle, missHaystack);
     CHECK(0x0000'0000u == m2.potentialMatches.value());
-    // We get a deadline here, incorrect.
-    //CHECK(0x0000'0080u == m2.deadline);
     CHECK(0 == m2.deadline);
 
     // If the haystack has no matches and has a richer element, we should get a
@@ -97,9 +95,6 @@ TEST_CASE("RobinHood potentialMatches", "[api][mapping][swar][robin-hood]") {
     auto deadlineHaystack = RH35u32::Metadata{0x0515'0403u};
     auto m3 = RH35u32::potentialMatches(needle, deadlineHaystack);
     CHECK(0x0080'0000u == m3.potentialMatches.value());
-    // Position 4 has needle psl 6 vs haystack psl 5, which should result in a
-    // deadline.
-    //CHECK(0x0000'0000u == m3.deadline);
     CHECK(0x80'00'00'00 == m3.deadline);
 }
 
