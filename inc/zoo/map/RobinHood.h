@@ -16,7 +16,6 @@
     #include <assert>
 #endif
 
-template<typename> struct GT;
 
 namespace zoo {
 
