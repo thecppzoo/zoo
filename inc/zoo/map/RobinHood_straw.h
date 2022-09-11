@@ -28,7 +28,6 @@ struct StrawMetadata {
 };
 
 template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
-  
   template <typename KeyCheck>
   bool exists(Key k, KeyCheck kc) {
     return findSlot(k, kc).second;
