@@ -79,16 +79,16 @@ using u8 = uint8_t;
 namespace impl {
 
 /// \todo decide on whether to rename this?
-template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
-struct Metadata: swar::SWARWithSubLanes<HashBits, PSL_Bits, U> {
-    using Base = swar::SWARWithSubLanes<HashBits, PSL_Bits, U>;
+template<int PSL_Bits, int HashBits, typename U>
+struct Metadata: swar::SWARWithSubLanes<PSL_Bits, HashBits, U> {
+    using Base = swar::SWARWithSubLanes<PSL_Bits, HashBits, U>;
     using Base::Base;
 
     constexpr auto PSLs() const noexcept { return this->least(); }
     constexpr auto Hashes() const noexcept { return this->most(); }
 };
 
-template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
+template<int PSL_Bits, int HashBits, typename U>
 struct MatchResult {
     U deadline;
     Metadata<PSL_Bits, HashBits, U> potentialMatches;

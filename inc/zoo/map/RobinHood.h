@@ -16,6 +16,7 @@
     #include <assert>
 #endif
 
+
 namespace zoo {
 
 namespace rh {
@@ -38,68 +39,58 @@ struct RH_Backend {
     1. A cheap SWAR check of hoisted hashes
     2. If there are still potential matches (now also the hoisted hashes), fall back to non-SWAR,
     or iterative and expensive "deep equality" test for each potential match, outside of this function
-    
+
     The above makes it very important to detect the first case in which the PSL is greater equal to the needle.
     We call this the "deadline".
     Because we assume the LITTLE ENDIAN byte ordering, the first element would be the least significant
     non-false Boolean SWAR.
-    
+
     Note about performance:
     Every "early exit" faces a big justification hurdle, the proportion of cases
     they intercept to be large enough that the branch prediction penalty of the entropy introduced is
     overcompensated.
     */
+
+    /// Boolean SWAR true in the first element/lane of the needle strictly poorer than its corresponding
+    /// haystack
+    constexpr static auto
+    firstInvariantBreakage(Metadata needle, Metadata haystack) {
+        auto nPSL = needle.PSLs();
+        auto hPSL = haystack.PSLs();
+        auto theyKeepInvariant =
+            greaterEqual_MSB_off(hPSL, nPSL);
+            // BTW, the reason to have encoded the PSLs in the least
+            // significant bits is to be able to call the cheaper version
+            // _MSB_off here
+
+        auto theyBreakInvariant = not theyKeepInvariant;
+        // because we make the assumption of LITTLE ENDIAN byte ordering,
+        // we're interested in the elements up to the first haystack-richer
+        auto firstBreakage = swar::isolateLSB(theyBreakInvariant.value());
+        return firstBreakage;
+    }
+
     constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
     potentialMatches(
         Metadata needle, Metadata haystack
     ) noexcept {
         // We need to determine if there are potential matches to consider
         auto sames = equals(needle, haystack);
-
-        auto needlePSLs = needle.PSLs();
-        auto haystackPSLs = haystack.PSLs();
-        auto haystackStrictlyRichers =
-            // !(needlePSLs >= haystackPSLs) <=> haystackPSLs < needlePSLs
-            not greaterEqual_MSB_off(needlePSLs, haystackPSLs);
-            // BTW, the reason to have encoded the PSLs in the least
-            // significant bits is to be able to call the cheaper version
-            // _MSB_off here
-
-        // We could branch on 'all haystack slots are poorer than needle', but
-        // branches are expensive and nondeterministic, so we think that simply
-        // doing the computation is better, as all other instructions here are
-        // very simple.
-        //if(!haystackStrictlyRichers) { return { 0, sames }; }
-
-        // Performance wise, this test is profitable because the search
-        // has reached finality:
-        // There is a haystack element richer than the potential PSL of the
-        // needle, if the needle is in the table, it would have been
-        // inserted before that haystack element.
-        // If the needle is not in the table, that element, that we call
-        // "deadline" would be the slot to insert it.
-
-        // I (Eddie) believe an early exit of not having "sames" is not
-        // profitable here
-        // filter the needle, haystack equals by being before the deadline
-        // (by the way, the deadline means that slot can't be equal)
-        auto haystackRichersAsNumber = haystackStrictlyRichers.value();
-        // because we make the assumption of LITTLE ENDIAN byte ordering,
-        // we're interested in the elements up to the first haystack-richer
-        auto deadline = swar::isolateLSB(haystackRichersAsNumber);
-        // to analyze before the deadline, "maskify" it.  Remember, the
-        // deadline element itself can't be a potential match, it does
-        // not need preservation.
-        auto deadlineMaskified = Metadata{deadline - 1};
-        auto beforeDeadlineMatches = sames & deadlineMaskified;
+        auto deadline = firstInvariantBreakage(needle, haystack);
+        // In a valid haystack, the PSLs can grow at most by 1 per entry.
+        // If a PSL is richer than the needle in any place, because the
+        // needle, by construction, always grows at least by 1 per entry,
+        // then the PSL won't be equal again.
+        // There is no need to filter potential matches using the deadline
+        // as previous versions of the code did.
         return {
             deadline,
-            beforeDeadlineMatches
+            sames
         };
     }
 
     /*! \brief converts the given starting PSL and reduced hash code into a SWAR-ready needle
-    
+
     The given needle would have a PSL as the starting (PSL + 1) in the first slot, the "+ 1" is because
     the count starts at 1, in this way, a haystack PSL of 0 is always "richer"
     */
@@ -151,7 +142,7 @@ struct RH_Backend {
 
         }
     }
-        
+
     template<typename KeyComparer>
     constexpr auto
     findThroughIndirectJump(
@@ -216,7 +207,6 @@ struct RH_Backend {
             // TODO psl overflow must be checked.
         }
     }
-
 };
 
 template<typename K, typename MV>
@@ -360,7 +350,7 @@ struct RH_Frontend_WithSkarupkeTail {
             // deadline is true, swarIndex (but not `index`), intraIndex is set
             // mdp points to the haystack that gave the deadline
             // needle is correct
-            
+
             // Make a backup for making the new needle since we will change
             // this in the eviction
             auto mdBackup = *mdp;
@@ -398,7 +388,7 @@ struct RH_Frontend_WithSkarupkeTail {
 
             // now, where should the evicted element go to?
             // assemble a new needle
-            
+
             // Constants relevant for the rest
             constexpr auto Ones = meta::BitmaskMaker<U, 1, MD::NBits>::value;
                 // | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
