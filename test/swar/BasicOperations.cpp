@@ -206,7 +206,7 @@ GE_MSB_TEST(0x7777'7777,
             0x8888'8888)
 
 // 3 bits on msb side, 5 bits on lsb side.
-using Lanes = SWARWithSubLanes<3,5,u32>;
+using Lanes = SWARWithSubLanes<5, 3, u32>;
 using S8u32 = SWAR<8, u32>;
 static constexpr inline u32 allF = broadcast<8>(S8u32(0x0000'00FFul)).value();
 

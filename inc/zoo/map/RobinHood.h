@@ -16,6 +16,8 @@
     #include <assert>
 #endif
 
+template<typename> struct GT;
+
 namespace zoo {
 
 namespace rh {
@@ -62,14 +64,14 @@ struct RH_Backend {
             // significant bits is to be able to call the cheaper version
             // _MSB_off here
 
-        auto theyBreakInvaraint = not theyKeepInvariant;
+        auto theyBreakInvariant = not theyKeepInvariant;
         // because we make the assumption of LITTLE ENDIAN byte ordering,
         // we're interested in the elements up to the first haystack-richer
-        auto firstBreakage = swar::isolateLSB(theyBreakInvaraint.value());
+        auto firstBreakage = swar::isolateLSB(theyBreakInvariant.value());
         return firstBreakage;
     }
 
-    constexpr static impl::MatchResult<PSL_Bits, HashBits>
+    constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
     potentialMatches(
         Metadata needle, Metadata haystack
     ) noexcept {
@@ -79,11 +81,11 @@ struct RH_Backend {
         // to analyze before the deadline, "maskify" it.  Remember, the
         // deadline element itself can't be a potential match, it does
         // not need preservation.
-        auto deadlineMaskified = Metadata{deadline - 1};
-        auto beforeDeadlineMatches = sames & deadlineMaskified;
+        auto deadlineMaskified = deadline - 1;
+        auto beforeDeadlineMatches = sames.value() & deadlineMaskified;
         return {
             deadline,
-            beforeDeadlineMatches
+            Metadata{beforeDeadlineMatches}
         };
     }
 
