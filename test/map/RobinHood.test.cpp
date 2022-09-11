@@ -33,6 +33,10 @@ auto instantiateFind(int v, FrontendExample &f) {
     return f.find(v);
 }
 
+auto instantiateInsert(int v, FrontendExample &f) {
+    return f.insert(v, 0);
+}
+
 
 static_assert(
     0xE9E8E7E6E5E4E3E2ull == RHC::makeNeedle(1, 7).value()

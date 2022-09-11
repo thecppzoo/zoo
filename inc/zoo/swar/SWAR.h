@@ -83,8 +83,21 @@ struct SWAR {
     constexpr int top() const noexcept { return msbIndex(m_v) / NBits; }
     constexpr int lsbIndex() const noexcept { return __builtin_ctzll(m_v) / NBits; }
 
-    constexpr SWAR set(int index, int bit) const noexcept {
+    constexpr SWAR setBit(int index, int bit) const noexcept {
         return SWAR(m_v | (T(1) << (index * NBits + bit)));
+    }
+
+    constexpr auto blitElement(int index, T value) const noexcept {
+        auto elementMask = ((T(1) << NBits) - 1) << (index * NBits);
+        return SWAR((m_v & ~elementMask) | (value << (index * NBits)));
+    }
+
+    constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
+        return SWAR(value() << (NBits * laneCount));
+    }
+
+    constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
+        return SWAR(value() >> (NBits * laneCount));
     }
 
     T m_v;
