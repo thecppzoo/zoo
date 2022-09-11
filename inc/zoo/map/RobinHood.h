@@ -49,44 +49,33 @@ struct RH_Backend {
     they intercept to be large enough that the branch prediction penalty of the entropy introduced is
     overcompensated.
     */
-    constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
+
+    /// Boolean SWAR true in the first element/lane of the needle strictly poorer than its corresponding
+    /// haystack
+    constexpr static auto
+    firstInvariantBreakage(Metadata needle, Metadata haystack) {
+        auto nPSL = needle.PSLs();
+        auto hPSL = haystack.PSLs();
+        auto theyKeepInvariant =
+            greaterEqual_MSB_off(hPSL, nPSL);
+            // BTW, the reason to have encoded the PSLs in the least
+            // significant bits is to be able to call the cheaper version
+            // _MSB_off here
+
+        auto theyBreakInvaraint = not theyKeepInvariant;
+        // because we make the assumption of LITTLE ENDIAN byte ordering,
+        // we're interested in the elements up to the first haystack-richer
+        auto firstBreakage = swar::isolateLSB(theyBreakInvaraint.value());
+        return firstBreakage;
+    }
+
+    constexpr static impl::MatchResult<PSL_Bits, HashBits>
     potentialMatches(
         Metadata needle, Metadata haystack
     ) noexcept {
         // We need to determine if there are potential matches to consider
         auto sames = equals(needle, haystack);
-
-        auto needlePSLs = needle.PSLs();
-        auto haystackPSLs = haystack.PSLs();
-        auto haystackStrictlyRichers =
-            // !(needlePSLs >= haystackPSLs) <=> haystackPSLs < needlePSLs
-            not greaterEqual_MSB_off(needlePSLs, haystackPSLs);
-            // BTW, the reason to have encoded the PSLs in the least
-            // significant bits is to be able to call the cheaper version
-            // _MSB_off here
-
-        // We could branch on 'all haystack slots are poorer than needle', but
-        // branches are expensive and nondeterministic, so we think that simply
-        // doing the computation is better, as all other instructions here are
-        // very simple.
-        //if(!haystackStrictlyRichers) { return { 0, sames }; }
-
-        // Performance wise, this test is profitable because the search
-        // has reached finality:
-        // There is a haystack element richer than the potential PSL of the
-        // needle, if the needle is in the table, it would have been
-        // inserted before that haystack element.
-        // If the needle is not in the table, that element, that we call
-        // "deadline" would be the slot to insert it.
-
-        // I (Eddie) believe an early exit of not having "sames" is not
-        // profitable here
-        // filter the needle, haystack equals by being before the deadline
-        // (by the way, the deadline means that slot can't be equal)
-        auto haystackRichersAsNumber = haystackStrictlyRichers.value();
-        // because we make the assumption of LITTLE ENDIAN byte ordering,
-        // we're interested in the elements up to the first haystack-richer
-        auto deadline = swar::isolateLSB(haystackRichersAsNumber);
+        auto deadline = firstInvariantBreakage(needle, haystack);
         // to analyze before the deadline, "maskify" it.  Remember, the
         // deadline element itself can't be a potential match, it does
         // not need preservation.
