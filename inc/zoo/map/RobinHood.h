@@ -311,7 +311,7 @@ struct RH_Frontend_WithSkarupkeTail {
             };
     }
 
-    auto find(const K &k) const noexcept {
+    auto find(const K &k) noexcept {
         auto [hoisted, homeIndex, keyChecker] = findParameters(k);
         auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
         Backend be{thy->md_.data()};
@@ -320,6 +320,10 @@ struct RH_Frontend_WithSkarupkeTail {
                 hoisted, homeIndex, keyChecker
             );
         return deadline ? values_.end() : values_.data() + index;
+    }
+
+    auto find(const K &k) const noexcept {
+        const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
     }
 
     auto insert(const K &k, const MV &mv) {
@@ -472,6 +476,8 @@ struct RH_Frontend_WithSkarupkeTail {
             (*haystack & ~deadlineElementBlitMask) |
             (needle & deadlineElementBlitMask);
     }
+
+    auto end() const noexcept { return this->values_.end(); }
 };
 
 } // rh
