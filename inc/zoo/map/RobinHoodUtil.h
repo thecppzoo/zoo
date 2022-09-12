@@ -186,14 +186,5 @@ void poke(MetadataCollection &collection, size_t index, u64 psl, u64 hash) {
 }
 
 } // impl
-
-template<typename Key>auto reducedhashUnitary(Key k) noexcept {
-    return 1;
-}
-
-template<typename Key>auto slotFromKeyUnitary(Key k) noexcept {
-    return 1;
-}
-
 } // namespace rh
 } // namespace zoo

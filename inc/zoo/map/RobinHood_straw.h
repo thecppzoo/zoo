@@ -9,10 +9,15 @@ namespace zoo {
 
 namespace rh {
 
-using u64 = uint64_t;
-using u32 = uint32_t;
-using u16 = uint16_t;
-using u8 = uint8_t;
+template<typename Key>
+auto reducedhashUnitary(Key k) noexcept {
+    return 1;
+}
+
+template<typename Key>
+auto slotFromKeyUnitary(Key k) noexcept {
+    return 1;
+}
 
 // The naive method of keeping metadata.
 // TODO(sbruce) actually have correct widths of psl/hash for direct comparison
