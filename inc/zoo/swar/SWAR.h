@@ -43,6 +43,7 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
+    using type = T;
     constexpr static inline auto NBits = NBits_;
     static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
 
@@ -117,8 +118,11 @@ struct SWAR {
 // versa.  In the spirit of separation of concerns, we provide a cut-lane-SWAR
 // abstraction here.
 
-template<int NBitsLeast, int NBitsMost, typename T = uint64_t>
-struct SWARWithSubLanes: SWAR<NBitsMost + NBitsLeast, T> {
+template<int NBitsLeast_, int NBitsMost_, typename T = uint64_t>
+struct SWARWithSubLanes: SWAR<NBitsMost_ + NBitsLeast_, T> {
+    static constexpr inline auto NBitsLeast = NBitsLeast_;
+    static constexpr inline auto NBitsMost = NBitsMost_;
+
     using Base = SWAR<NBitsMost + NBitsLeast, T>;
     static constexpr inline auto Available = sizeof(T);
     static constexpr inline auto LaneBits = NBitsLeast + NBitsMost;
