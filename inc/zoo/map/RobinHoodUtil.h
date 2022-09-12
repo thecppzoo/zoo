@@ -94,7 +94,7 @@ struct MatchResult {
     Metadata<PSL_Bits, HashBits, U> potentialMatches;
 };
 
-}
+} // impl
 
 template<int NBits, typename U>
 constexpr auto hashReducer(U n) noexcept {
@@ -158,6 +158,34 @@ constexpr int mapToSlotLemireReduction(T halved) {
     return (halved * T(SizeTable)) >> (sizeof(T)/2); 
 }
 
+namespace impl {
+
+template<typename MetadataCollection>
+auto peek(const MetadataCollection &collection, size_t index) {
+    using MD =
+        std::remove_const_t<std::remove_reference_t<decltype(collection[0])>>;
+    auto swarIndex = index / MD::NSlots;
+    auto intraIndex = index % MD::NSlots;
+    auto swar = collection[swarIndex];
+    return
+        std::tuple{
+            swar.leastFlat(intraIndex),
+            swar.mostFlat(intraIndex)
+        };
+}
+
+template<typename MetadataCollection >
+void poke(MetadataCollection &collection, size_t index, u64 psl, u64 hash) {
+    using MD = std::remove_reference_t<decltype(collection[0])>;
+    auto swarIndex = index / MD::NSlots;
+    auto intraIndex = index % MD::NSlots;
+    auto swar = collection[swarIndex];
+    auto newPSL = swar.least(psl, intraIndex);
+    auto replacement = newPSL.most(hash, intraIndex);
+    collection[swarIndex] = replacement;
+}
+
+} // impl
 
 template<typename Key>auto reducedhashUnitary(Key k) noexcept {
     return 1;
@@ -166,7 +194,6 @@ template<typename Key>auto reducedhashUnitary(Key k) noexcept {
 template<typename Key>auto slotFromKeyUnitary(Key k) noexcept {
     return 1;
 }
-
 
 } // namespace rh
 } // namespace zoo
