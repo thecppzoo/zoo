@@ -1,7 +1,12 @@
 #include "zoo/map/RobinHood.h"
+#include "zoo/map/RobinHoodAlt.h"
 #include "zoo/map/RobinHoodUtil.h"
 
 #include <catch2/catch.hpp>
+
+using namespace zoo;
+using namespace zoo::swar;
+using namespace zoo::rh;
 
 using u64 = uint64_t;
 using u32 = uint32_t;
@@ -109,4 +114,30 @@ TEST_CASE(
     CHECK(0x0000'ffff'ffff'ffffull == zoo::rh::badMixer<48>(v));
     CHECK(0x0000'0000'ffff'ffffull == zoo::rh::badMixer<32>(v));
     CHECK(0x0000'0000'0000'ffffull == zoo::rh::badMixer<16>(v));
+}
+
+TEST_CASE(
+    "SlotMetadataBasic",
+    "[robinhood]"
+) {
+    using SM = SWAR<8, u32>;
+    using SO35u32Ops = SlotOperations<3,5,u32>;
+    using MD35u32Ops = SlotMetadata<3,5,u32>;
+    CHECK(0x0504'0302u == SO35u32Ops::needlePSL(1).value());
+
+    // 0 psl is reserved.
+    const auto psl1 = 0x0403'0201u;
+    const auto hash1 = 0x8080'8080u;
+    {
+    MD35u32Ops m;
+    m.data_ = MD35u32Ops::SSL{0x0403'8201};
+    CHECK(0x0000'8000u == m.attemptMatch(SM{hash1}, SM{psl1}).value());
+    CHECK(0x0000'8000u == SO35u32Ops::attemptMatch(m.data_, SM{hash1}, SM{psl1}).value());
+    }
+    {
+    MD35u32Ops m;
+    m.data_ = MD35u32Ops::SSL{0x0401'8201};
+    CHECK(0x0000'8001u == m.attemptMatch(SM{hash1}, SM{psl1}).value());
+    CHECK(0x0000'8001u == SO35u32Ops::attemptMatch(m.data_, SM{hash1}, SM{psl1}).value());
+    } 
 }

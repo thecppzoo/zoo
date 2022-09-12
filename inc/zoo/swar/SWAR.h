@@ -46,6 +46,9 @@ struct SWAR {
     using type = T;
     constexpr static inline auto NBits = NBits_;
     static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
+    constexpr static T BitMod = sizeof(T)*8 % NBits;
+    constexpr static T ValidBitsCount = sizeof(T)*8 - BitMod;
+    constexpr static T AllOnes = (BitMod == 0) ? ~(T(0)) : ((T(1) << ValidBitsCount) -1);
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -241,7 +244,6 @@ template<int NBits, uint64_t T>
 constexpr auto leastNBitsMask() {
     return ~((0ull)<<NBits);
 }
-
 
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
