@@ -128,7 +128,7 @@ constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     static_assert(sizeof(T) == sizeof(uint64_t));
     static_assert(Size < (1ull << 32));
     auto halved = uint32_t(input);
-    return Size * input >> 32;
+    return Size * halved >> 32;
 }
 
 template<int NBits>
