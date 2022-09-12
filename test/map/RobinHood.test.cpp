@@ -127,6 +127,35 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     }
 }
 
+using FrontendSmall32 =
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 4,
+        std::hash<int>, std::equal_to<int>, u32>;
+
+TEST_CASE("Robin Hood Metadata peek/poke u32",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32::MetadataCollection md;
+    md.fill(FrontendSmall32::MD{0});  // Zero for testing.
+    for (auto i = 0; i < md.size(); i++) {
+        auto [psl1, hash1] = zoo::rh::impl::peek(md, i);
+        CHECK(0 == psl1);
+        CHECK(0 == hash1);
+    }
+    for (auto i = 0; i < md.size(); i++) {
+        zoo::rh::impl::poke(md, i, 16+1, 4+1);
+        auto [psl2, hash2] = zoo::rh::impl::peek(md, i);
+        CHECK(17 == psl2);
+        CHECK(5 == hash2);
+    }
+}
+
+TEST_CASE("Robin Hood Metadata peek/poke u32",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32 table;
+    table.md_;
+
+}
+
+
 
 using RH35u32 = zoo::rh::RH_Backend<3, 5, u32>;
 //makeNeedle
@@ -207,3 +236,4 @@ TEST_CASE(
     CHECK(0x0000'8001u == SO35u32Ops::attemptMatch(m.data_, SM{hash1}, SM{psl1}).value());
     } 
 }
+
