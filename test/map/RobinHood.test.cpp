@@ -128,7 +128,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
 }
 
 using FrontendSmall32 =
-    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 4,
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 3,
         std::hash<int>, std::equal_to<int>, u32>;
 
 TEST_CASE("Robin Hood Metadata peek/poke u32",
@@ -148,13 +148,26 @@ TEST_CASE("Robin Hood Metadata peek/poke u32",
     }
 }
 
-TEST_CASE("Robin Hood Metadata peek/poke u32",
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
           "[api][mapping][swar][robin-hood]") {
     FrontendSmall32 table;
-    table.md_;
+    zoo::rh::impl::poke(table.md_, 1, 0x1, 0x7);
+    CHECK(std::tuple{1,0x7} == zoo::rh::impl::peek(table.md_, 1));
+    CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
+    CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 2));
+
+    // If we ask for a skarupke tail 
+    FrontendSmall32::Backend be{table.md_.data()};
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x7, 1, [](int i) {return true;});
+    CHECK(1 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    //U hoistedHash, int homeIndex, const KeyComparer &kc
+    //return std::tuple(position, deadline, Metadata(needle));
+
 
 }
-
 
 
 using RH35u32 = zoo::rh::RH_Backend<3, 5, u32>;
@@ -197,7 +210,6 @@ TEST_CASE("RobinHood potentialMatches", "[api][mapping][swar][robin-hood]") {
     CHECK(0x0080'0000u == m3.potentialMatches.value());
     CHECK(0x80'00'00'00 == m3.deadline);
 }
-
 
 TEST_CASE(
     "BadMix",
