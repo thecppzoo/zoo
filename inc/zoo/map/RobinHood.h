@@ -305,7 +305,7 @@ struct RH_Frontend_WithSkarupkeTail {
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             size_t destroyedCount = 0;
         #endif
-        for(size_t ndx = SlotCount; ndx--; ) {
+        for(size_t ndx = SWARCount; ndx--; ) {
             auto PSLs = md_[ndx].PSLs();
             auto occupied = booleans(PSLs);
             if(!occupied) { continue; }
