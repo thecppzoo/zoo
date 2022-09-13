@@ -4,9 +4,9 @@
 
 #include <catch2/catch.hpp>
 
-using namespace zoo;
-using namespace zoo::swar;
-using namespace zoo::rh;
+#include <algorithm>
+#include <regex>
+#include <map>
 
 using u64 = uint64_t;
 using u32 = uint32_t;
@@ -40,7 +40,6 @@ auto instantiateFED(FrontendExample *ptr) {
     delete ptr;
 }
 
-/*
 auto instantiateFind(int v, FrontendExample &f) {
     return f.find(v);
 }
@@ -48,7 +47,6 @@ auto instantiateFind(int v, FrontendExample &f) {
 auto instantiateInsert(int v, FrontendExample &f) {
     return f.insert(v, 0);
 }
-*/
 
 static_assert(
     0xE9E8E7E6E5E4E3E2ull == RHC::makeNeedle(1, 7).value()
@@ -56,9 +54,73 @@ static_assert(
 
 
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
+    using SMap =
+        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 1024, 5, 3>;
+    std::string HenryVChorus =
+        "O for a Muse of fire, that would ascend\n"
+        "The brightest heaven of invention,\n"
+        "A kingdom for a stage, princes to act\n"
+        "And monarchs to behold the swelling scene!\n"
+        "Then should the warlike Harry, like himself,\n"
+        "Assume the port of Mars; and at his heels,\n"
+        "Leash'd in like hounds, should famine, sword and fire\n"
+        "Crouch for employment. But pardon, and gentles all,\n"
+        "The flat unraised spirits that have dared\n"
+        "On this unworthy scaffold to bring forth\n"
+        "So great an object: can this cockpit hold\n"
+        "The vasty fields of France? or may we cram\n"
+        "Within this wooden O the very casques\n"
+        "That did affright the air at Agincourt?\n"
+        "O, pardon! since a crooked figure may\n"
+        "Attest in little place a million;\n"
+        "And let us, ciphers to this great accompt,\n"
+        "On your imaginary forces work.\n"
+        "Suppose within the girdle of these walls\n"
+        "Are now confined two mighty monarchies,\n"
+        "Whose high upreared and abutting fronts\n"
+        "The perilous narrow ocean parts asunder:\n"
+        "Piece out our imperfections with your thoughts;\n"
+        "Into a thousand parts divide on man,\n"
+        "And make imaginary puissance;\n"
+        "Think when we talk of horses, that you see them\n"
+        "Printing their proud hoofs i' the receiving earth;\n"
+        "For 'tis your thoughts that now must deck our kings,\n"
+        "Carry them here and there; jumping o'er times,\n"
+        "Turning the accomplishment of many years\n"
+        "Into an hour-glass: for the which supply,\n"
+        "Admit me Chorus to this history;\n"
+        "Who prologue-like your humble patience pray,\n"
+        "Gently to hear, kindly to judge, our play.\n"
+    ;
+    std::transform(
+        HenryVChorus.begin(), HenryVChorus.end(),
+        HenryVChorus.begin(), [](char c) { return std::tolower(c); }
+    );
 
 
+    SMap ex;
+    std::map<std::string, int> mirror;
 
+    std::regex words("\\w+");
+    std::sregex_iterator
+        wordsEnd{},
+        wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
+    while(wordsEnd != wordIterator) {
+        const auto &word = wordIterator->str();
+        auto findResult = ex.find(word);
+        auto mfr = mirror.find(word);
+        bool resultEndInMirror = mfr == mirror.end();
+        bool resultEndInExample = findResult == ex.end();
+        REQUIRE(resultEndInMirror == resultEndInExample);
+        if(resultEndInMirror) {
+            mirror[word] = 0;
+            ex.insert(word, 0);
+        } else {
+            ++mirror[word];
+            ++findResult->value().second;
+        }
+        ++wordIterator;
+    }
 }
 
 

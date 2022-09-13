@@ -300,6 +300,9 @@ struct RH_Frontend_WithSkarupkeTail {
         auto fibonacciScrambled = fibonacciIndexModulo(hashCode);
         auto homeIndex =
             lemireModuloReductionAlternative<RequestedSize>(fibonacciScrambled);
+        #if ZOO_CONFIG_DEEP_ASSERTIONS
+            assert(homeIndex < RequestedSize);
+        #endif
         auto hoisted = hashReducer<HashBits>(hashCode);
         return
             std::tuple{
@@ -311,15 +314,18 @@ struct RH_Frontend_WithSkarupkeTail {
             };
     }
 
-    auto find(const K &k) const noexcept {
+    auto find(const K &k) noexcept {
         auto [hoisted, homeIndex, keyChecker] = findParameters(k);
-        auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
-        Backend be{thy->md_.data()};
+        Backend be{this->md_.data()};
         auto [index, deadline, dontcare] =
             be.findMisaligned_assumesSkarupkeTail(
                 hoisted, homeIndex, keyChecker
             );
         return deadline ? values_.end() : values_.data() + index;
+    }
+
+    auto find(const K &k) const noexcept {
+        const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
     }
 
     auto insert(const K &k, const MV &mv) {
@@ -333,11 +339,19 @@ struct RH_Frontend_WithSkarupkeTail {
         auto deadline = deadlineT;
         auto needle = needleT;
         if(!deadline) { return std::pair{values_.data() + index, false}; }
+        return insertionEvictionChain(index, deadline, needle, k, mv);
+    }
 
-        // Do the chain of relocations
-        // From this point onward, the hashes don't matter except for the
-        // updates to the metadata, the relocations
-
+    // Do the chain of relocations
+    // From this point onward, the hashes don't matter except for the
+    // updates to the metadata, the relocations
+    auto insertionEvictionChain(
+        std::size_t index,
+        U deadline,
+        MD needle,
+        const K &k,
+        const MV &mv
+    ) {
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
         auto mdp = this->md_.data() + swarIndex;
@@ -347,7 +361,7 @@ struct RH_Frontend_WithSkarupkeTail {
         //auto needlePSLs = needle.PSLs();
         for(;;) {
             // Loop invariant:
-            // deadline is true, swarIndex (but not `index`), intraIndex is set
+            // deadline is true, index, swarIndex, intraIndex is set
             // mdp points to the haystack that gave the deadline
             // needle is correct
 
@@ -450,6 +464,7 @@ struct RH_Frontend_WithSkarupkeTail {
                     ++swarIndex;
                         // should the maintenance of `index` be replaced
                         // with pointer arithmetic on mdp?
+                    index += MD::NSlots;
                     ++mdp;
                     haystackPSLs = mdp->PSLs();
                     breaksRobinHood =
@@ -472,6 +487,8 @@ struct RH_Frontend_WithSkarupkeTail {
             (*haystack & ~deadlineElementBlitMask) |
             (needle & deadlineElementBlitMask);
     }
+
+    auto end() const noexcept { return this->values_.end(); }
 };
 
 } // rh
