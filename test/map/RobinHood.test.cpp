@@ -51,6 +51,28 @@ static_assert(
     0xE9E8E7E6E5E4E3E2ull == RHC::makeNeedle(1, 7).value()
 );
 
+struct V {
+    u64 v;
+};
+
+std::ostream &operator<<(std::ostream &out, V v) {
+    char buffer[19];
+    auto upper = v.v >> 32;
+    auto lower = v.v & 0xFFffFFff;
+    snprintf(buffer, 18, "%08llx'%08llx", upper, lower);
+    out << buffer;
+    return out;
+}
+
+template<typename Iter, typename MD>
+auto validateInsertion(
+    Iter result, Iter begin, MD *md
+) {
+    auto index = result - begin;
+    auto swarIndex = index / MD::NSlots;
+    //auto intraIndex = index % MD::NSlots;
+    return V{md[swarIndex].value()};
+}
 
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     using SMap =
@@ -98,6 +120,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
 
 
     SMap ex;
+    using MD = SMap::MD;
     std::map<std::string, int> mirror;
 
     std::regex words("\\w+");
@@ -108,15 +131,30 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         const auto &word = wordIterator->str();
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
+        WARN(word);
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
+        if(resultEndInMirror != resultEndInExample) {
+            WARN(resultEndInMirror);
+            auto r = ex.find(word);
+        }
         REQUIRE(resultEndInMirror == resultEndInExample);
         if(resultEndInMirror) {
             mirror[word] = 0;
-            ex.insert(word, 0);
+            auto [iter, inserted] = ex.insert(word, 0);
+            auto [hh, indexFP, dc] = ex.findParameters(word);
+            auto index = (iter - ex.values_.begin());
+            WARN(
+                index << ':' << (index / MD::NSlots) << ':' <<
+                (index % MD::NSlots) << ' ' << std::hex <<
+                validateInsertion(iter, ex.values_.begin(), ex.md_.data()) <<
+                ' ' << hh << std::dec << ' ' << indexFP
+            );
+            REQUIRE(inserted);
         } else {
             ++mirror[word];
             ++findResult->value().second;
+            REQUIRE(mirror[word] == findResult->value().second);
         }
         ++wordIterator;
     }

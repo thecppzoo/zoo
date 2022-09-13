@@ -196,8 +196,37 @@ struct RH_Backend {
             }
             auto deadline = result.deadline;
             if(deadline) {
+                // The deadline is relative to the misalignment.
+                // To build an absolute deadline, there are two cases:
+                // the bit falls in the first SWAR or the second SWAR.
+                // The same applies for needle.
+                // in general, for example a misaglignment of 6:
+                // { . | . | . | . | . | . | . | .}{ . | . | . | . | . | . | . | . }
+                //                         { a | b | c | d | e | f | g | h }
+                // shift left (to higher bits) by the misalignment
+                // { 0 | 0 | 0 | 0 | 0 | 0 | a | b }
+                // shift right (to lower bits) by NSlots - misalignment:
+                // { c | d | e | f | g | h | 0 | 0 }
+                // Technically, if the misalignment is 0, the shift right would
+                // be for the number of bits in the SWAR, which is undefined
+                // behavior, however, in practice, the only two reasonable
+                // behaviors, zeroing the result, or the result unchanged, will
+                // both work.
+                auto mdd = Metadata{deadline};
+                auto toAbsolute = [](auto v, auto ma) {
+                    return
+                        Metadata{
+                            v.shiftLanesLeft(ma) |
+                            v.shiftLanesRight(Metadata::NSlots - ma)
+                        };
+                };
                 auto position = index + Metadata{deadline}.lsbIndex();
-                return std::tuple(position, deadline, Metadata(needle));
+                return
+                    std::tuple(
+                        position,
+                        toAbsolute(mdd, misalignment).value(),
+                        toAbsolute(needle, misalignment)
+                    );
             }
             // Skarupke's tail allows us to not have to worry about the end
             // of the metadata
@@ -337,8 +366,8 @@ struct RH_Frontend_WithSkarupkeTail {
             be.findMisaligned_assumesSkarupkeTail(hoisted, homeIndex, kc);
         auto index = iT;
         auto deadline = deadlineT;
-        auto needle = needleT;
         if(!deadline) { return std::pair{values_.data() + index, false}; }
+        auto needle = needleT;
         return insertionEvictionChain(index, deadline, needle, k, mv);
     }
 
@@ -358,7 +387,6 @@ struct RH_Frontend_WithSkarupkeTail {
         constexpr auto MaxRelocations = 64;
         std::array<std::size_t, MaxRelocations> relocations;
         auto relocationsCount = 0;
-        //auto needlePSLs = needle.PSLs();
         for(;;) {
             // Loop invariant:
             // deadline is true, index, swarIndex, intraIndex is set
