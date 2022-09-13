@@ -81,7 +81,7 @@ auto validateInsertion(
 
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     using SMap =
-        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 256, 5, 3>;
+        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 1024, 5, 3>;
     std::string HenryVChorus =
         "O for a Muse of fire, that would ascend\n"
         "The brightest heaven of invention,\n"
