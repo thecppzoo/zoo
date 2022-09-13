@@ -46,6 +46,9 @@ struct SWAR {
     using type = T;
     constexpr static inline auto NBits = NBits_;
     static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
+    constexpr static T BitMod = sizeof(T)*8 % NBits;
+    constexpr static T ValidBitsCount = sizeof(T)*8 - BitMod;
+    constexpr static T AllOnes = (BitMod == 0) ? ~(T(0)) : ((T(1) << ValidBitsCount) -1);
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -136,7 +139,7 @@ struct SWARWithSubLanes: SWAR<NBitsMost_ + NBitsLeast_, T> {
 
     // M is most significant bits slice, L is least significant bits slice.
     // 0x....M2L2M1L1 or MN|LN||...||M2|L2||M1|L1
-    using SL = SWARWithSubLanes<NBitsMost, NBitsLeast, T>;
+    using SL = SWARWithSubLanes<NBitsLeast, NBitsMost, T>;
 
     //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
     static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value;
@@ -241,7 +244,6 @@ template<int NBits, uint64_t T>
 constexpr auto leastNBitsMask() {
     return ~((0ull)<<NBits);
 }
-
 
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
