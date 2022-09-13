@@ -130,13 +130,13 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
 
     SMap ex;
     using MD = SMap::MD;
+
     std::map<std::string, int> mirror;
 
     std::regex words("\\w+");
     std::sregex_iterator
         wordsEnd{},
         wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
-
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
         WARN(word);

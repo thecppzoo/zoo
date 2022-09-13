@@ -20,6 +20,31 @@ namespace zoo {
 
 namespace rh {
 
+namespace impl {
+
+template<typename Callable>
+struct ScopeGuard {
+    Callable c_;
+
+    ScopeGuard(Callable &&c): c_(std::move(c)) {}
+    ~ScopeGuard() noexcept(false) {
+        c_();
+    }
+};
+
+}
+
+struct RobinHoodException: std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+struct MaximumProbeSequenceLengthExceeded: RobinHoodException {
+    using RobinHoodException::RobinHoodException;
+};
+struct RelocationStackExhausted: RobinHoodException {
+    using RobinHoodException::RobinHoodException;
+};
+
 template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
 struct RH_Backend {
     using Metadata = impl::Metadata<PSL_Bits, HashBits, U>;
@@ -102,71 +127,6 @@ struct RH_Backend {
         return startingPSLmadePotentialPSLs;
     }
 
-    template<int Misalignment, typename KeyComparer>
-    constexpr static auto
-    unalignedFind(
-        U hoistedHash,
-        Metadata *base,
-        int homeIndex,
-        const KeyComparer &kc
-    ) noexcept {
-        constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
-        constexpr auto Progression = Metadata{Ones * Ones};
-        constexpr auto SlotCountAsSwar = Metadata{Ones * Metadata::NSlots};
-
-        MisalignedGenerator<Metadata, 8*Misalignment> p{base};
-        auto index = homeIndex;
-        auto needle = makeNeedle(0, hoistedHash);
-        for(;;) {
-            auto result = potentialMatches(needle, *p);
-            auto positives = result.potentialMatches;
-            auto deadline = result.deadline;
-            while(positives.value()) {
-                auto matchSubIndex = positives.lsbIndex();
-                auto matchIndex = index + matchSubIndex;
-                if(kc(matchIndex)) {
-                    return std::tuple(true, matchIndex);
-                }
-                positives = Metadata{clearLSB(positives.value())};
-            }
-            if(deadline) {
-                auto position = index + Metadata{deadline}.lsbIndex();
-                return std::tuple(false, position);
-            }
-            // Skarupke's tail allows us to not have to worry about the end
-            // of the metadata
-            ++p;
-            index += Metadata::NSlots;
-            needle = needle + SlotCountAsSwar;
-
-        }
-    }
-
-    template<typename KeyComparer>
-    constexpr auto
-    findThroughIndirectJump(
-        U hh, int index, const KeyComparer &kc
-    ) const noexcept {
-        auto misalignment = index % Metadata::NSlots;
-        auto baseIndex = index / Metadata::NSlots;
-        auto base = this->md_ + baseIndex;
-        switch(misalignment) {
-            case 0: return unalignedFind<0>(hh, base, index, kc);
-            case 1: return unalignedFind<1>(hh, base, index, kc);
-            case 2: return unalignedFind<2>(hh, base, index, kc);
-            case 3: return unalignedFind<3>(hh, base, index, kc);
-            case 4: return unalignedFind<4>(hh, base, index, kc);
-            case 5: return unalignedFind<5>(hh, base, index, kc);
-            case 6: return unalignedFind<6>(hh, base, index, kc);
-            case 7: return unalignedFind<7>(hh, base, index, kc);
-        }
-        __builtin_unreachable();
-    }
-
-    // Returned metadata is irrelevant except for the element at the same index
-    // as the deadline which contains the PSL and hash of the element which
-    // matches the deadline. IE: it is returnedMetadata.at(deadline.lsbindex())
-    // that is the PSL + hashbits
     template<typename KeyComparer>
     constexpr auto
     findMisaligned_assumesSkarupkeTail(
@@ -183,6 +143,7 @@ struct RH_Backend {
         MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
         auto index = homeIndex;
         auto needle = makeNeedle(0, hoistedHash);
+
         for(;;) {
             auto result = potentialMatches(needle, *p);
             auto positives = result.potentialMatches;
@@ -280,8 +241,7 @@ struct RH_Frontend_WithSkarupkeTail {
 
     constexpr static inline auto WithTail =
         RequestedSize +
-        (1 << PSL_Bits) - 1 // the Skarupke tail
-        // also note it is desirable to have an odd number of elements
+        (1 << PSL_Bits) // the Skarupke tail
     ;
     constexpr static inline auto SWARCount =
         (
@@ -290,11 +250,13 @@ struct RH_Frontend_WithSkarupkeTail {
         ) / MD::NSlots
     ;
     constexpr static inline auto SlotCount = SWARCount * MD::NSlots;
+    constexpr static inline auto HighestSafePSL =
+        (1 << PSL_Bits) - MD::NSlots - 1;
 
     using MetadataCollection = std::array<MD, SWARCount>;
-    MetadataCollection md_;
     using value_type = std::pair<K, MV>;
 
+    MetadataCollection md_;
     /// \todo Scatter key and value in a flavor
     std::array<KeyValuePairWrapper<K, MV>, SlotCount> values_;
     size_t elementCount_;
@@ -387,26 +349,41 @@ struct RH_Frontend_WithSkarupkeTail {
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
         auto mdp = this->md_.data() + swarIndex;
-        constexpr auto MaxRelocations = 64;
+        constexpr auto MaxRelocations = 100;
         std::array<std::size_t, MaxRelocations> relocations;
+        std::array<int, MaxRelocations> newElements;
         auto relocationsCount = 0;
-        auto elementToInsert = MD(needle.at(intraIndex));
+        auto elementToInsert = needle.at(intraIndex);
+
+        // The very last element in the metadata will always have a psl of 0
+        // this serves as a sentinel for insertions, the only place to make
+        // sure the table has not been exhausted is an eviction chain that
+        // ends in the sentinel
+        // Also, the encoding for the PSL may be exhausted
+
+        /*auto PSLexceeded = false;
+        impl::ScopeGuard PSLexceededGuard{
+            [&]() {
+                if(!PSLexceeded) { return; }
+                throw MaximumProbeSequenceLengthExceeded("Max PSL used");
+        }};*/
         for(;;) {
             // Loop invariant:
             // deadline, index, swarIndex, intraIndex, elementToInsert correct
             // mdp points to the haystack that gave the deadline
-
-            // back this up to pick the element being evicted, if there is one
-            auto mdBackup = *mdp;
-            auto evictedPSL = mdBackup.PSLs().at(intraIndex);
+            auto md = *mdp;
+            auto evictedPSL = md.PSLs().at(intraIndex);
             if(0 == evictedPSL) { // end of eviction chain!
-                assignMetadataElement(
-                    deadline,
-                    elementToInsert.shiftLanesLeft(intraIndex),
-                    mdp
-                );
+                if(SlotCount - 1 <= index) {
+                    throw MaximumProbeSequenceLengthExceeded("full table");
+                }
                 if(0 == relocationsCount) { // direct build of a new value
-                    values_[index].build(std::pair{k, mv}); // inplace?
+                    values_[index].build(
+                        std::piecewise_construct,
+                        std::tuple(k),
+                        std::tuple(mv)
+                    );
+                    *mdp = mdp->blitElement(intraIndex, elementToInsert);
                     return std::pair{values_.data() + index, true};
                 }
                 // the last element is special because it is a
@@ -415,17 +392,32 @@ struct RH_Frontend_WithSkarupkeTail {
                 values_[index].build(
                     std::move(values_[fromIndex].value())
                 );
+                auto mde = newElements[relocationsCount];
+                md_[index] = md_[index].blitElement(intraIndex, mde);
                 index = fromIndex;
+                swarIndex = index / MD::NSlots;
+                intraIndex = index % MD::NSlots;
+
                 // do the pair relocations
                 while(relocationsCount--) {
                     fromIndex = relocations[relocationsCount];
                     values_[index].value() =
                         std::move(values_[fromIndex].value());
+                    mde = newElements[relocationsCount];
+                    md_[index] = md_[index].blitElement(intraIndex, mde);
                     index = fromIndex;
+                    swarIndex = index / MD::NSlots;
+                    intraIndex = index % MD::NSlots;
                 }
                 values_[index].value() = std::pair(k, mv);
+                md_[swarIndex] =
+                    md_[swarIndex].blitElement(intraIndex, mde);
                 return std::pair{values_.data() + index, true};
             }
+            if(HighestSafePSL < evictedPSL) {
+                throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
+            }
+            
             // evict the "deadline" element:
             // first, insert the element in its place (it "stole")
             // find the place for the evicted: when Robin Hood breaks again.
@@ -433,16 +425,17 @@ struct RH_Frontend_WithSkarupkeTail {
             // for this search, we need to make a search needle with only
             // the PSL being evicted.
 
-            // The needle stole the entry: replace it with the needle
-            assignMetadataElement(
-                deadline,
-                elementToInsert.shiftLanesLeft(intraIndex),
-                mdp
-            );
-            // now the insertion will be for the old metadata entry
-            elementToInsert = MD(mdBackup.hashes().at(intraIndex));
+
             // "push" the index of the element that will be evicted
-            relocations[relocationsCount++] = index;
+            relocations[relocationsCount] = index;
+            newElements[relocationsCount++] = elementToInsert;
+            if(MaxRelocations <= relocationsCount) {
+                throw RelocationStackExhausted("");
+            }
+
+            // now the insertion will be for the old metadata entry
+            elementToInsert = md.hashes().at(intraIndex);
+            
 
             // now, where should the evicted element go to?
             // assemble a new needle
@@ -476,7 +469,7 @@ struct RH_Frontend_WithSkarupkeTail {
                 // assuming the deadline happened in the index 2:
                 // needlePSLs = |    0   |   0    | ePSL   | ePSL+1 | ... | ePSL+5 |
             // find the place for the new needle, without checking the keys.
-            auto haystackPSLs = mdBackup.PSLs();
+            auto haystackPSLs = md.PSLs();
             // haystack < needle => !(haystack >= needle)
             auto breaksRobinHood =
                 not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
@@ -514,17 +507,21 @@ struct RH_Frontend_WithSkarupkeTail {
                     breaksRobinHood =
                         not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
                     if(breaksRobinHood) { break; }
+                    evictedPSL += MD::NSlots;
+                    if(HighestSafePSL < evictedPSL) {
+                        throw MaximumProbeSequenceLengthExceeded("Scanning for eviction");
+                    }
                     needlePSLs = needlePSLs + BroadcastSWAR_ElementCount;
                 }
             }
             deadline = swar::isolateLSB(breaksRobinHood.value());
             intraIndex = breaksRobinHood.lsbIndex();
             index = swarIndex * MD::NSlots + intraIndex;
-            elementToInsert = elementToInsert | MD(needlePSLs.at(intraIndex));
+            elementToInsert = elementToInsert | needlePSLs.at(intraIndex);
         }
     }
 
-    static void
+    /*static void
     assignMetadataElement(U deadline, MD needle, MD *haystack) noexcept {
         auto deadlineAsElementWithValue1 = deadline >> (MD::NBits - 1);
         auto deadlineElementLowBitsOn = deadline - deadlineAsElementWithValue1;
@@ -532,7 +529,7 @@ struct RH_Frontend_WithSkarupkeTail {
         *haystack =
             (*haystack & ~deadlineElementBlitMask) |
             (needle & deadlineElementBlitMask);
-    }
+    }*/
 
     auto end() const noexcept { return this->values_.end(); }
 };
