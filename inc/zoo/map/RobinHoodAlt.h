@@ -46,7 +46,7 @@ template<int NBitsHash, int NBitsPSL, typename T = u64> struct SlotOperations {
     // using decls.
     static constexpr auto attemptMatch(
              SM haystack, SM needleHashes, SM needlePSL) {
-        const auto haystackPSL = SM{SSL::LeastMask & haystack.value()};
+        const auto haystackPSL = SM{SSL::LeastMask.value() & haystack.value()};
         const auto d = deadline(haystackPSL, needlePSL);  // breaks abstraction
         const auto needle = needleHashes | needlePSL;
 
