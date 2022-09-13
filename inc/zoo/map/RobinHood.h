@@ -400,12 +400,19 @@ struct RH_Frontend_WithSkarupkeTail {
             if(0 == evictedPSL) { // end of eviction chain!
                 assignMetadataElement(deadline, needle, mdp);
                 if(0 == relocationsCount) { // direct build of a new value
-                    values_[index].build(std::pair{k, mv});
+                    values_[index].build(std::pair{k, mv}); // inplace?
                     return std::pair{values_.data() + index, true};
                 }
+                // the last element is special because it is a
+                // move-construction, not a move-assignment
+                auto fromIndex = relocations[--relocationsCount];
+                values_[index].build(
+                    std::move(values_[fromIndex].value())
+                );
+                index = fromIndex;
                 // do the pair relocations
                 while(relocationsCount--) {
-                    auto fromIndex = relocations[relocationsCount];
+                    fromIndex = relocations[relocationsCount];
                     values_[index].value() =
                         std::move(values_[fromIndex].value());
                     index = fromIndex;

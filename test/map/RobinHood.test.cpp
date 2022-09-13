@@ -79,9 +79,13 @@ auto validateInsertion(
     return V{md[swarIndex].value()};
 }
 
+using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 256, 5, 3>;
+
+auto valueInvoker(void *p, std::size_t index) {
+    return static_cast<SMap *>(p)->values_[index].value();
+}
+
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
-    using SMap =
-        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 1024, 5, 3>;
     std::string HenryVChorus =
         "O for a Muse of fire, that would ascend\n"
         "The brightest heaven of invention,\n"
