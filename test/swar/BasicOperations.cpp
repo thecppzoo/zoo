@@ -259,3 +259,8 @@ static_assert(0xE000'0000 == Lanes(allF).most(3));
 
 static_assert(0x123 == SWAR<4, uint32_t>(0x173).blitElement(1, 2).value());
 static_assert(0 == isolateLSB(u32(0)));
+
+constexpr auto aBooleansWithTrue = booleans(SWAR<4, u32>{0x1});
+static_assert(aBooleansWithTrue);
+static_assert(!aBooleansWithTrue); // this is a pitfall, but lesser evil?
+static_assert(false == !bool(aBooleansWithTrue));

@@ -58,25 +58,36 @@ static_assert(
 
 struct V {
     u64 v;
+    u64 intraIndex;
 };
 
 std::ostream &operator<<(std::ostream &out, V v) {
-    char buffer[19];
-    auto upper = v.v >> 32;
-    auto lower = v.v & 0xFFffFFff;
-    snprintf(buffer, 18, "%08llx'%08llx", upper, lower);
+    char buffer[30];
+    char *ptr = buffer;
+    auto val = v.v;
+    auto printHalf = [&](auto low, auto high) {
+        for(auto ndx = low; ndx < high; ++ndx) {
+            if(v.intraIndex == ndx) {
+                ptr += sprintf(ptr, "<");
+            }
+            ptr += sprintf(ptr, "%02llx", val & 0xFF);
+            if(v.intraIndex == ndx) {
+                ptr += sprintf(ptr, ">");
+            }
+            val >>= 8;
+        }
+    };
+    printHalf(0, 4);
+    ptr += sprintf(ptr, "'");
+    printHalf(4, 8);
     out << buffer;
     return out;
 }
 
-template<typename Iter, typename MD>
-auto validateInsertion(
-    Iter result, Iter begin, MD *md
-) {
-    auto index = result - begin;
+template<typename MD>
+auto showMetadata(std::size_t index, MD *md) {
     auto swarIndex = index / MD::NSlots;
-    //auto intraIndex = index % MD::NSlots;
-    return V{md[swarIndex].value()};
+    return V{md[swarIndex].value(), index % MD::NSlots};
 }
 
 using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 256, 5, 3>;
@@ -140,7 +151,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
         WARN(word);
-        if("confined" == word) {
+        if("accomplishment" == word) {
             WARN(mirror.size());
         }
         bool resultEndInMirror = mfr == mirror.end();
@@ -150,22 +161,27 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             auto r = ex.find(word);
         }
         REQUIRE(resultEndInMirror == resultEndInExample);
-        if(resultEndInMirror) {
-            mirror[word] = 0;
-            auto [iter, inserted] = ex.insert(word, 0);
-            auto [hh, indexFP, dc] = ex.findParameters(word);
+        auto showRecord = [&](auto iter) {
+            auto [hh, indexHome, dc] = ex.findParameters(word);
             auto index = (iter - ex.values_.begin());
+            auto swarIndex = index / MD::NSlots;
             WARN(
-                index << ':' << (index / MD::NSlots) << ':' <<
-                (index % MD::NSlots) << ' ' << std::hex <<
-                validateInsertion(iter, ex.values_.begin(), ex.md_.data()) <<
-                ' ' << hh << std::dec << ' ' << indexFP
+                index << ':' << swarIndex << ':' <<
+                (index % MD::NSlots) << ' ' <<
+                showMetadata(index, ex.md_.data()) <<
+                ' ' << hh << ' ' << indexHome
             );
+        };
+        if(resultEndInMirror) {
+            mirror[word] = 1;
+            auto [iter, inserted] = ex.insert(word, 1);
             REQUIRE(inserted);
+            showRecord(iter);
         } else {
             ++mirror[word];
             ++findResult->value().second;
             REQUIRE(mirror[word] == findResult->value().second);
+            showRecord(findResult);
             WARN(word << ' ' << mirror[word]);
         }
         ++wordIterator;

@@ -290,8 +290,8 @@ struct BooleanSWAR: SWAR<NBits, T> {
     /// BooleanSWAR treats the MSB of each lane as the boolean associated with that lane.
     /// A logical NOT in this circumstance _only_ flips the MSB of each lane.  This operation is
     /// not ones or twos complement.
-    constexpr BooleanSWAR operator not() const noexcept {
-        return MaskLaneMSB ^ *this;
+    constexpr auto operator not() const noexcept {
+        return BooleanSWAR(MaskLaneMSB ^ *this);
     }
 
     constexpr operator bool() const noexcept { return this->m_v; }

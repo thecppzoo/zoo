@@ -358,8 +358,9 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     auto insert(const K &k, const MV &mv) {
-        auto [hoistedT, homeIndex, kc] = findParameters(k);
+        auto [hoistedT, homeIndexT, kc] = findParameters(k);
         auto hoisted = hoistedT;
+        auto homeIndex = homeIndexT;
         auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
         Backend be{thy->md_.data()};
         auto [iT, deadlineT, needleT] =
@@ -387,18 +388,21 @@ struct RH_Frontend_WithSkarupkeTail {
         constexpr auto MaxRelocations = 64;
         std::array<std::size_t, MaxRelocations> relocations;
         auto relocationsCount = 0;
+        auto elementToInsert = MD(needle.at(intraIndex));
         for(;;) {
             // Loop invariant:
-            // deadline is true, index, swarIndex, intraIndex is set
+            // deadline, index, swarIndex, intraIndex, elementToInsert correct
             // mdp points to the haystack that gave the deadline
-            // needle is correct
 
-            // Make a backup for making the new needle since we will change
-            // this in the eviction
+            // back this up to pick the element being evicted, if there is one
             auto mdBackup = *mdp;
             auto evictedPSL = mdBackup.PSLs().at(intraIndex);
             if(0 == evictedPSL) { // end of eviction chain!
-                assignMetadataElement(deadline, needle, mdp);
+                assignMetadataElement(
+                    deadline,
+                    elementToInsert.shiftLanesLeft(intraIndex),
+                    mdp
+                );
                 if(0 == relocationsCount) { // direct build of a new value
                     values_[index].build(std::pair{k, mv}); // inplace?
                     return std::pair{values_.data() + index, true};
@@ -421,17 +425,20 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             // evict the "deadline" element:
-            // first, insert the current needle in its place (the needle stole)
-            // make it the new needle.
-            // find the place for it: when Robin Hood breaks again.
+            // first, insert the element in its place (it "stole")
+            // find the place for the evicted: when Robin Hood breaks again.
 
             // for this search, we need to make a search needle with only
             // the PSL being evicted.
 
             // The needle stole the entry: replace it with the needle
-            assignMetadataElement(deadline, needle, mdp);
-            // now the needle will be the old metadata entry
-            needle = mdBackup;
+            assignMetadataElement(
+                deadline,
+                elementToInsert.shiftLanesLeft(intraIndex),
+                mdp
+            );
+            // now the insertion will be for the old metadata entry
+            elementToInsert = MD(mdBackup.shiftLanesRight(intraIndex));
             // "push" the index of the element that will be evicted
             relocations[relocationsCount++] = index;
 
@@ -471,7 +478,7 @@ struct RH_Frontend_WithSkarupkeTail {
             // haystack < needle => !(haystack >= needle)
             auto breaksRobinHood =
                 not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
-            if(!breaksRobinHood) {
+            if(!bool(breaksRobinHood)) {
                 // no place for the evicted element found in this swar.
                 // increment the PSLs in the needle to check the next haystack
 
