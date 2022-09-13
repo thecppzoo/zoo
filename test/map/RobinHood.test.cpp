@@ -70,7 +70,6 @@ std::ostream &operator<<(std::ostream &out, V v) {
     printHalf(0, 4);
     ptr += sprintf(ptr, "'");
     printHalf(4, 8);
-    out << buffer;
     return out;
 }
 
@@ -130,7 +129,6 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
 
     SMap ex;
     using MD = SMap::MD;
-
     std::map<std::string, int> mirror;
 
     std::regex words("\\w+");
@@ -142,9 +140,6 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         WARN(word);
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
-        if("accomplishment" == word) {
-            WARN(mirror.size());
-        }
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
         if(resultEndInMirror != resultEndInExample) {
