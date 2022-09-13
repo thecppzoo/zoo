@@ -146,6 +146,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     std::sregex_iterator
         wordsEnd{},
         wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
+
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
         auto findResult = ex.find(word);
@@ -214,6 +215,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32",
 TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
           "[api][mapping][swar][robin-hood]") {
     FrontendSmall32 table;
+    /*
     zoo::rh::impl::poke(table.md_, 1, 0x1, 0x7);
     CHECK(std::tuple{1,0x7} == zoo::rh::impl::peek(table.md_, 1));
     CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
@@ -226,6 +228,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
     CHECK(1 == index);
     CHECK(0x0000'0000u == deadline);
     CHECK(0x0000'0000u == metadata.value());
+    */
     //U hoistedHash, int homeIndex, const KeyComparer &kc
     //return std::tuple(position, deadline, Metadata(needle));
 
