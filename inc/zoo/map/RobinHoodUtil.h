@@ -85,7 +85,7 @@ struct Metadata: swar::SWARWithSubLanes<PSL_Bits, HashBits, U> {
     using Base::Base;
 
     constexpr auto PSLs() const noexcept { return this->least(); }
-    constexpr auto Hashes() const noexcept { return this->most(); }
+    constexpr auto hashes() const noexcept { return this->most(); }
 };
 
 template<int PSL_Bits, int HashBits, typename U>

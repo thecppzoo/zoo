@@ -245,17 +245,22 @@ static_assert(0x00e0'0000 == Lanes(all0).least(0, 2).most(31, 2).value());
 static_assert(0xe000'0000 == Lanes(all0).least(0, 3).most(31, 3).value());
 
 static_assert(0x1F1F'1F1F == Lanes(allF).least().value());
-static_assert(0xE0E0'E0E0 == Lanes(allF).most());
+static_assert(0xE0E0'E0E0 == Lanes(allF).most().value());
 
-static_assert(0x0000'001F == Lanes(allF).least(0));
-static_assert(0x0000'1F00 == Lanes(allF).least(1));
-static_assert(0x001F'0000 == Lanes(allF).least(2));
-static_assert(0x1F00'0000 == Lanes(allF).least(3));
+static_assert(0x0000'001F == Lanes(allF).least(0).value());
+static_assert(0x0000'1F00 == Lanes(allF).least(1).value());
+static_assert(0x001F'0000 == Lanes(allF).least(2).value());
+static_assert(0x1F00'0000 == Lanes(allF).least(3).value());
 
-static_assert(0x0000'00E0 == Lanes(allF).most(0));
-static_assert(0x0000'E000 == Lanes(allF).most(1));
-static_assert(0x00E0'0000 == Lanes(allF).most(2));
-static_assert(0xE000'0000 == Lanes(allF).most(3));
+static_assert(0x0000'00E0 == Lanes(allF).most(0).value());
+static_assert(0x0000'E000 == Lanes(allF).most(1).value());
+static_assert(0x00E0'0000 == Lanes(allF).most(2).value());
+static_assert(0xE000'0000 == Lanes(allF).most(3).value());
 
 static_assert(0x123 == SWAR<4, uint32_t>(0x173).blitElement(1, 2).value());
 static_assert(0 == isolateLSB(u32(0)));
+
+constexpr auto aBooleansWithTrue = booleans(SWAR<4, u32>{0x1});
+static_assert(aBooleansWithTrue);
+static_assert(!aBooleansWithTrue); // this is a pitfall, but lesser evil?
+static_assert(false == !bool(aBooleansWithTrue));

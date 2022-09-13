@@ -56,10 +56,47 @@ static_assert(
     0xE9E8E7E6E5E4E3E2ull == RHC::makeNeedle(1, 7).value()
 );
 
+struct V {
+    u64 v;
+    u64 intraIndex;
+};
+
+std::ostream &operator<<(std::ostream &out, V v) {
+    char buffer[30];
+    char *ptr = buffer;
+    auto val = v.v;
+    auto printHalf = [&](auto low, auto high) {
+        for(auto ndx = low; ndx < high; ++ndx) {
+            if(v.intraIndex == ndx) {
+                ptr += sprintf(ptr, "<");
+            }
+            ptr += sprintf(ptr, "%02llx", val & 0xFF);
+            if(v.intraIndex == ndx) {
+                ptr += sprintf(ptr, ">");
+            }
+            val >>= 8;
+        }
+    };
+    printHalf(0, 4);
+    ptr += sprintf(ptr, "'");
+    printHalf(4, 8);
+    out << buffer;
+    return out;
+}
+
+template<typename MD>
+auto showMetadata(std::size_t index, MD *md) {
+    auto swarIndex = index / MD::NSlots;
+    return V{md[swarIndex].value(), index % MD::NSlots};
+}
+
+using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 256, 5, 3>;
+
+auto valueInvoker(void *p, std::size_t index) {
+    return static_cast<SMap *>(p)->values_[index].value();
+}
 
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
-    using SMap =
-        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 1024, 5, 3>;
     std::string HenryVChorus =
         "O for a Muse of fire, that would ascend\n"
         "The brightest heaven of invention,\n"
@@ -101,32 +138,59 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         HenryVChorus.begin(), [](char c) { return std::tolower(c); }
     );
 
-
     SMap ex;
+    using MD = SMap::MD;
     std::map<std::string, int> mirror;
 
     std::regex words("\\w+");
     std::sregex_iterator
         wordsEnd{},
         wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
+
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
+        WARN(word);
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
+        if("accomplishment" == word) {
+            WARN(mirror.size());
+        }
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
+        if(resultEndInMirror != resultEndInExample) {
+            WARN(resultEndInMirror);
+            auto r = ex.find(word);
+        }
         REQUIRE(resultEndInMirror == resultEndInExample);
+        auto showRecord = [&](auto iter) {
+            auto [hh, indexHome, dc] = ex.findParameters(word);
+            auto index = (iter - ex.values_.begin());
+            auto swarIndex = index / MD::NSlots;
+            WARN(
+                index << ':' << swarIndex << ':' <<
+                (index % MD::NSlots) << ' ' <<
+                showMetadata(index, ex.md_.data()) <<
+                ' ' << hh << ' ' << indexHome
+            );
+        };
         if(resultEndInMirror) {
-            mirror[word] = 0;
-            ex.insert(word, 0);
+            mirror[word] = 1;
+            auto [iter, inserted] = ex.insert(word, 1);
+            REQUIRE(inserted);
+            showRecord(iter);
         } else {
             ++mirror[word];
             ++findResult->value().second;
+            REQUIRE(mirror[word] == findResult->value().second);
+            showRecord(findResult);
+            WARN(word << ' ' << mirror[word]);
         }
         ++wordIterator;
     }
+    WARN(mirror.size());
 }
 
+#if 0
 using FrontendSmall32 =
     zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 3,
         std::hash<int>, std::equal_to<int>, u32>;
@@ -151,6 +215,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32",
 TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
           "[api][mapping][swar][robin-hood]") {
     FrontendSmall32 table;
+    /*
     zoo::rh::impl::poke(table.md_, 1, 0x1, 0x7);
     CHECK(std::tuple{1,0x7} == zoo::rh::impl::peek(table.md_, 1));
     CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
@@ -163,17 +228,15 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
     CHECK(1 == index);
     CHECK(0x0000'0000u == deadline);
     CHECK(0x0000'0000u == metadata.value());
+    */
     //U hoistedHash, int homeIndex, const KeyComparer &kc
     //return std::tuple(position, deadline, Metadata(needle));
 
 
 }
-
+#endif
 
 using RH35u32 = zoo::rh::RH_Backend<3, 5, u32>;
-//makeNeedle
-//template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
-
 
 TEST_CASE("RobinHood basic needle", "[api][mapping][swar][robin-hood]") {
 

@@ -45,7 +45,8 @@ template<int NBits_, typename T = uint64_t>
 struct SWAR {
     using type = T;
     constexpr static inline auto NBits = NBits_;
-    static constexpr inline auto Lanes = sizeof(T) * 8 / NBits;
+    constexpr static inline auto Lanes = sizeof(T) * 8 / NBits;
+    constexpr static inline auto NSlots = Lanes;
     constexpr static T BitMod = sizeof(T)*8 % NBits;
     constexpr static T ValidBitsCount = sizeof(T)*8 - BitMod;
     constexpr static T AllOnes = (BitMod == 0) ? ~(T(0)) : ((T(1) << ValidBitsCount) -1);
@@ -129,7 +130,6 @@ struct SWARWithSubLanes: SWAR<NBitsLeast_ + NBitsMost_ , T> {
     using Base = SWAR<NBitsMost + NBitsLeast, T>;
     static constexpr inline auto Available = sizeof(T);
     static constexpr inline auto LaneBits = NBitsLeast + NBitsMost;
-    static constexpr inline auto NSlots = Available * 8 / LaneBits;
 
     using Base::Base;
     constexpr SWARWithSubLanes(Base b) noexcept: Base(b) {}
@@ -141,69 +141,70 @@ struct SWARWithSubLanes: SWAR<NBitsLeast_ + NBitsMost_ , T> {
     // 0x....M2L2M1L1 or MN|LN||...||M2|L2||M1|L1
     using SL = SWARWithSubLanes<NBitsLeast, NBitsMost, T>;
 
-    //constexpr T Ones = meta::BitmaskMaker<NBits, SWAR<NBits, T>{1}.value(), T>::value;
-    static constexpr inline auto LeastOnes = meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value;
-    static constexpr inline auto MostOnes = meta::BitmaskMaker<T, Base{1<<NBitsLeast}.value(), LaneBits>::value;
-    static constexpr inline auto LeastMask = meta::BitmaskMaker<T, Base{~(~0ull<<NBitsLeast)}.value(), LaneBits>::value;
+    static constexpr inline auto LeastOnes =
+        Base(meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value);
+    static constexpr inline auto MostOnes =
+        Base(LeastOnes.value() << NBitsLeast);
+    static constexpr inline auto LeastMask = MostOnes - LeastOnes;
     static constexpr inline auto MostMask = ~LeastMask;
 
     constexpr auto least() const noexcept {
-        return SL{this->m_v & LeastMask};
+        return SL{LeastMask & *this};
     }
 
-    // Returns only the least significant bits at specified position.
+    // Isolate the least significant bits of the lane at the specified position.
     constexpr auto least(int pos) const noexcept {
-        constexpr auto filter = (T(1) << LaneBits) - 1;
-        const auto keep = (filter << (LaneBits * pos)) & LeastMask;
-        return this->m_v & keep;
+        constexpr auto Filter = SL((T(1) << NBitsLeast) - 1);
+        return Filter.shiftLanesLeft(pos) & *this;
     }
 
     // Returns only the least significant bits at specified position, 'decoded' to their integer value.
     constexpr auto leastFlat(int pos) const noexcept {
-        return least(pos) >> (LaneBits*pos);
+        return least().at(pos);
     }
 
     constexpr auto most() const noexcept {
-        return this->m_v & MostMask;
+        return SL{MostMask & *this};
     }
 
-    // Returns only the most significant bits at specified position.
+    // The most significant bits of the lane at the specified position.
     constexpr auto most(int pos) const noexcept {
-        constexpr auto filter = (T(1) << LaneBits) - 1;
-        const auto keep = (filter << (LaneBits * pos)) & MostMask;
-        return this->m_v & keep;
+        constexpr auto Filter =
+            SL(((T(1) << SL::NBitsMost) - 1) << SL::NBitsLeast);
+        return Filter.shiftLanesLeft(pos) & *this;
     }
 
-    // Returns only the most significant bits at specified position, 'decoded' to their integer value.
+    // The most significant bits of the lane at the specified position,
+    // 'decoded' to their integer value.
     constexpr auto mostFlat(int pos) const noexcept {
-        return most(pos) >> (LaneBits*pos)>> NBitsLeast;
+        return most().at(pos) >> SL::NBitsLeast;
     }
 
     // Blits most sig bits into least significant bits. Experimental.
     constexpr auto flattenMostToLeast(int pos) const noexcept {
-        return (this->m_v >> NBitsLeast) & LeastMask;
+        return SL(this->m_v >> NBitsLeast) & LeastMask;
     }
 
     // Blits least sig bits into most significant bits. Experimental.
     constexpr auto promoteLeastToMost(int pos) const noexcept {
-        return (this->m_v << NBitsMost) & MostMask;
+        return SL(this->m_v << NBitsMost) & MostMask;
     }
 
     // Sets the lsb sublane at |pos| with least significant NBitsLeast of |in|
     constexpr auto least(T in, int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
-        const auto keep = ~(filter << (LaneBits * pos)) | MostMask;
+        const auto keep = ~(filter << (LaneBits * pos)) | MostMask.value();
         const auto rdyToInsert = this->m_v & keep;
-        const auto rval = rdyToInsert | ((in & LeastMask) << (LaneBits * pos));
+        const auto rval = rdyToInsert | ((in & LeastMask.value()) << (LaneBits * pos));
         return SL(rval);
     }
 
     // Sets the msb sublane at |pos| with least significant NBitsMost of |in|
     constexpr auto most(T in, int pos) const noexcept {
         constexpr auto filter = (T(1) << LaneBits) - 1;
-        const auto keep = ~(filter << (LaneBits * pos)) | LeastMask;
+        const auto keep = ~(filter << (LaneBits * pos)) | LeastMask.value();
         const auto rdyToInsert = this->m_v & keep;
-        const auto insVal = (((in<<NBitsLeast) & MostMask) << (LaneBits * pos));
+        const auto insVal = (((in<<NBitsLeast) & MostMask.value()) << (LaneBits * pos));
         const auto rval = rdyToInsert | insVal;
         return SL(rval);
     }
@@ -287,13 +288,18 @@ struct BooleanSWAR: SWAR<NBits, T> {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
 
+    constexpr BooleanSWAR clearLSB() const noexcept {
+        return BooleanSWAR(swar::clearLSB(this->value()));
+    }
+
     /// BooleanSWAR treats the MSB of each lane as the boolean associated with that lane.
     /// A logical NOT in this circumstance _only_ flips the MSB of each lane.  This operation is
     /// not ones or twos complement.
-    constexpr BooleanSWAR operator not() const noexcept {
-        return MaskLaneMSB ^ *this;
+    constexpr auto operator not() const noexcept {
+        return BooleanSWAR(MaskLaneMSB ^ *this);
     }
 
+    explicit
     constexpr operator bool() const noexcept { return this->m_v; }
  private:
     constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept:

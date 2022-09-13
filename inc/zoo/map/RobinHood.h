@@ -196,8 +196,37 @@ struct RH_Backend {
             }
             auto deadline = result.deadline;
             if(deadline) {
+                // The deadline is relative to the misalignment.
+                // To build an absolute deadline, there are two cases:
+                // the bit falls in the first SWAR or the second SWAR.
+                // The same applies for needle.
+                // in general, for example a misaglignment of 6:
+                // { . | . | . | . | . | . | . | .}{ . | . | . | . | . | . | . | . }
+                //                         { a | b | c | d | e | f | g | h }
+                // shift left (to higher bits) by the misalignment
+                // { 0 | 0 | 0 | 0 | 0 | 0 | a | b }
+                // shift right (to lower bits) by NSlots - misalignment:
+                // { c | d | e | f | g | h | 0 | 0 }
+                // Technically, if the misalignment is 0, the shift right would
+                // be for the number of bits in the SWAR, which is undefined
+                // behavior, however, in practice, the only two reasonable
+                // behaviors, zeroing the result, or the result unchanged, will
+                // both work.
+                auto mdd = Metadata{deadline};
+                auto toAbsolute = [](auto v, auto ma) {
+                    return
+                        Metadata{
+                            v.shiftLanesLeft(ma) |
+                            v.shiftLanesRight(Metadata::NSlots - ma)
+                        };
+                };
                 auto position = index + Metadata{deadline}.lsbIndex();
-                return std::tuple(position, deadline, Metadata(needle));
+                return
+                    std::tuple(
+                        position,
+                        toAbsolute(mdd, misalignment).value(),
+                        toAbsolute(needle, misalignment)
+                    );
             }
             // Skarupke's tail allows us to not have to worry about the end
             // of the metadata
@@ -274,15 +303,13 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     ~RH_Frontend_WithSkarupkeTail() {
-/*
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             size_t destroyedCount = 0;
         #endif
-        for(size_t ndx = SlotCount; ndx--; ) {
+        auto baseIndex = (SWARCount - 1) * MD::NSlots;
+        for(size_t ndx = SWARCount; ndx--; baseIndex -= MD::NSlots) {
             auto PSLs = md_[ndx].PSLs();
             auto occupied = booleans(PSLs);
-            if(!occupied) { continue; }
-            auto baseIndex = ndx * MD::NSlots;
             while(occupied) {
                 auto subIndex = occupied.lsbIndex();
                 auto index = baseIndex + subIndex;
@@ -290,12 +317,12 @@ struct RH_Frontend_WithSkarupkeTail {
                 #if ZOO_CONFIG_DEEP_ASSERTIONS
                     ++destroyedCount;
                 #endif
+                occupied = occupied.clearLSB();
             }
         }
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             assert(destroyedCount == elementCount_);
         #endif
-*/
     }
 
     auto findParameters(const K &k) const noexcept {
@@ -332,16 +359,17 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     auto insert(const K &k, const MV &mv) {
-        auto [hoistedT, homeIndex, kc] = findParameters(k);
+        auto [hoistedT, homeIndexT, kc] = findParameters(k);
         auto hoisted = hoistedT;
+        auto homeIndex = homeIndexT;
         auto thy = const_cast<RH_Frontend_WithSkarupkeTail *>(this);
         Backend be{thy->md_.data()};
         auto [iT, deadlineT, needleT] =
             be.findMisaligned_assumesSkarupkeTail(hoisted, homeIndex, kc);
         auto index = iT;
         auto deadline = deadlineT;
-        auto needle = needleT;
         if(!deadline) { return std::pair{values_.data() + index, false}; }
+        auto needle = needleT;
         return insertionEvictionChain(index, deadline, needle, k, mv);
     }
 
@@ -361,26 +389,35 @@ struct RH_Frontend_WithSkarupkeTail {
         constexpr auto MaxRelocations = 64;
         std::array<std::size_t, MaxRelocations> relocations;
         auto relocationsCount = 0;
-        //auto needlePSLs = needle.PSLs();
+        auto elementToInsert = MD(needle.at(intraIndex));
         for(;;) {
             // Loop invariant:
-            // deadline is true, index, swarIndex, intraIndex is set
+            // deadline, index, swarIndex, intraIndex, elementToInsert correct
             // mdp points to the haystack that gave the deadline
-            // needle is correct
 
-            // Make a backup for making the new needle since we will change
-            // this in the eviction
+            // back this up to pick the element being evicted, if there is one
             auto mdBackup = *mdp;
             auto evictedPSL = mdBackup.PSLs().at(intraIndex);
             if(0 == evictedPSL) { // end of eviction chain!
-                assignMetadataElement(deadline, needle, mdp);
+                assignMetadataElement(
+                    deadline,
+                    elementToInsert.shiftLanesLeft(intraIndex),
+                    mdp
+                );
                 if(0 == relocationsCount) { // direct build of a new value
-                    values_[index].build(std::pair{k, mv});
+                    values_[index].build(std::pair{k, mv}); // inplace?
                     return std::pair{values_.data() + index, true};
                 }
+                // the last element is special because it is a
+                // move-construction, not a move-assignment
+                auto fromIndex = relocations[--relocationsCount];
+                values_[index].build(
+                    std::move(values_[fromIndex].value())
+                );
+                index = fromIndex;
                 // do the pair relocations
                 while(relocationsCount--) {
-                    auto fromIndex = relocations[relocationsCount];
+                    fromIndex = relocations[relocationsCount];
                     values_[index].value() =
                         std::move(values_[fromIndex].value());
                     index = fromIndex;
@@ -389,17 +426,20 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             // evict the "deadline" element:
-            // first, insert the current needle in its place (the needle stole)
-            // make it the new needle.
-            // find the place for it: when Robin Hood breaks again.
+            // first, insert the element in its place (it "stole")
+            // find the place for the evicted: when Robin Hood breaks again.
 
             // for this search, we need to make a search needle with only
             // the PSL being evicted.
 
             // The needle stole the entry: replace it with the needle
-            assignMetadataElement(deadline, needle, mdp);
-            // now the needle will be the old metadata entry
-            needle = mdBackup;
+            assignMetadataElement(
+                deadline,
+                elementToInsert.shiftLanesLeft(intraIndex),
+                mdp
+            );
+            // now the insertion will be for the old metadata entry
+            elementToInsert = MD(mdBackup.hashes().at(intraIndex));
             // "push" the index of the element that will be evicted
             relocations[relocationsCount++] = index;
 
@@ -439,7 +479,7 @@ struct RH_Frontend_WithSkarupkeTail {
             // haystack < needle => !(haystack >= needle)
             auto breaksRobinHood =
                 not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
-            if(!breaksRobinHood) {
+            if(!bool(breaksRobinHood)) {
                 // no place for the evicted element found in this swar.
                 // increment the PSLs in the needle to check the next haystack
 
@@ -476,8 +516,10 @@ struct RH_Frontend_WithSkarupkeTail {
                     needlePSLs = needlePSLs + BroadcastSWAR_ElementCount;
                 }
             }
-            deadline = isolateLSB(breaksRobinHood);
+            deadline = swar::isolateLSB(breaksRobinHood.value());
             intraIndex = breaksRobinHood.lsbIndex();
+            index = swarIndex * MD::NSlots + intraIndex;
+            elementToInsert = elementToInsert | MD(needlePSLs.at(intraIndex));
         }
     }
 
