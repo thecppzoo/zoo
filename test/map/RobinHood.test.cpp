@@ -81,7 +81,7 @@ auto validateInsertion(
 
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     using SMap =
-        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 1024, 5, 3>;
+        zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 256, 5, 3>;
     std::string HenryVChorus =
         "O for a Muse of fire, that would ascend\n"
         "The brightest heaven of invention,\n"
@@ -123,7 +123,6 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         HenryVChorus.begin(), [](char c) { return std::tolower(c); }
     );
 
-
     SMap ex;
     using MD = SMap::MD;
     std::map<std::string, int> mirror;
@@ -137,6 +136,9 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
         WARN(word);
+        if("confined" == word) {
+            WARN(mirror.size());
+        }
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
         if(resultEndInMirror != resultEndInExample) {
@@ -160,16 +162,14 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             ++mirror[word];
             ++findResult->value().second;
             REQUIRE(mirror[word] == findResult->value().second);
+            WARN(word << ' ' << mirror[word]);
         }
         ++wordIterator;
     }
+    WARN(mirror.size());
 }
 
-
 using RH35u32 = zoo::rh::RH_Backend<3, 5, u32>;
-//makeNeedle
-//template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
-
 
 TEST_CASE("RobinHood basic needle", "[api][mapping][swar][robin-hood]") {
 
