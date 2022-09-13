@@ -8,6 +8,10 @@
 #include <regex>
 #include <map>
 
+using namespace zoo;
+using namespace zoo::swar;
+using namespace zoo::rh;
+
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
