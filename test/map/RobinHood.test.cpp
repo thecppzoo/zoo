@@ -136,6 +136,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     std::sregex_iterator
         wordsEnd{},
         wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
+    /*
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
         WARN(word);
@@ -173,7 +174,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         }
         ++wordIterator;
     }
-    WARN(mirror.size());
+    */
 }
 
 using FrontendSmall32 =
