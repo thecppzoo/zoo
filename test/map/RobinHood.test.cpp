@@ -142,6 +142,12 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         WARN(word);
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
+<<<<<<< HEAD
+=======
+        if("accomplishment" == word) {
+            WARN(mirror.size());
+        }
+>>>>>>> bcd6838 (Milestone: insertion passes tests)
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
         if(resultEndInMirror != resultEndInExample) {
