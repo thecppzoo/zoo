@@ -397,7 +397,6 @@ struct RH_Frontend_WithSkarupkeTail {
                 index = fromIndex;
                 swarIndex = index / MD::NSlots;
                 intraIndex = index % MD::NSlots;
-
                 // do the pair relocations
                 while(relocationsCount--) {
                     fromIndex = relocations[relocationsCount];
