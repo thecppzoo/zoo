@@ -303,15 +303,13 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     ~RH_Frontend_WithSkarupkeTail() {
-/*
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             size_t destroyedCount = 0;
         #endif
-        for(size_t ndx = SWARCount; ndx--; ) {
+        auto baseIndex = (SWARCount - 1) * MD::NSlots;
+        for(size_t ndx = SWARCount; ndx--; baseIndex -= MD::NSlots) {
             auto PSLs = md_[ndx].PSLs();
             auto occupied = booleans(PSLs);
-            if(!occupied) { continue; }
-            auto baseIndex = ndx * MD::NSlots;
             while(occupied) {
                 auto subIndex = occupied.lsbIndex();
                 auto index = baseIndex + subIndex;
@@ -319,12 +317,12 @@ struct RH_Frontend_WithSkarupkeTail {
                 #if ZOO_CONFIG_DEEP_ASSERTIONS
                     ++destroyedCount;
                 #endif
+                occupied = occupied.clearLSB();
             }
         }
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             assert(destroyedCount == elementCount_);
         #endif
-*/
     }
 
     auto findParameters(const K &k) const noexcept {
