@@ -345,13 +345,6 @@ struct RH_Frontend_WithSkarupkeTail {
         // sure the table has not been exhausted is an eviction chain that
         // ends in the sentinel
         // Also, the encoding for the PSL may be exhausted
-
-        /*auto PSLexceeded = false;
-        impl::ScopeGuard PSLexceededGuard{
-            [&]() {
-                if(!PSLexceeded) { return; }
-                throw MaximumProbeSequenceLengthExceeded("Max PSL used");
-        }};*/
         for(;;) {
             // Loop invariant:
             // deadline, index, swarIndex, intraIndex, elementToInsert correct
