@@ -122,7 +122,7 @@ struct SWAR {
 // abstraction here.
 
 template<int NBitsLeast_, int NBitsMost_, typename T = uint64_t>
-struct SWARWithSubLanes: SWAR<NBitsMost_ + NBitsLeast_, T> {
+struct SWARWithSubLanes: SWAR<NBitsLeast_ + NBitsMost_ , T> {
     static constexpr inline auto NBitsLeast = NBitsLeast_;
     static constexpr inline auto NBitsMost = NBitsMost_;
 

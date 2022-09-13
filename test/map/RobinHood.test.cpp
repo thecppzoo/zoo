@@ -189,6 +189,50 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     WARN(mirror.size());
 }
 
+#if 0
+using FrontendSmall32 =
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 3,
+        std::hash<int>, std::equal_to<int>, u32>;
+
+TEST_CASE("Robin Hood Metadata peek/poke u32",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32::MetadataCollection md;
+    md.fill(FrontendSmall32::MD{0});  // Zero for testing.
+    for (auto i = 0; i < md.size(); i++) {
+        auto [psl1, hash1] = zoo::rh::impl::peek(md, i);
+        CHECK(0 == psl1);
+        CHECK(0 == hash1);
+    }
+    for (auto i = 0; i < md.size(); i++) {
+        zoo::rh::impl::poke(md, i, 16+1, 4+1);
+        auto [psl2, hash2] = zoo::rh::impl::peek(md, i);
+        CHECK(17 == psl2);
+        CHECK(5 == hash2);
+    }
+}
+
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32 table;
+    zoo::rh::impl::poke(table.md_, 1, 0x1, 0x7);
+    CHECK(std::tuple{1,0x7} == zoo::rh::impl::peek(table.md_, 1));
+    CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
+    CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 2));
+
+    // If we ask for a skarupke tail 
+    FrontendSmall32::Backend be{table.md_.data()};
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x7, 1, [](int i) {return true;});
+    CHECK(1 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    //U hoistedHash, int homeIndex, const KeyComparer &kc
+    //return std::tuple(position, deadline, Metadata(needle));
+
+
+}
+#endif
+
 using RH35u32 = zoo::rh::RH_Backend<3, 5, u32>;
 
 TEST_CASE("RobinHood basic needle", "[api][mapping][swar][robin-hood]") {
@@ -227,7 +271,6 @@ TEST_CASE("RobinHood potentialMatches", "[api][mapping][swar][robin-hood]") {
     CHECK(0x80'00'00'00 == m3.deadline);
 }
 
-
 TEST_CASE(
     "BadMix",
     "[hash]"
@@ -265,3 +308,4 @@ TEST_CASE(
     CHECK(0x0000'8001u == SO35u32Ops::attemptMatch(m.data_, SM{hash1}, SM{psl1}).value());
     } 
 }
+

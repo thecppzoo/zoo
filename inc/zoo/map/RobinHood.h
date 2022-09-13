@@ -290,7 +290,8 @@ struct RH_Frontend_WithSkarupkeTail {
     ;
     constexpr static inline auto SlotCount = SWARCount * MD::NSlots;
 
-    std::array<MD, SWARCount> md_;
+    using MetadataCollection = std::array<MD, SWARCount>;
+    MetadataCollection md_;
     using value_type = std::pair<K, MV>;
 
     /// \todo Scatter key and value in a flavor
@@ -302,6 +303,7 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     ~RH_Frontend_WithSkarupkeTail() {
+/*
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             size_t destroyedCount = 0;
         #endif
@@ -322,6 +324,7 @@ struct RH_Frontend_WithSkarupkeTail {
         #if ZOO_CONFIG_DEEP_ASSERTIONS
             assert(destroyedCount == elementCount_);
         #endif
+*/
     }
 
     auto findParameters(const K &k) const noexcept {
