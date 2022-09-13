@@ -70,6 +70,7 @@ std::ostream &operator<<(std::ostream &out, V v) {
     printHalf(0, 4);
     ptr += sprintf(ptr, "'");
     printHalf(4, 8);
+    out << buffer;
     return out;
 }
 

@@ -424,7 +424,6 @@ struct RH_Frontend_WithSkarupkeTail {
             // for this search, we need to make a search needle with only
             // the PSL being evicted.
 
-
             // "push" the index of the element that will be evicted
             relocations[relocationsCount] = index;
             newElements[relocationsCount++] = elementToInsert;
