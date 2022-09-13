@@ -149,9 +149,9 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
 
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
+        WARN(word);
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
-        WARN(word);
         if("accomplishment" == word) {
             WARN(mirror.size());
         }

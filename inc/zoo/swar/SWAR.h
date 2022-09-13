@@ -295,6 +295,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
         return BooleanSWAR(MaskLaneMSB ^ *this);
     }
 
+    explicit
     constexpr operator bool() const noexcept { return this->m_v; }
  private:
     constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept:

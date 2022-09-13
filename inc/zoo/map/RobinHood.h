@@ -441,7 +441,7 @@ struct RH_Frontend_WithSkarupkeTail {
                 mdp
             );
             // now the insertion will be for the old metadata entry
-            elementToInsert = MD(mdBackup.shiftLanesRight(intraIndex));
+            elementToInsert = MD(mdBackup.hashes().at(intraIndex));
             // "push" the index of the element that will be evicted
             relocations[relocationsCount++] = index;
 
@@ -518,8 +518,10 @@ struct RH_Frontend_WithSkarupkeTail {
                     needlePSLs = needlePSLs + BroadcastSWAR_ElementCount;
                 }
             }
-            deadline = isolateLSB(breaksRobinHood);
+            deadline = swar::isolateLSB(breaksRobinHood.value());
             intraIndex = breaksRobinHood.lsbIndex();
+            index = swarIndex * MD::NSlots + intraIndex;
+            elementToInsert = elementToInsert | MD(needlePSLs.at(intraIndex));
         }
     }
 
