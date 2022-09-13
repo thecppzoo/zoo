@@ -17,22 +17,7 @@
 #endif
 
 namespace zoo {
-
 namespace rh {
-
-namespace impl {
-
-template<typename Callable>
-struct ScopeGuard {
-    Callable c_;
-
-    ScopeGuard(Callable &&c): c_(std::move(c)) {}
-    ~ScopeGuard() noexcept(false) {
-        c_();
-    }
-};
-
-}
 
 struct RobinHoodException: std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -518,16 +503,6 @@ struct RH_Frontend_WithSkarupkeTail {
             elementToInsert = elementToInsert | needlePSLs.at(intraIndex);
         }
     }
-
-    /*static void
-    assignMetadataElement(U deadline, MD needle, MD *haystack) noexcept {
-        auto deadlineAsElementWithValue1 = deadline >> (MD::NBits - 1);
-        auto deadlineElementLowBitsOn = deadline - deadlineAsElementWithValue1;
-        auto deadlineElementBlitMask = MD(deadline | deadlineElementLowBitsOn);
-        *haystack =
-            (*haystack & ~deadlineElementBlitMask) |
-            (needle & deadlineElementBlitMask);
-    }*/
 
     auto end() const noexcept { return this->values_.end(); }
 };
