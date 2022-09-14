@@ -130,7 +130,8 @@ struct RH_Backend {
         auto needle = makeNeedle(0, hoistedHash);
 
         for(;;) {
-            auto result = potentialMatches(needle, *p);
+            auto hay = *p;
+            auto result = potentialMatches(needle, hay);
             auto positives = result.potentialMatches;
             while(positives.value()) {
                 auto matchSubIndex = positives.lsbIndex();
@@ -366,12 +367,16 @@ struct RH_Frontend_WithSkarupkeTail {
                 }
                 // the last element is special because it is a
                 // move-construction, not a move-assignment
-                auto fromIndex = relocations[--relocationsCount];
+                --relocationsCount;
+                auto fromIndex = relocations[relocationsCount];
                 values_[index].build(
                     std::move(values_[fromIndex].value())
                 );
-                auto mde = newElements[relocationsCount];
-                md_[index] = md_[index].blitElement(intraIndex, mde);
+                md_[swarIndex] =
+                    md_[swarIndex].blitElement(
+                        intraIndex, elementToInsert
+                    );
+                elementToInsert = newElements[relocationsCount];
                 index = fromIndex;
                 swarIndex = index / MD::NSlots;
                 intraIndex = index % MD::NSlots;
@@ -380,15 +385,15 @@ struct RH_Frontend_WithSkarupkeTail {
                     fromIndex = relocations[relocationsCount];
                     values_[index].value() =
                         std::move(values_[fromIndex].value());
-                    mde = newElements[relocationsCount];
-                    md_[index] = md_[index].blitElement(intraIndex, mde);
+                    md_[swarIndex] = md_[swarIndex].blitElement(intraIndex, elementToInsert);
+                    elementToInsert = newElements[relocationsCount];
                     index = fromIndex;
                     swarIndex = index / MD::NSlots;
                     intraIndex = index % MD::NSlots;
                 }
                 values_[index].value() = std::pair(k, mv);
                 md_[swarIndex] =
-                    md_[swarIndex].blitElement(intraIndex, mde);
+                    md_[swarIndex].blitElement(intraIndex, elementToInsert);
                 return std::pair{values_.data() + index, true};
             }
             if(HighestSafePSL < evictedPSL) {
@@ -404,6 +409,7 @@ struct RH_Frontend_WithSkarupkeTail {
 
             // "push" the index of the element that will be evicted
             relocations[relocationsCount] = index;
+            // we have a place for the element being inserted, at this index
             newElements[relocationsCount++] = elementToInsert;
             if(MaxRelocations <= relocationsCount) {
                 throw RelocationStackExhausted("");
@@ -455,23 +461,25 @@ struct RH_Frontend_WithSkarupkeTail {
 
                 // for the next swar, we will want (continuing the assumption
                 // of the deadline happening at index 2)
+                // old needle:
+                // |    0   |    0   |  ePSL  | ePSL+1 | ... | ePSL+5  |
+                // desired new needle PSLs:
                 // | ePSL+6 | ePSL+7 | ePSL+8 | ePSL+9 | ... | ePSL+13 |
                 // from evictedPSLWithProgressionFromZero,
                 // shift "right" NLanes - intraIndex (keep the last two lanes):
                 // | ePSL+6 | ePSL+7 | 0 | ... | 0 |
                 auto lowerPart =
                     evictedPSLWithProgressionFromZero.
-                        shiftLanesRight(MD::Lanes - intraIndex);
-                // the other part, of +8 onwards, is
-                // ProgressionFromZero + BroadcastElementCount, shifted:
-                //    | 0 | 1 | 2 | 3 | ...       | 7 |
-                // +  | 8 | 8 | 8 | 8 | ...       | 8 |
-                // == | 8 | 9 | ...               | 15 |
+                        shiftLanesRight(MD::Lanes - intraIndex - 1).
+                        shiftLanesRight(1);
+                // the other part, of +8 onwards, is BroadcastElementCount,
+                // shifted:
+                //    | 8 | 8 | 8 | 8 | ...       | 8 |
                 // shifted two lanes:
-                //    | 0 | 0 | 8 | 9 | ...       | 13 |
+                //    | 0 | 0 | 8 | 8 | ...       | 8 |
+                //
                 auto topAdd =
-                    (ProgressionFromZero + BroadcastSWAR_ElementCount).
-                        shiftLanesLeft(intraIndex);
+                    BroadcastSWAR_ElementCount.shiftLanesLeft(intraIndex);
                 needlePSLs = needlePSLs + lowerPart + topAdd;
                 for(;;) { // hunt for the next deadline
                     ++swarIndex;

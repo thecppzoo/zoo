@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <regex>
 #include <map>
+#include <sstream>
 
 using namespace zoo;
 using namespace zoo::swar;
@@ -80,10 +81,75 @@ auto showMetadata(std::size_t index, MD *md) {
     return V{md[swarIndex].value(), index % MD::NSlots};
 }
 
+#define ZOO_TEST_TRACE_WARN(...)
+//WARN(__VA_ARGS__)
+
 using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 256, 5, 3>;
 
 auto valueInvoker(void *p, std::size_t index) {
     return static_cast<SMap *>(p)->values_[index].value();
+}
+
+auto validateMetadata(SMap &map) {
+    auto prior = 0;
+    auto ndx = 0;
+    for(auto md: map.md_) {
+        auto v = md.PSLs();
+        assert(0 == ndx % SMap::MD::NSlots);
+        for(auto n = SMap::MD::NSlots; n--; ++ndx) {
+            auto current = v.at(0);
+            if(prior + 1 < current) {
+                auto d = map.md_.data();
+                ZOO_TEST_TRACE_WARN("broken " << showMetadata(ndx - SMap::MD::NSlots, d));
+                ZOO_TEST_TRACE_WARN("broken " << showMetadata(ndx, d) << ' ' << ndx << ' ' << map.values_[ndx].value().first);
+                ZOO_TEST_TRACE_WARN("broken " << showMetadata(ndx + SMap::MD::NSlots, d));
+                return std::tuple(false, ndx); }
+            v = v.shiftLanesRight(1);
+            prior = current;
+        }
+    }
+    return std::tuple(true, 0);
+}
+
+template<typename Table>
+auto display(const Table &t, std::size_t begin, std::size_t end) {
+    std::ostringstream out;
+
+    using MD = typename Table::MD;
+    //auto mdp = t.md_.data();
+    auto swarNdx = begin / MD::NSlots;
+    auto intraNdx = begin % MD::NSlots;
+    auto initial = t.md_[swarNdx];
+    initial = initial.shiftLanesRight(intraNdx);
+    char buffer[30];
+    auto printLine =
+        [&]() {
+            char buffer[4];
+            sprintf(buffer, "%02llx", initial.at(0));
+            out << buffer;
+            if(initial.PSLs().at(0)) {
+                auto &v = t.values_[begin].value();
+                out << ' ' << v.first << ':' << v.second;
+            }
+            out << '\n';
+            initial = initial.shiftLanesRight(1);
+            ++begin;
+        };
+    switch(intraNdx) {
+        do {
+            case 0: printLine();
+            case 1: printLine();
+            case 2: printLine();
+            case 3: printLine();
+            case 4: printLine();
+            case 5: printLine();
+            case 6: printLine();
+            case 7: printLine();
+            out << "- " << begin << '\n';
+            initial = t.md_[++swarNdx];
+        } while(begin < end);
+    }
+    return out.str();
 }
 
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
@@ -136,22 +202,23 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     std::sregex_iterator
         wordsEnd{},
         wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
-    /*
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
-        WARN(word);
+        ZOO_TEST_TRACE_WARN(word);
+        if("gently" == word) {
+            auto [hoisted, homeIndex, dontcare] = ex.findParameters("gently");
+            ZOO_TEST_TRACE_WARN(
+                "gently " << homeIndex << ':' << hoisted << '\n' <<
+                display(ex, homeIndex - 3, homeIndex + 20)
+            );
+            ;
+        }
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
-<<<<<<< HEAD
-=======
-        if("accomplishment" == word) {
-            WARN(mirror.size());
-        }
->>>>>>> bcd6838 (Milestone: insertion passes tests)
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
         if(resultEndInMirror != resultEndInExample) {
-            WARN(resultEndInMirror);
+            ZOO_TEST_TRACE_WARN(resultEndInMirror);
             auto r = ex.find(word);
         }
         REQUIRE(resultEndInMirror == resultEndInExample);
@@ -159,7 +226,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             auto [hh, indexHome, dc] = ex.findParameters(word);
             auto index = (iter - ex.values_.begin());
             auto swarIndex = index / MD::NSlots;
-            WARN(
+            ZOO_TEST_TRACE_WARN(
                 index << ':' << swarIndex << ':' <<
                 (index % MD::NSlots) << ' ' <<
                 showMetadata(index, ex.md_.data()) <<
@@ -176,11 +243,22 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             ++findResult->value().second;
             REQUIRE(mirror[word] == findResult->value().second);
             showRecord(findResult);
-            WARN(word << ' ' << mirror[word]);
+            ZOO_TEST_TRACE_WARN(word << ' ' << mirror[word]);
+        }
+         if("patience" == word) {
+            auto fr = ex.find("to");
+            REQUIRE(ex.end() != fr);
+            ZOO_TEST_TRACE_WARN("to!");
+        }
+        auto [ok, failureNdx] = validateMetadata(ex);
+        CHECK(ok);
+        if(!ok) {
+            auto ms = mirror.size();
+            ZOO_TEST_TRACE_WARN("At " << ms << ' ' << failureNdx);
+            ZOO_TEST_TRACE_WARN(word << '\n' << display(ex, failureNdx - 2, failureNdx + 14));
         }
         ++wordIterator;
     }
-    */
 }
 
 using FrontendSmall32 =
