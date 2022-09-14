@@ -215,7 +215,7 @@ struct KeyValuePairWrapper {
 template<
     typename K,
     typename MV,
-    size_t RequestedSize,
+    size_t RequestedSize_,
     int PSL_Bits, int HashBits,
     typename Hash = std::hash<K>,
     typename KE = std::equal_to<K>,
@@ -225,9 +225,11 @@ struct RH_Frontend_WithSkarupkeTail {
     using Backend = RH_Backend<PSL_Bits, HashBits, U>;
     using MD = typename Backend::Metadata;
 
+    constexpr static inline auto RequestedSize = RequestedSize_;
+    constexpr static inline auto LongestEncodablePSL = (1 << PSL_Bits);
     constexpr static inline auto WithTail =
         RequestedSize +
-        (1 << PSL_Bits) // the Skarupke tail
+        LongestEncodablePSL // the Skarupke tail
     ;
     constexpr static inline auto SWARCount =
         (
@@ -237,7 +239,7 @@ struct RH_Frontend_WithSkarupkeTail {
     ;
     constexpr static inline auto SlotCount = SWARCount * MD::NSlots;
     constexpr static inline auto HighestSafePSL =
-        (1 << PSL_Bits) - MD::NSlots - 1;
+        LongestEncodablePSL - MD::NSlots - 1;
 
     using MetadataCollection = std::array<MD, SWARCount>;
     using value_type = std::pair<K, MV>;
@@ -319,7 +321,9 @@ struct RH_Frontend_WithSkarupkeTail {
         auto deadline = deadlineT;
         if(!deadline) { return std::pair{values_.data() + index, false}; }
         auto needle = needleT;
-        return insertionEvictionChain(index, deadline, needle, k, mv);
+        auto rv = insertionEvictionChain(index, deadline, needle, k, mv);
+        ++elementCount_;
+        return rv;
     }
 
     // Do the chain of relocations
@@ -385,7 +389,8 @@ struct RH_Frontend_WithSkarupkeTail {
                     fromIndex = relocations[relocationsCount];
                     values_[index].value() =
                         std::move(values_[fromIndex].value());
-                    md_[swarIndex] = md_[swarIndex].blitElement(intraIndex, elementToInsert);
+                    md_[swarIndex] =
+                        md_[swarIndex].blitElement(intraIndex, elementToInsert);
                     elementToInsert = newElements[relocationsCount];
                     index = fromIndex;
                     swarIndex = index / MD::NSlots;
@@ -417,7 +422,6 @@ struct RH_Frontend_WithSkarupkeTail {
 
             // now the insertion will be for the old metadata entry
             elementToInsert = md.hashes().at(intraIndex);
-            
 
             // now, where should the evicted element go to?
             // assemble a new needle
