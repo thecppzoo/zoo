@@ -272,7 +272,10 @@ template<
     int PSL_Bits, int HashBits,
     typename Hash = std::hash<K>,
     typename KE = std::equal_to<K>,
-    typename U = std::uint64_t
+    typename U = std::uint64_t,
+    typename Scatter = FibonacciScatter<U>,
+    typename RangeReduce = LemireReduce<RequestedSize, U>,
+    typename HashReduce = TopHashReducer<HashBits, U>
 >
 struct RH_Frontend_WithSkarupkeTail {
     using Backend = RH_Backend<PSL_Bits, HashBits, U>;
@@ -327,14 +330,10 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     auto findParameters(const K &k) const noexcept {
-        auto hashCode = Hash{}(k);
-        auto fibonacciScrambled = fibonacciIndexModulo(hashCode);
-        auto homeIndex =
-            lemireModuloReductionAlternative<RequestedSize>(fibonacciScrambled);
-        #if ZOO_CONFIG_DEEP_ASSERTIONS
-            assert(homeIndex < RequestedSize);
-        #endif
-        auto hoisted = hashReducer<HashBits>(hashCode);
+        auto [hoisted, homeIndex] =
+            findBasicParameters 
+                <K, RequestedSize, HashBits, U,
+                Hash, Scatter, RangeReduce, HashReduce >(k);
         return
             std::tuple{
                 hoisted,

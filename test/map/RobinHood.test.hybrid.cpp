@@ -26,12 +26,12 @@ bool intCheck(int n, int h) { return n == h; }
 using Robin =
     zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 3,
         std::hash<int>, std::equal_to<int>, u32>;
-using Straw = StrawmanMap<5, 3, u32>;
+using Straw = StrawmanMap<5, 3, u32, 16>;
 
 TEST_CASE("Robin Hood Metadata straw hybrid",
           "[api][mapping][swar][robin-hood]") {
     Robin rh;
-    Straw straw(16);
+    Straw straw;
 
     CHECK(straw.insert(5, &intCheck).first == 1);
     CHECK(straw.insert(7, &intCheck).first == 2);

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 
 namespace zoo {
 
@@ -51,7 +52,6 @@ struct MisalignedGenerator_Dynamic {
         base_(base),
         misalignmentFirst(ma), misalignmentSecondLessOne(Width - ma - 1)
     {}
-    
 
     constexpr T operator*() noexcept {
         auto firstPart = base_[0];
@@ -139,6 +139,7 @@ template<typename Key, typename T = u64> T fibhash(Key k) noexcept {
     return k * GoldenConstant;
 }
 
+
 template<size_t Size, typename T>
 constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     static_assert(sizeof(T) == sizeof(uint64_t));
@@ -147,13 +148,80 @@ constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     return Size * halved >> 32;
 }
 
+// Scatters a range onto itself
+template<typename T>
+struct FibonacciScatter {
+    constexpr auto operator()(T index) noexcept {
+      return fibonacciIndexModulo(index);
+    }
+};
+
+// Reduces an int onto a range via Lemire reduction.
+template<size_t Size, typename T>
+struct LemireReduce {
+    constexpr auto operator()(T input) noexcept {
+      return lemireModuloReductionAlternative<Size, T>(input);
+    }
+};
+
+// Reduces an input value of U to NBits width, via ones multiply and top bits.
+template<int NBits, typename U>
+struct TopHashReducer {
+    constexpr auto operator()(U n) noexcept {
+        return hashReducer<NBits>(n);
+    }
+};
+
+// Hash that is always 1.
+template<typename T>
+struct UnitaryHash {
+    constexpr auto operator()(const T& v) noexcept { return 1; }
+};
+
+// Scatters a range to always be 1
+template<typename T>
+struct UnitaryScatter {
+    constexpr auto operator()(T index) noexcept { return 1; }
+};
+
+// Reduces an int onto a range but that range is always 1.
+template<typename T>
+struct UnitaryReduce {
+    constexpr auto operator()(T input) noexcept { return 1; }
+};
+
+// Reduces an input value of U to NBits width, but that value is always 1.
+template<typename U>
+struct UnitaryReducer {
+    constexpr auto operator()(U n) noexcept { return 1; }
+};
+
+/// Given a key and sufficient templates specifying its transformation process,
+/// return hoisted hash bits and home index in table.
+template<
+    typename K,
+    size_t RequestedSize,
+    int HashBits,
+    typename U = std::uint64_t,
+    typename Hash = std::hash<K>,
+    typename Scatter = FibonacciScatter<U>,
+    typename RangeReduce = LemireReduce<RequestedSize, U>,
+    typename HashReduce = TopHashReducer<HashBits, U> >
+static constexpr auto findBasicParameters(const K&k) noexcept {
+    auto hashCode = Hash{}(k);
+    auto scattered = Scatter{}(hashCode);
+    auto homeIndex = RangeReduce{}(scattered);
+    auto hoisted = HashReduce{}(hashCode);
+    return std::tuple{hoisted, homeIndex};
+}
+
 template<int NBits>
 constexpr auto cheapOkHash(u64 n) noexcept {
     constexpr auto shift = (NBits * ((64 / NBits)-1));
     constexpr u64 allOnes = meta::BitmaskMaker<u64, 1, NBits>::value;
     auto temporary = allOnes * n;
     auto higestNBits = temporary >> shift;
-    return (0 == (64 % NBits)) ? 
+    return (0 == (64 % NBits)) ?
         higestNBits : swar::isolate<NBits, u64>(higestNBits);
 }
 
@@ -163,7 +231,7 @@ template<int NBits> auto badMixer(u64 h) noexcept {
     constexpr u64 allOnes = ~0ull;
     constexpr u64 mostSigNBits = swar::mostNBitsMask<NBits, u64>();
     auto tmp = h * allOnes;
-    
+
     auto mostSigBits = tmp & mostSigNBits;
     return mostSigBits >> (64 - NBits);
 }
@@ -171,7 +239,7 @@ template<int NBits> auto badMixer(u64 h) noexcept {
 /// Evenly map a large int to an int without division or modulo.
 template<int SizeTable, typename T>
 constexpr int mapToSlotLemireReduction(T halved) {
-    return (halved * T(SizeTable)) >> (sizeof(T)/2); 
+    return (halved * T(SizeTable)) >> (sizeof(T)/2);
 }
 
 namespace impl {

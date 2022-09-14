@@ -9,16 +9,6 @@ namespace zoo {
 
 namespace rh {
 
-template<typename Key>
-auto reducedhashUnitary(Key k) noexcept {
-    return 1;
-}
-
-template<typename Key>
-auto slotFromKeyUnitary(Key k) noexcept {
-    return 1;
-}
-
 
 // The naive method of keeping metadata.
 // TODO(sbruce) actually have correct widths of psl/hash for direct comparison
@@ -33,18 +23,27 @@ struct StrawMetadata {
     auto Hash(u32 pos) const { return hashes_[pos]; }
 };
 
-template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
-  template <typename KeyCheck>
-  bool exists(Key k, KeyCheck kc) {
-    return findSlot(k, kc).second;
-  }
+template<u8 PSLBits, u8 HashBits, typename Key,
+    size_t RequestedSize,
+    typename Hash = UnitaryHash<u64>,
+    typename Scatter = UnitaryScatter<u64>,
+    typename RangeReduce = UnitaryReduce<u64>,
+    typename HashReduce = UnitaryReducer<u64>
+>
+struct StrawmanMap {
+    template <typename KeyCheck>
+    bool exists(Key k, KeyCheck kc) {
+        return findSlot(k, kc).second;
+    }
 
-  // Slot that key exists in or should exist in, true means found, false not
-  // found.
-  template <typename KeyCheck>
-  std::pair<int, bool> findSlot(Key k, KeyCheck kc) {
-      u32 hashbits = reducedhashUnitary(k);
-      u32 slot = slotFromKeyUnitary<u32>(k);
+    // Slot that key exists in or should exist in, true means found, false not
+    // found.
+    template <typename KeyCheck>
+    std::pair<int, bool> findSlot(Key k, KeyCheck kc) {
+      auto [hashbits, slot] = findBasicParameters
+        <u64, RequestedSize, HashBits, u64,
+         Hash, Scatter, RangeReduce, HashReduce>(k);
+
       auto psl = 0;
       while (true) {
         ++psl;  // bias psl by one, convenient to do it here
@@ -68,8 +67,9 @@ template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
 
     template <typename KeyCheck> 
     std::pair<int, bool> insert(Key k, KeyCheck kc) {
-        u32 hashbits = reducedhashUnitary(k);
-        u32 slot = slotFromKeyUnitary<u32>(k);
+      auto [hashbits, slot] = findBasicParameters
+        <u64, RequestedSize, HashBits, u64,
+         Hash, Scatter, RangeReduce, HashReduce>(k);
         auto slotFind = findSlot(k, kc);
         if (slotFind.second) {
             return {slotFind.first, false};  // already in
@@ -103,7 +103,7 @@ template<u8 PSLBits, u8 HashBits, typename Key> struct StrawmanMap {
         }
     }
 
-    StrawmanMap(std::size_t sz) : sz_(sz), md_(sz), keys_(sz) {}
+    StrawmanMap() : sz_(RequestedSize), md_(RequestedSize), keys_(RequestedSize) {}
 
     std::size_t sz_;
     StrawMetadata md_;

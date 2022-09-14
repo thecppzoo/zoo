@@ -31,11 +31,11 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "StrawhoodBasic",
+    "Strawhood basic",
     "[robinhood]"
 ) {
     u32 sz = 9;
-    StrawmanMap<7, 9, u64> rhmap(sz);
+    StrawmanMap<7, 9, u64, 9> rhmap;
 
     CHECK(rhmap.keys_.size() == sz);
     CHECK(rhmap.md_.psls_.size() == sz);
@@ -54,5 +54,37 @@ TEST_CASE(
     CHECK(rhmap.exists(9, &keyCheck) == true);
     CHECK(rhmap.exists(11, &keyCheck) == true);
     CHECK(rhmap.insert(11, &keyCheck).first == 4);
+    CHECK(rhmap.exists(11, &keyCheck) == true);
+}
+
+TEST_CASE(
+    "Strawhood real hashes ",
+    "[robinhood]"
+) {
+    static constexpr auto sz = 9;
+    static constexpr auto hbits = 9;
+    StrawmanMap<7, hbits, u64, sz, std::hash<u64>,
+        FibonacciScatter<u64>,
+        LemireReduce<sz, u64>,
+        TopHashReducer<hbits, u64>
+    > rhmap;
+
+    CHECK(rhmap.keys_.size() == sz);
+    CHECK(rhmap.md_.psls_.size() == sz);
+    CHECK(rhmap.md_.hashes_.size() == sz);
+    CHECK(rhmap.insert(5, &keyCheck).second);
+    CHECK(rhmap.exists(5, &keyCheck) == true);
+    CHECK(!rhmap.insert(5, &keyCheck).second);
+    CHECK(rhmap.exists(5, &keyCheck) == true);
+    CHECK(rhmap.insert(7, &keyCheck).second);
+    CHECK(rhmap.exists(7, &keyCheck) == true);
+    CHECK(rhmap.insert(9, &keyCheck).second);
+    CHECK(rhmap.exists(9, &keyCheck) == true);
+    CHECK(rhmap.insert(11, &keyCheck).second);
+    CHECK(rhmap.exists(5, &keyCheck) == true);
+    CHECK(rhmap.exists(7, &keyCheck) == true);
+    CHECK(rhmap.exists(9, &keyCheck) == true);
+    CHECK(rhmap.exists(11, &keyCheck) == true);
+    CHECK(!rhmap.insert(11, &keyCheck).second);
     CHECK(rhmap.exists(11, &keyCheck) == true);
 }
