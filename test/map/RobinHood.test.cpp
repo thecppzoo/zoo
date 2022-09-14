@@ -230,6 +230,16 @@ void writeFourBlock(int offset, MetadataCollection& md) {
     CHECK(std::tuple{0x1, 0x3} == zoo::rh::impl::peek(md, 3+offset));
 }
 
+template <typename MetadataCollection>
+void writeIncrementPSL(int offset, MetadataCollection& md) {
+    zoo::rh::impl::poke(md, 1+offset, 0x1, 0x7);
+    zoo::rh::impl::poke(md, 2+offset, 0x2, 0x5);
+    zoo::rh::impl::poke(md, 3+offset, 0x3, 0x3);
+    CHECK(std::tuple{0x1, 0x7} == zoo::rh::impl::peek(md, 1+offset));
+    CHECK(std::tuple{0x2, 0x5} == zoo::rh::impl::peek(md, 2+offset));
+    CHECK(std::tuple{0x3, 0x3} == zoo::rh::impl::peek(md, 3+offset));
+}
+
 TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata block of three",
           "[api][mapping][swar][robin-hood]") {
     FrontendSmall32 table;
@@ -278,7 +288,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata block of three",
     }
 }
 
-TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata ",
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata psl one",
           "[api][mapping][swar][robin-hood]") {
     FrontendSmall32 table;
     writeFourBlock(0, table.md_);
@@ -289,40 +299,24 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata ",
 
     FrontendSmall32::Backend be{table.md_.data()};
     for (auto i = 0 ; i< table.md_.size() ;i++) {
-      auto [p,h] =zoo::rh::impl::peek(table.md_, i);
-      if ( p == 0) continue;
-      // All lookups for entries in the metadata should work correctly.
-      auto [index, deadline, metadata] =
-          be.findMisaligned_assumesSkarupkeTail(h, i, trueKc);
-      CHECK(p == 1);
-      CHECK(i == index);
-      CHECK(0x0000'0000u == deadline);
-      CHECK(0x0000'0000u == metadata.value());
-
-    }
-
-
-    auto kcGen = [](int z) { return [z](int i){ return i == z;};};
-    {
-    auto [index, deadline, metadata] =
-        be.findMisaligned_assumesSkarupkeTail(0x7, 1, trueKc);
-    CHECK(1 == index);
-    CHECK(0x0000'0000u == deadline);
-    CHECK(0x0000'0000u == metadata.value());
-    }
-    {
-    auto [index, deadline, metadata] =
-        be.findMisaligned_assumesSkarupkeTail(0x5, 2, trueKc);
-    CHECK(2 == index);
-    CHECK(0x0000'0000u == deadline);
-    CHECK(0x0000'0000u == metadata.value());
-    }
-    {
-    auto [index, deadline, metadata] =
-        be.findMisaligned_assumesSkarupkeTail(0x3, 3, trueKc);
-    CHECK(3 == index);
-    CHECK(0x0000'0000u == deadline);
-    CHECK(0x0000'0000u == metadata.value());
+        auto [p,h] =zoo::rh::impl::peek(table.md_, i);
+        if ( p == 0) continue;
+        // All lookups for entries in the metadata should work correctly.
+        auto [index, deadline, metadata] =
+            be.findMisaligned_assumesSkarupkeTail(h, i, trueKc);
+        CHECK(p == 1);
+        CHECK(i == index);
+        CHECK(0x0000'0000u == deadline);
+        CHECK(0x0000'0000u == metadata.value());
+        // No entries have a 0 hash, all psl are 1, so all entry points will be
+        // 1 after a valid entry.
+        auto [missIndex, missDeadline, missMetadata] =
+            be.findMisaligned_assumesSkarupkeTail(0, i, trueKc);
+        CHECK(i+1 == missIndex);
+        CHECK((missIndex)%4 ==
+            FrontendSmall32::MD{missDeadline}.lsbIndex());
+        CHECK(0x02 == 
+            missMetadata.at(FrontendSmall32::MD{missDeadline}.lsbIndex()));
     }
     {
     auto [index, deadline, metadata] =
@@ -335,6 +329,38 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata ",
     // deadline.
     CHECK(0x00c2'0000u ==
         metadata.isolateLane(FrontendSmall32::MD{deadline}.lsbIndex()));
+    }
+}
+
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata psl not one",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32 table;
+    writeIncrementPSL(0, table.md_);
+    writeIncrementPSL(5, table.md_);
+    writeIncrementPSL(10, table.md_);
+    writeIncrementPSL(15, table.md_);
+    auto trueKc = [](int z) { return true; };
+
+    FrontendSmall32::Backend be{table.md_.data()};
+    for (auto i = 0 ; i< table.md_.size() ;i++) {
+        auto [p,h] =zoo::rh::impl::peek(table.md_, i);
+        if ( p == 0) continue;
+        // All lookups for entries in the metadata should work correctly.
+        auto [index, deadline, metadata] =
+            be.findMisaligned_assumesSkarupkeTail(h, i-p+1, trueKc);
+        CHECK(i == index);
+        CHECK(0x0000'0000u == deadline);
+        CHECK(0x0000'0000u == metadata.value());
+        // No entries have a 0 hash, metadata has 3 long blocks that have 1,2,3
+        // psl, all missed key lookups will have a 4 psl, so their index will
+        // be at i - psl + 4.
+        auto [missIndex, missDeadline, missMetadata] =
+            be.findMisaligned_assumesSkarupkeTail(0, i-p+1, trueKc);
+        CHECK(i-p+4 == missIndex);
+        CHECK((missIndex)%4 ==
+            FrontendSmall32::MD{missDeadline}.lsbIndex());
+        CHECK(0x04 == 
+            missMetadata.at(FrontendSmall32::MD{missDeadline}.lsbIndex()));
     }
 }
 
