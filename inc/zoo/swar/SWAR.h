@@ -71,6 +71,13 @@ struct SWAR {
     SWAR_BINARY_OPERATORS_X_LIST
     #undef X
 
+    // Returns lane at position with other lanes cleared.
+    constexpr T isolateLane(int position) const noexcept {
+        constexpr auto filter = (T(1) << NBits) - 1;
+        return m_v & (filter << (NBits * position));
+    }
+
+    // Returns lane value at position, in lane 0, rest of SWAR cleared.
     constexpr T at(int position) const noexcept {
         constexpr auto filter = (T(1) << NBits) - 1;
         return filter & (m_v >> (NBits * position));

@@ -23,16 +23,6 @@ using RHC = zoo::rh::RH_Backend<5, 3>;
 int *collectionOfKeys;
 RHC::Metadata *md;
 
-auto blue(int sPSL, int hh, int key, int homeIndex) {
-    RHC fromPointer{md};
-    auto r =
-        fromPointer.findMisaligned_assumesSkarupkeTail(
-            hh,
-            homeIndex,
-            [&](int matchIndex) { return collectionOfKeys[matchIndex] == key; }
-        );
-}
-
 using FrontendExample =
     zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 1024, 5, 3>;
 
@@ -190,7 +180,6 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     WARN(mirror.size());
 }
 
-#if 0
 using FrontendSmall32 =
     zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, 5, 3,
         std::hash<int>, std::equal_to<int>, u32>;
@@ -212,10 +201,11 @@ TEST_CASE("Robin Hood Metadata peek/poke u32",
     }
 }
 
-TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
+
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata basic",
           "[api][mapping][swar][robin-hood]") {
     FrontendSmall32 table;
-    /*
+
     zoo::rh::impl::poke(table.md_, 1, 0x1, 0x7);
     CHECK(std::tuple{1,0x7} == zoo::rh::impl::peek(table.md_, 1));
     CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
@@ -228,23 +218,131 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata",
     CHECK(1 == index);
     CHECK(0x0000'0000u == deadline);
     CHECK(0x0000'0000u == metadata.value());
-    */
-    //U hoistedHash, int homeIndex, const KeyComparer &kc
-    //return std::tuple(position, deadline, Metadata(needle));
-
-
 }
-#endif
+
+template <typename MetadataCollection>
+void writeFourBlock(int offset, MetadataCollection& md) {
+    zoo::rh::impl::poke(md, 1+offset, 0x1, 0x7);
+    zoo::rh::impl::poke(md, 2+offset, 0x1, 0x5);
+    zoo::rh::impl::poke(md, 3+offset, 0x1, 0x3);
+    CHECK(std::tuple{0x1, 0x7} == zoo::rh::impl::peek(md, 1+offset));
+    CHECK(std::tuple{0x1, 0x5} == zoo::rh::impl::peek(md, 2+offset));
+    CHECK(std::tuple{0x1, 0x3} == zoo::rh::impl::peek(md, 3+offset));
+}
+
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata block of three",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32 table;
+    writeFourBlock(0, table.md_);
+    CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
+    CHECK(std::tuple{1,0x7} == zoo::rh::impl::peek(table.md_, 1));
+    CHECK(std::tuple{1,0x5} == zoo::rh::impl::peek(table.md_, 2));
+    CHECK(std::tuple{1,0x3} == zoo::rh::impl::peek(table.md_, 3));
+    CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 4));
+
+    FrontendSmall32::Backend be{table.md_.data()};
+    auto kcGen = [](int z) { return [z](int i){ return i == z;};};
+    auto trueKc = [](int z) { return true; };
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x7, 1, trueKc);
+    CHECK(1 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x5, 2, trueKc);
+    CHECK(2 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x3, 3, trueKc);
+    CHECK(3 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x6, 1, trueKc);
+    // try to find at homeIndex 1, receive idx 2 as insertionIndex, as idx 2
+    // has a psl of 1 and needle has psl of 2 at that point.
+    CHECK(2 == index);
+    CHECK(0x0080'0000u == deadline);
+    // Returned metadata contains one valid lane: the lane at the offset of
+    // deadline.
+    CHECK(0x00c2'0000u ==
+        metadata.isolateLane(FrontendSmall32::MD{deadline}.lsbIndex()));
+    }
+}
+
+TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata ",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32 table;
+    writeFourBlock(0, table.md_);
+    writeFourBlock(5, table.md_);
+    writeFourBlock(10, table.md_);
+    writeFourBlock(15, table.md_);
+    auto trueKc = [](int z) { return true; };
+
+    FrontendSmall32::Backend be{table.md_.data()};
+    for (auto i = 0 ; i< table.md_.size() ;i++) {
+      auto [p,h] =zoo::rh::impl::peek(table.md_, i);
+      if ( p == 0) continue;
+      // All lookups for entries in the metadata should work correctly.
+      auto [index, deadline, metadata] =
+          be.findMisaligned_assumesSkarupkeTail(h, i, trueKc);
+      CHECK(p == 1);
+      CHECK(i == index);
+      CHECK(0x0000'0000u == deadline);
+      CHECK(0x0000'0000u == metadata.value());
+
+    }
+
+
+    auto kcGen = [](int z) { return [z](int i){ return i == z;};};
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x7, 1, trueKc);
+    CHECK(1 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x5, 2, trueKc);
+    CHECK(2 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x3, 3, trueKc);
+    CHECK(3 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x6, 1, trueKc);
+    // try to find at homeIndex 1, receive idx 2 as insertionIndex, as idx 2
+    // has a psl of 1 and needle has psl of 2 at that point.
+    CHECK(2 == index);
+    CHECK(0x0080'0000u == deadline);
+    // Returned metadata contains one valid lane: the lane at the offset of
+    // deadline.
+    CHECK(0x00c2'0000u ==
+        metadata.isolateLane(FrontendSmall32::MD{deadline}.lsbIndex()));
+    }
+}
 
 using RH35u32 = zoo::rh::RH_Backend<3, 5, u32>;
 
-TEST_CASE("RobinHood basic needle", "[api][mapping][swar][robin-hood]") {
-
-CHECK(0x0403'0201u == RH35u32::makeNeedle(0, 0).value());
-CHECK(0x1615'1413u == RH35u32::makeNeedle(2, 2).value());
-CHECK(0x1817'1615u == RH35u32::makeNeedle(4, 2).value());
-
-}
+static_assert(0x0403'0201u == RH35u32::makeNeedle(0, 0).value());
+static_assert(0x1615'1413u == RH35u32::makeNeedle(2, 2).value());
+static_assert(0x1817'1615u == RH35u32::makeNeedle(4, 2).value());
 
 TEST_CASE("RobinHood potentialMatches", "[api][mapping][swar][robin-hood]") {
     //U deadline, Metadata<PSL_Bits, HashBits, U> potentialMatches;

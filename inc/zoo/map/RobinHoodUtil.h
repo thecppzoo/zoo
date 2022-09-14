@@ -38,16 +38,18 @@ struct MisalignedGenerator {
 template<typename T>
 struct MisalignedGenerator<T, 0>: GeneratorFromPointer<T> {};
 
+// This is tightly coupled with a Metadata that happens-to have lane widths of
+// 8.
 template<typename T>
 struct MisalignedGenerator_Dynamic {
     constexpr static auto Width = sizeof(T) * 8;
     T *base_;
 
-    int misalignmentFirst, misalignmentSecond;
+    int misalignmentFirst, misalignmentSecondLessOne;
 
     MisalignedGenerator_Dynamic(T *base, int ma):
         base_(base),
-        misalignmentFirst(ma), misalignmentSecond(Width - ma)
+        misalignmentFirst(ma), misalignmentSecondLessOne(Width - ma - 1)
     {}
     
 
@@ -59,7 +61,8 @@ struct MisalignedGenerator_Dynamic {
             // I'd prefer to not use std::make_unsigned_t, since how do we
             // "make unsigned" user types?
         auto firstPartLowered = firstPart.value() >> misalignmentFirst;
-        auto secondPartRaised = secondPart.value() << misalignmentSecond;
+        // Avoid undefined behavior of << width of type.
+        auto secondPartRaised = (secondPart.value() << misalignmentSecondLessOne) << 1;
         return T{firstPartLowered | secondPartRaised};
     }
 
@@ -74,7 +77,6 @@ using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
 using u8 = uint8_t;
-
 
 namespace impl {
 
