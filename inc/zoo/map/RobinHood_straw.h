@@ -19,6 +19,7 @@ auto slotFromKeyUnitary(Key k) noexcept {
     return 1;
 }
 
+
 // The naive method of keeping metadata.
 // TODO(sbruce) actually have correct widths of psl/hash for direct comparison
 // to real metadata.
