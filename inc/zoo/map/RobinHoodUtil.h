@@ -85,6 +85,7 @@ template<int PSL_Bits, int HashBits, typename U>
 struct Metadata: swar::SWARWithSubLanes<PSL_Bits, HashBits, U> {
     using Base = swar::SWARWithSubLanes<PSL_Bits, HashBits, U>;
     using Base::Base;
+    static constexpr auto MaxPSL = 1 << PSL_Bits;
 
     constexpr auto PSLs() const noexcept { return this->least(); }
     constexpr auto hashes() const noexcept { return this->most(); }
@@ -172,6 +173,8 @@ struct TopHashReducer {
     }
 };
 
+// Often used as:
+// UnitaryHash<u64>, UnitaryScatter<u64>, UnitaryReduce<u64>, UnitaryReducer<u64>
 // Hash that is always 1.
 template<typename T>
 struct UnitaryHash {

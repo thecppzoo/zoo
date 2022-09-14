@@ -80,7 +80,7 @@ auto showMetadata(std::size_t index, MD *md) {
 #define ZOO_TEST_TRACE_WARN(...)
 //WARN(__VA_ARGS__)
 
-using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 155, 5, 3>;
+using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 255, 5, 3>;
 
 auto valueInvoker(void *p, std::size_t index) {
     return static_cast<SMap *>(p)->values_[index].value();
@@ -245,7 +245,6 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         }
         ++wordIterator;
     }
-    WARN(mirror.size());
 }
 
 using FrontendSmall32 =
@@ -504,3 +503,70 @@ TEST_CASE(
     } 
 }
 
+TEST_CASE("Robin Hood Metadata u32 removal tests",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendSmall32 table;
+    writeFourBlock(0, table.md_);
+
+    FrontendSmall32::Backend be{table.md_.data()};
+    auto kcGen = [](int z) { return [z](int i){ return i == z;};};
+    auto trueKc = [](int z) { return true; };
+    {
+    auto [index, deadline, metadata] =
+        be.findMisaligned_assumesSkarupkeTail(0x7, 1, trueKc);
+    CHECK(1 == index);
+    CHECK(0x0000'0000u == deadline);
+    CHECK(0x0000'0000u == metadata.value());
+    }
+}
+
+
+TEST_CASE("Robin Hood narrow unitary table find",
+          "[api][mapping][swar][robin-hood]") {
+    constexpr auto pslBits = 2;
+    constexpr auto hashBits = 6;
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, pslBits, hashBits,
+        UnitaryHash<u64>, std::equal_to<int>, u32,
+        UnitaryScatter<u64>, UnitaryReduce<u64>, UnitaryReducer<u64>> table;
+    zoo::rh::impl::poke(table.md_, 1, 1, 1);
+    table.values_[1].build(std::pair{5, 3});
+    {
+    auto findResult = table.find(5);
+    CHECK(findResult != table.end());
+    CHECK(findResult->value().first == 5);
+    CHECK(findResult->value().second == 3);
+    }
+}
+
+constexpr auto saturationPSL = 5;
+using FrontendUnitary32 =
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, saturationPSL, 3,
+        UnitaryHash<u64>, std::equal_to<int>, u32,
+        UnitaryScatter<u64>, UnitaryReduce<u64>, UnitaryReducer<u64>>;
+
+template<typename Metadata, typename Values>
+void setEntry(Metadata& md, Values& values,
+        int index, int psl, int hash, int key, int val) {
+    zoo::rh::impl::poke(md, index, psl, hash);
+    values[index].build(std::pair{key, val});
+}
+
+TEST_CASE("Robin Hood unitary insert saturation",
+          "[api][mapping][swar][robin-hood]") {
+//void poke(MetadataCollection &collection, size_t index, u64 psl, u64 hash)
+    FrontendUnitary32 table;
+    auto top = 35;
+    for (int i = 1; i < top; i++ ) {
+      setEntry(table.md_, table.values_, i, i, 1, i+5, i+3);
+      //CHECK(i+5 == table.find(i+5)->value().first);
+      //CHECK(i+3 == table.find(i+5)->value().first);
+    }
+
+    for (int i = 1; i < top; i++ ) {
+        // This will exhaust psl
+        auto findResult = table.find(i+5);
+std::cerr << i << "\n";
+        CHECK(findResult->value().first == i+5);
+        CHECK(findResult == table.end());
+    }
+}

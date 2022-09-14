@@ -150,6 +150,7 @@ struct SWARWithSubLanes: SWAR<NBitsLeast_ + NBitsMost_ , T> {
 
     static constexpr inline auto LeastOnes =
         Base(meta::BitmaskMaker<T, Base{1}.value(), LaneBits>::value);
+    // MostOnes might be incorrect.
     static constexpr inline auto MostOnes =
         Base(LeastOnes.value() << NBitsLeast);
     static constexpr inline auto LeastMask = MostOnes - LeastOnes;

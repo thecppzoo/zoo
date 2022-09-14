@@ -8,6 +8,10 @@
     #define ZOO_CONFIG_DEEP_ASSERTIONS 0
 #endif
 
+#include <ios>
+#include <iomanip>
+#include <iostream>
+
 #include <tuple>
 #include <array>
 #include <functional>
@@ -80,6 +84,31 @@ struct RH_Backend {
         return firstBreakage;
     }
 
+    // This should be more generic: if PSLs breach a broadcast PSL, saturate
+    // This should be more generic: if a SWAR breaches a SWAR condition, saturate.
+    constexpr static auto
+    needlePSLSaturation(Metadata nPSL) {
+        // create a saturator for max PSL.  If any needle saturates, all later PSLs will be set to saturated.
+        constexpr auto saturatedPSL = broadcast(Metadata(Metadata::MaxPSL));
+        //auto nPSL = needle.PSLs();
+        auto saturation = greaterEqual_MSB_off(nPSL, saturatedPSL);
+        auto invertSatMask = ((swar::isolateLSB(saturation.value()) - 1) );
+        auto satMask = (~(swar::isolateLSB(saturation.value()) - 1) );
+std::cerr << std::setw(8) << std::hex << 
+" needlePSL " <<  nPSL.value()  << 
+" maxPSL " << Metadata::MaxPSL << 
+" saturation " << saturation.value() << 
+" invertSatMask " << invertSatMask << 
+" satMask " << satMask << "\n";
+        //if (not bool(saturation)) return std::tuple{nPSL, false};
+        // Least sig lane is saturated, all more sig must be made saturated.
+        auto needlePSLsToSaturate = Metadata{satMask & saturatedPSL.value()};
+std:: cerr << " -- saturatedPSL " << saturatedPSL.value() << 
+" needlePSLsToSaturate " << needlePSLsToSaturate.value() << "\n";
+        // addition might have overflown nPSL before entering function
+        return std::tuple{Metadata{nPSL.PSLs() | needlePSLsToSaturate}, bool(saturation)};  // saturated at any point, last swar to check.
+    }
+
     constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
     potentialMatches(
         Metadata needle, Metadata haystack
@@ -110,9 +139,14 @@ struct RH_Backend {
         auto core = startingPSL | (hoistedHash << PSL_Bits);
         auto broadcasted = broadcast(Metadata(core));
         auto startingPSLmadePotentialPSLs = Metadata(Progression) + broadcasted;
-        return startingPSLmadePotentialPSLs;
+        return Metadata{startingPSLmadePotentialPSLs};
     }
 
+    // Returned metadata is irrelevant except for the element at the same index
+    // as the deadline which contains the PSL and hash of the element which
+    // matches the deadline. IE: it is returnedMetadata.at(deadline.lsbindex())
+    // that is the PSL + hashbits
+    // If we run out of psl bits returned index is homeindex+maxpsl+1
     template<typename KeyComparer>
     constexpr auto
     findMisaligned_assumesSkarupkeTail(
@@ -129,7 +163,7 @@ struct RH_Backend {
         MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
         auto index = homeIndex;
         auto needle = makeNeedle(0, hoistedHash);
-
+        auto PSLsAreUnsafe = false;  // this could be true here for small PSLs relative to big lane counts.
         for(;;) {
             auto hay = *p;
             auto result = potentialMatches(needle, hay);
@@ -177,11 +211,23 @@ struct RH_Backend {
                         toAbsolute(needle, misalignment)
                     );
             }
+            // If we marked last time around as unsafe, we just completed our
+            // last swar block check, fail.
+            if (PSLsAreUnsafe) {
+              // Signal we ran out of psl by returning an index that can't be
+              // reached with max PSL
+              return std::tuple{homeIndex + Metadata::MaxPSL + 1, U(0), Metadata{0}};
+            }
             // Skarupke's tail allows us to not have to worry about the end
             // of the metadata
             ++p;
             index += Metadata::NSlots;
-            needle = needle + AllNSlots;
+            auto [safeNeedlePSLs, shouldStop] =
+                needlePSLSaturation(needle.PSLs() + AllNSlots);
+            PSLsAreUnsafe = shouldStop;
+std::cerr << std::setw(8) << std::hex << "needle " << needle.value()  << " safeNeedlePSLs " << safeNeedlePSLs.value() 
+<< " new needle " << (needle.hashes() | safeNeedlePSLs).value() << "\n";
+            needle = needle.hashes() | safeNeedlePSLs;
             // TODO psl overflow must be checked.
         }
     }
@@ -302,7 +348,56 @@ struct RH_Frontend_WithSkarupkeTail {
             be.findMisaligned_assumesSkarupkeTail(
                 hoisted, homeIndex, keyChecker
             );
-        return deadline ? values_.end() : values_.data() + index;
+        auto pslDeadline = not (index - homeIndex - 1 - MD::MaxPSL);
+        //std::cerr << "pslDeadline " << pslDeadline << "\n";
+        return (deadline || pslDeadline) ? values_.end() : values_.data() + index;
+    }
+
+    auto at(size_t index) {
+        auto swarIndex = index / MD::Lanes;
+        auto intraIndex = index % MD::Lanes;
+        return at(index, swarIndex, intraIndex);
+    }
+
+    auto at(size_t index, size_t swarIndex, size_t intraIndex) {
+        auto mdp = this->md_.data() + swarIndex;
+        // returning via isolateLane is more efficient.
+        return std::tuple{mdp.lane(intraIndex), this->values_.data() + index};
+    }
+
+    // deletion shifts back to avoid tombstones choking table. block starts at
+    // point, ends at psl={0,1} (block & 0x0 | lane(0001) don't care bit check)
+    auto remove(const K &k) noexcept {
+        auto [hoisted, homeIndex, kc] = findParameters(k);
+        Backend be{this->md_.data()};
+        auto [index, deadline, needle] =
+            be.findMisaligned_assumesSkarupkeTail(hoisted, homeIndex, kc);
+        if (!deadline) return values_.end();
+        // element found, find end of shift region
+        auto swarIndex = index / MD::Lanes;
+        auto intraIndex = index % MD::Lanes;
+        auto mdp = this->md_.data() + swarIndex;
+        auto haystackPSLStrict = mdp->PSLs() & (deadline-1);
+        // We're looking for 0 or 1 in PSL position, so we | in an AllOnes
+        auto removeDeadline = haystackPSLStrict | MD::AllOnes;
+        if (removeDeadline) {  // within same block
+          shiftRangeBackSimple(index, swarIndex, intraIndex, swarIndex, removeDeadline.lsbIndex());
+          return values_.data() + index;
+        }
+    }
+
+    auto shiftRangeBackSimple( std::size_t index, std::size_t  swarIndexStart, std::size_t intraIndexStart,
+            std::size_t  swarIndexEnd, std::size_t intraIndexEnd) {
+        // assert first entry is empty
+      //std::size_t outSt = swarIndexStart;
+      //std::size_t inSt = intraIndexStart;
+      //auto mdp = this->md_.data() + swarIndexStart;
+      //while (inSt < intraIndexEnd && outSt <= swarIndexEnd) {
+      //   auto [isolate, value] = at(index + 1);
+      //   isolate.PSLs().lane(0)-1
+      //   set(index, isolate, value 
+      //}
+        // set last entry to empty.
     }
 
     auto find(const K &k) const noexcept {
@@ -345,6 +440,7 @@ struct RH_Frontend_WithSkarupkeTail {
     ) {
         auto &k = val.first;
         auto &mv = val.second;
+        // This division can be saved by keeping value from find.
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
         auto mdp = this->md_.data() + swarIndex;
