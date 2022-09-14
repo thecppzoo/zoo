@@ -72,7 +72,7 @@ struct SWAR {
     #undef X
 
     // Returns lane at position with other lanes cleared.
-    constexpr T lane(int position) const noexcept {
+    constexpr T isolateLane(int position) const noexcept {
         constexpr auto filter = (T(1) << NBits) - 1;
         return m_v & (filter << (NBits * position));
     }
