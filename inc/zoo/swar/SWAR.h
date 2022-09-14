@@ -112,15 +112,6 @@ struct SWAR {
         return SWAR(value() >> (NBits * laneCount));
     }
 
-    // This will shift 1 bit less right to avoid undefined behavior. Use only
-    // in conditions when the caller can prove that laneCount is not zero.
-    constexpr SWAR shiftLanesRightSafe(int laneCount) const noexcept {
-        return SWAR(value() >> ((NBits * laneCount) - 1));
-    }
-    constexpr SWAR shiftOneBitRight() const noexcept {
-        return SWAR(value() >> 1);
-    }
-
     T m_v;
 };
 

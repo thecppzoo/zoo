@@ -163,10 +163,10 @@ struct RH_Backend {
         __builtin_unreachable();
     }
 
-    // Returned metadata is all garbage except for any entry in a deadline,
-    // which contains the PSL and hash of the element which matches the
-    // deadline. IE: it is returnedMetadata.at(deadline.lsbindex()) that is the
-    // PSL+hashbits
+    // Returned metadata is irrelevant except for the element at the same index
+    // as the deadline which contains the PSL and hash of the element which
+    // matches the deadline. IE: it is returnedMetadata.at(deadline.lsbindex())
+    // that is the PSL + hashbits
     template<typename KeyComparer>
     constexpr auto
     findMisaligned_assumesSkarupkeTail(
@@ -218,7 +218,7 @@ struct RH_Backend {
                 auto toAbsolute = [](auto v, auto ma) {
                     auto shiftedLeft = v.shiftLanesLeft(ma);
                     auto shiftedRight =
-                        v.shiftLanesRightSafe(Metadata::NSlots - ma).shiftOneBitRight();
+                        v.shiftLanesRight(Metadata::NSlots - ma - 1).shiftLanesRight(1);
                     return Metadata{shiftedLeft | shiftedRight};
                 };
                 auto position = index + Metadata{deadline}.lsbIndex();

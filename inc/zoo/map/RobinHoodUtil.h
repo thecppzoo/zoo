@@ -38,6 +38,8 @@ struct MisalignedGenerator {
 template<typename T>
 struct MisalignedGenerator<T, 0>: GeneratorFromPointer<T> {};
 
+// This is tightly coupled with a Metadata that happens-to have lane widths of
+// 8.
 template<typename T>
 struct MisalignedGenerator_Dynamic {
     constexpr static auto Width = sizeof(T) * 8;

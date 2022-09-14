@@ -274,7 +274,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata block of three",
     // Returned metadata contains one valid lane: the lane at the offset of
     // deadline.
     CHECK(0x00c2'0000u ==
-        metadata.lane(FrontendSmall32::MD{deadline}.lsbIndex()));
+        metadata.isolateLane(FrontendSmall32::MD{deadline}.lsbIndex()));
     }
 }
 
@@ -334,7 +334,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata ",
     // Returned metadata contains one valid lane: the lane at the offset of
     // deadline.
     CHECK(0x00c2'0000u ==
-        metadata.lane(FrontendSmall32::MD{deadline}.lsbIndex()));
+        metadata.isolateLane(FrontendSmall32::MD{deadline}.lsbIndex()));
     }
 }
 
