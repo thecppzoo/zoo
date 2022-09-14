@@ -16,7 +16,6 @@
     #include <assert>
 #endif
 
-
 namespace zoo {
 
 namespace rh {
@@ -164,6 +163,10 @@ struct RH_Backend {
         __builtin_unreachable();
     }
 
+    // Returned metadata is all garbage except for any entry in a deadline,
+    // which contains the PSL and hash of the element which matches the
+    // deadline. IE: it is returnedMetadata.at(deadline.lsbindex()) that is the
+    // PSL+hashbits
     template<typename KeyComparer>
     constexpr auto
     findMisaligned_assumesSkarupkeTail(
@@ -207,18 +210,16 @@ struct RH_Backend {
                 // { 0 | 0 | 0 | 0 | 0 | 0 | a | b }
                 // shift right (to lower bits) by NSlots - misalignment:
                 // { c | d | e | f | g | h | 0 | 0 }
-                // Technically, if the misalignment is 0, the shift right would
-                // be for the number of bits in the SWAR, which is undefined
-                // behavior, however, in practice, the only two reasonable
-                // behaviors, zeroing the result, or the result unchanged, will
-                // both work.
+                // One might hope undefined behavior might be reasonable (zero
+                // result, unchanged result), but ARM proves that undefined
+                // behavior is indeed undefined, so we do our right shift as a
+                // double: shift by n-1, then shift by 1.
                 auto mdd = Metadata{deadline};
                 auto toAbsolute = [](auto v, auto ma) {
-                    return
-                        Metadata{
-                            v.shiftLanesLeft(ma) |
-                            v.shiftLanesRight(Metadata::NSlots - ma)
-                        };
+                    auto shiftedLeft = v.shiftLanesLeft(ma);
+                    auto shiftedRight =
+                        v.shiftLanesRightSafe(Metadata::NSlots - ma).shiftOneBitRight();
+                    return Metadata{shiftedLeft | shiftedRight};
                 };
                 auto position = index + Metadata{deadline}.lsbIndex();
                 return

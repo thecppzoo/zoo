@@ -71,6 +71,13 @@ struct SWAR {
     SWAR_BINARY_OPERATORS_X_LIST
     #undef X
 
+    // Returns lane at position with other lanes cleared.
+    constexpr T lane(int position) const noexcept {
+        constexpr auto filter = (T(1) << NBits) - 1;
+        return m_v & (filter << (NBits * position));
+    }
+
+    // Returns lane value at position, in lane 0, rest of SWAR cleared.
     constexpr T at(int position) const noexcept {
         constexpr auto filter = (T(1) << NBits) - 1;
         return filter & (m_v >> (NBits * position));
@@ -103,6 +110,15 @@ struct SWAR {
 
     constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
         return SWAR(value() >> (NBits * laneCount));
+    }
+
+    // This will shift 1 bit less right to avoid undefined behavior. Use only
+    // in conditions when the caller can prove that laneCount is not zero.
+    constexpr SWAR shiftLanesRightSafe(int laneCount) const noexcept {
+        return SWAR(value() >> ((NBits * laneCount) - 1));
+    }
+    constexpr SWAR shiftOneBitRight() const noexcept {
+        return SWAR(value() >> 1);
     }
 
     T m_v;
