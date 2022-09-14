@@ -51,7 +51,7 @@ struct MisalignedGenerator_Dynamic {
         base_(base),
         misalignmentFirst(ma), misalignmentSecondLessOne(Width - ma - 1)
     {}
-    
+
 
     constexpr T operator*() noexcept {
         auto firstPart = base_[0];
@@ -139,6 +139,7 @@ template<typename Key, typename T = u64> T fibhash(Key k) noexcept {
     return k * GoldenConstant;
 }
 
+
 template<size_t Size, typename T>
 constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     static_assert(sizeof(T) == sizeof(uint64_t));
@@ -147,13 +148,39 @@ constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     return Size * halved >> 32;
 }
 
+// Scatters a range onto itself
+template<typename T>
+struct FibonacciScatter {
+    constexpr auto operator()(T index) noexcept {
+      return fibonacciIndexModulo(index);
+    }
+};
+
+// Reduces an int onto a range via Lemire reduction.
+template<size_t Size, typename T>
+struct LemireReduce {
+    constexpr auto operator()(T input) noexcept {
+      return lemireModuloReductionAlternative<Size, T>(input);
+    }
+};
+
+// Reduces an input value of U to NBits width, via ones multiply and top bits.
+template<int NBits, typename U>
+struct TopHashReducer {
+    constexpr auto operator()(U n) noexcept {
+        return hashReducer<NBits>(n);
+    }
+};
+
+
+
 template<int NBits>
 constexpr auto cheapOkHash(u64 n) noexcept {
     constexpr auto shift = (NBits * ((64 / NBits)-1));
     constexpr u64 allOnes = meta::BitmaskMaker<u64, 1, NBits>::value;
     auto temporary = allOnes * n;
     auto higestNBits = temporary >> shift;
-    return (0 == (64 % NBits)) ? 
+    return (0 == (64 % NBits)) ?
         higestNBits : swar::isolate<NBits, u64>(higestNBits);
 }
 
@@ -163,7 +190,7 @@ template<int NBits> auto badMixer(u64 h) noexcept {
     constexpr u64 allOnes = ~0ull;
     constexpr u64 mostSigNBits = swar::mostNBitsMask<NBits, u64>();
     auto tmp = h * allOnes;
-    
+
     auto mostSigBits = tmp & mostSigNBits;
     return mostSigBits >> (64 - NBits);
 }
@@ -171,7 +198,7 @@ template<int NBits> auto badMixer(u64 h) noexcept {
 /// Evenly map a large int to an int without division or modulo.
 template<int SizeTable, typename T>
 constexpr int mapToSlotLemireReduction(T halved) {
-    return (halved * T(SizeTable)) >> (sizeof(T)/2); 
+    return (halved * T(SizeTable)) >> (sizeof(T)/2);
 }
 
 namespace impl {
