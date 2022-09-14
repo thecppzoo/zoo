@@ -11,6 +11,7 @@
 #include <tuple>
 #include <array>
 #include <functional>
+#include <stdexcept>
 
 #if ZOO_CONFIG_DEEP_ASSERTIONS
     #include <assert>
