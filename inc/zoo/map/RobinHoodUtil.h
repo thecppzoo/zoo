@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 
 namespace zoo {
 
@@ -51,7 +52,6 @@ struct MisalignedGenerator_Dynamic {
         base_(base),
         misalignmentFirst(ma), misalignmentSecondLessOne(Width - ma - 1)
     {}
-
 
     constexpr T operator*() noexcept {
         auto firstPart = base_[0];
@@ -172,7 +172,48 @@ struct TopHashReducer {
     }
 };
 
+// Hash that is always 1.
+template<typename T>
+struct UnitaryHash {
+    constexpr auto operator()(const T& v) noexcept { return 1; }
+};
 
+// Scatters a range to always be 1
+template<typename T>
+struct UnitaryScatter {
+    constexpr auto operator()(T index) noexcept { return 1; }
+};
+
+// Reduces an int onto a range but that range is always 1.
+template<typename T>
+struct UnitaryReduce {
+    constexpr auto operator()(T input) noexcept { return 1; }
+};
+
+// Reduces an input value of U to NBits width, but that value is always 1.
+template<typename U>
+struct UnitaryReducer {
+    constexpr auto operator()(U n) noexcept { return 1; }
+};
+
+/// Given a key and sufficient templates specifying its transformation process,
+/// return hoisted hash bits and home index in table.
+template<
+    typename K,
+    size_t RequestedSize,
+    int HashBits,
+    typename U = std::uint64_t,
+    typename Hash = std::hash<K>,
+    typename Scatter = FibonacciScatter<U>,
+    typename RangeReduce = LemireReduce<RequestedSize, U>,
+    typename HashReduce = TopHashReducer<HashBits, U> >
+static constexpr auto findBasicParameters(const K&k) noexcept {
+    auto hashCode = Hash{}(k);
+    auto scattered = Scatter{}(hashCode);
+    auto homeIndex = RangeReduce{}(scattered);
+    auto hoisted = HashReduce{}(hashCode);
+    return std::tuple{hoisted, homeIndex};
+}
 
 template<int NBits>
 constexpr auto cheapOkHash(u64 n) noexcept {

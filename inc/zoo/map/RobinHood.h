@@ -330,14 +330,10 @@ struct RH_Frontend_WithSkarupkeTail {
     }
 
     auto findParameters(const K &k) const noexcept {
-        auto hashCode = Hash{}(k);
-
-        auto fibonacciScrambled = Scatter{}(hashCode);
-        auto homeIndex = RangeReduce{}(fibonacciScrambled);
-        #if ZOO_CONFIG_DEEP_ASSERTIONS
-            assert(homeIndex < RequestedSize);
-        #endif
-        auto hoisted = HashReduce{}(hashCode);
+        auto [hoisted, homeIndex] =
+            findBasicParameters 
+                <K, RequestedSize, HashBits, U,
+                Hash, Scatter, RangeReduce, HashReduce >(k);
         return
             std::tuple{
                 hoisted,
