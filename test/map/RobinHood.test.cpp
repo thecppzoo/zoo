@@ -198,6 +198,14 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     using MD = SMap::MD;
     std::map<std::string, int> mirror;
 
+    auto allKeysThere = [&]() {
+        for(auto &v: mirror) {
+            auto fr = ex.find(v.first);
+            if(ex.end() == fr) { return false; }
+        }
+        return true;
+    };
+    
     std::regex words("\\w+");
     std::sregex_iterator
         wordsEnd{},
@@ -205,22 +213,10 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
         ZOO_TEST_TRACE_WARN(word);
-        if("gently" == word) {
-            auto [hoisted, homeIndex, dontcare] = ex.findParameters("gently");
-            ZOO_TEST_TRACE_WARN(
-                "gently " << homeIndex << ':' << hoisted << '\n' <<
-                display(ex, homeIndex - 3, homeIndex + 20)
-            );
-            ;
-        }
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
-        if(resultEndInMirror != resultEndInExample) {
-            ZOO_TEST_TRACE_WARN(resultEndInMirror);
-            auto r = ex.find(word);
-        }
         REQUIRE(resultEndInMirror == resultEndInExample);
         auto showRecord = [&](auto iter) {
             auto [hh, indexHome, dc] = ex.findParameters(word);
@@ -237,18 +233,12 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             mirror[word] = 1;
             auto [iter, inserted] = ex.insert(word, 1);
             REQUIRE(inserted);
-            showRecord(iter);
+            REQUIRE(allKeysThere());
         } else {
             ++mirror[word];
             ++findResult->value().second;
             REQUIRE(mirror[word] == findResult->value().second);
-            showRecord(findResult);
             ZOO_TEST_TRACE_WARN(word << ' ' << mirror[word]);
-        }
-         if("patience" == word) {
-            auto fr = ex.find("to");
-            REQUIRE(ex.end() != fr);
-            ZOO_TEST_TRACE_WARN("to!");
         }
         auto [ok, failureNdx] = validateMetadata(ex);
         CHECK(ok);
