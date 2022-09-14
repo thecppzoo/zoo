@@ -309,7 +309,10 @@ struct RH_Frontend_WithSkarupkeTail {
         const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
     }
 
-    auto insert(const K &k, const MV &mv) {
+    template<typename ValuteTypeCompatible>
+    auto insert(ValuteTypeCompatible &&val) {
+        auto &k = val.first;
+        auto &mv = val.second;
         auto [hoistedT, homeIndexT, kc] = findParameters(k);
         auto hoisted = hoistedT;
         auto homeIndex = homeIndexT;
@@ -321,7 +324,11 @@ struct RH_Frontend_WithSkarupkeTail {
         auto deadline = deadlineT;
         if(!deadline) { return std::pair{values_.data() + index, false}; }
         auto needle = needleT;
-        auto rv = insertionEvictionChain(index, deadline, needle, k, mv);
+        auto rv =
+            insertionEvictionChain(
+                index, deadline, needle,
+                std::forward<ValuteTypeCompatible>(val)
+            );
         ++elementCount_;
         return rv;
     }
@@ -329,13 +336,15 @@ struct RH_Frontend_WithSkarupkeTail {
     // Do the chain of relocations
     // From this point onward, the hashes don't matter except for the
     // updates to the metadata, the relocations
+    template<typename VTC>
     auto insertionEvictionChain(
         std::size_t index,
         U deadline,
         MD needle,
-        const K &k,
-        const MV &mv
+        VTC &&val
     ) {
+        auto &k = val.first;
+        auto &mv = val.second;
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
         auto mdp = this->md_.data() + swarIndex;
@@ -363,8 +372,8 @@ struct RH_Frontend_WithSkarupkeTail {
                 if(0 == relocationsCount) { // direct build of a new value
                     values_[index].build(
                         std::piecewise_construct,
-                        std::tuple(k),
-                        std::tuple(mv)
+                        std::tuple(std::forward<VTC>(val).first),
+                        std::tuple(std::forward<VTC>(val).second)
                     );
                     *mdp = mdp->blitElement(intraIndex, elementToInsert);
                     return std::pair{values_.data() + index, true};
@@ -396,7 +405,7 @@ struct RH_Frontend_WithSkarupkeTail {
                     swarIndex = index / MD::NSlots;
                     intraIndex = index % MD::NSlots;
                 }
-                values_[index].value() = std::pair(k, mv);
+                values_[index].value() = std::forward<VTC>(val);
                 md_[swarIndex] =
                     md_[swarIndex].blitElement(intraIndex, elementToInsert);
                 return std::pair{values_.data() + index, true};

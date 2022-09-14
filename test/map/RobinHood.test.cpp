@@ -39,10 +39,6 @@ auto instantiateFind(int v, FrontendExample &f) {
     return f.find(v);
 }
 
-auto instantiateInsert(int v, FrontendExample &f) {
-    return f.insert(v, 0);
-}
-
 static_assert(
     0xE9E8E7E6E5E4E3E2ull == RHC::makeNeedle(1, 7).value()
 );
@@ -231,7 +227,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         };
         if(resultEndInMirror) {
             mirror[word] = 1;
-            auto [iter, inserted] = ex.insert(word, 1);
+            auto [iter, inserted] = ex.insert(SMap::value_type{word, 1});
             REQUIRE(inserted);
             REQUIRE(allKeysThere());
         } else {
