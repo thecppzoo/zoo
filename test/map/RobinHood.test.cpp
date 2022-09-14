@@ -60,7 +60,7 @@ std::ostream &operator<<(std::ostream &out, V v) {
             if(v.intraIndex == ndx) {
                 ptr += sprintf(ptr, "<");
             }
-            ptr += sprintf(ptr, "%02llx", val & 0xFFull);
+            ptr += sprintf(ptr, "%02llx", val & 0xFF);
             if(v.intraIndex == ndx) {
                 ptr += sprintf(ptr, ">");
             }
