@@ -139,16 +139,16 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
 
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
-    //  WARN(word);
+        WARN(word);
         auto findResult = ex.find(word);
         auto mfr = mirror.find(word);
-    //  if("accomplishment" == word) {
-    //      WARN(mirror.size());
-    //  }
+        if("accomplishment" == word) {
+            WARN(mirror.size());
+        }
         bool resultEndInMirror = mfr == mirror.end();
         bool resultEndInExample = findResult == ex.end();
         if(resultEndInMirror != resultEndInExample) {
-    //      WARN(resultEndInMirror);
+            WARN(resultEndInMirror);
             auto r = ex.find(word);
         }
         REQUIRE(resultEndInMirror == resultEndInExample);
@@ -156,12 +156,12 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             auto [hh, indexHome, dc] = ex.findParameters(word);
             auto index = (iter - ex.values_.begin());
             auto swarIndex = index / MD::NSlots;
-    //      WARN(
-    //          index << ':' << swarIndex << ':' <<
-    //          (index % MD::NSlots) << ' ' <<
-    //          showMetadata(index, ex.md_.data()) <<
-    //          ' ' << hh << ' ' << indexHome
-    //      );
+            WARN(
+                index << ':' << swarIndex << ':' <<
+                (index % MD::NSlots) << ' ' <<
+                showMetadata(index, ex.md_.data()) <<
+                ' ' << hh << ' ' << indexHome
+            );
         };
         if(resultEndInMirror) {
             mirror[word] = 1;
@@ -173,11 +173,11 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             ++findResult->value().second;
             REQUIRE(mirror[word] == findResult->value().second);
             showRecord(findResult);
-    //      WARN(word << ' ' << mirror[word]);
+            WARN(word << ' ' << mirror[word]);
         }
         ++wordIterator;
     }
- // WARN(mirror.size());
+    WARN(mirror.size());
 }
 
 using FrontendSmall32 =
