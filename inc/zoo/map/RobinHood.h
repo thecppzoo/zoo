@@ -435,7 +435,6 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             if(HighestSafePSL < evictedPSL) {
-                std::cerr << debug::rh::display(*this, index - HighestSafePSL - 5, index + 10);
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
             }
             
