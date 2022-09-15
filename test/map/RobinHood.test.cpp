@@ -8,6 +8,8 @@
 #include <regex>
 #include <map>
 #include <sstream>
+#include <fstream>
+#include <unordered_map>
 
 using namespace zoo;
 using namespace zoo::swar;
@@ -86,68 +88,6 @@ auto valueInvoker(void *p, std::size_t index) {
     return static_cast<SMap *>(p)->values_[index].value();
 }
 
-auto validateMetadata(SMap &map) {
-    auto prior = 0;
-    auto ndx = 0;
-    for(auto md: map.md_) {
-        auto v = md.PSLs();
-        assert(0 == ndx % SMap::MD::NSlots);
-        for(auto n = SMap::MD::NSlots; n--; ++ndx) {
-            auto current = v.at(0);
-            if(prior + 1 < current) {
-                auto d = map.md_.data();
-                ZOO_TEST_TRACE_WARN("broken " << showMetadata(ndx - SMap::MD::NSlots, d));
-                ZOO_TEST_TRACE_WARN("broken " << showMetadata(ndx, d) << ' ' << ndx << ' ' << map.values_[ndx].value().first);
-                ZOO_TEST_TRACE_WARN("broken " << showMetadata(ndx + SMap::MD::NSlots, d));
-                return std::tuple(false, ndx); }
-            v = v.shiftLanesRight(1);
-            prior = current;
-        }
-    }
-    return std::tuple(true, 0);
-}
-
-template<typename Table>
-auto display(const Table &t, std::size_t begin, std::size_t end) {
-    std::ostringstream out;
-
-    using MD = typename Table::MD;
-    //auto mdp = t.md_.data();
-    auto swarNdx = begin / MD::NSlots;
-    auto intraNdx = begin % MD::NSlots;
-    auto initial = t.md_[swarNdx];
-    initial = initial.shiftLanesRight(intraNdx);
-    char buffer[30];
-    auto printLine =
-        [&]() {
-            char buffer[4];
-            sprintf(buffer, "%02llx", initial.at(0));
-            out << buffer;
-            if(initial.PSLs().at(0)) {
-                auto &v = t.values_[begin].value();
-                out << ' ' << v.first << ':' << v.second;
-            }
-            out << '\n';
-            initial = initial.shiftLanesRight(1);
-            ++begin;
-        };
-    switch(intraNdx) {
-        do {
-            case 0: printLine();
-            case 1: printLine();
-            case 2: printLine();
-            case 3: printLine();
-            case 4: printLine();
-            case 5: printLine();
-            case 6: printLine();
-            case 7: printLine();
-            out << "- " << begin << '\n';
-            initial = t.md_[++swarNdx];
-        } while(begin < end);
-    }
-    return out.str();
-}
-
 TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     std::string HenryVChorus =
         "O for a Muse of fire, that would ascend\n"
@@ -206,6 +146,11 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
     std::sregex_iterator
         wordsEnd{},
         wordIterator{HenryVChorus.begin(), HenryVChorus.end(), words};
+
+    std::map<std::string, int> converter;
+    auto differentWords = 0;
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 190, 5, 3> wordFreqByInt;
+
     while(wordsEnd != wordIterator) {
         const auto &word = wordIterator->str();
         ZOO_TEST_TRACE_WARN(word);
@@ -228,6 +173,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         if(resultEndInMirror) {
             mirror[word] = 1;
             auto [iter, inserted] = ex.insert(SMap::value_type{word, 1});
+            converter[word] = differentWords++;
             REQUIRE(inserted);
             REQUIRE(allKeysThere());
         } else {
@@ -236,7 +182,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             REQUIRE(mirror[word] == findResult->value().second);
             ZOO_TEST_TRACE_WARN(word << ' ' << mirror[word]);
         }
-        auto [ok, failureNdx] = validateMetadata(ex);
+        auto [ok, failureNdx] = zoo::debug::rh::satisfiesInvariant(ex);
         CHECK(ok);
         if(!ok) {
             auto ms = mirror.size();
@@ -504,3 +450,99 @@ TEST_CASE(
     } 
 }
 
+template<typename Container>
+struct ContainerCorpus {
+    Container &c_;
+    typename Container::const_iterator position_;
+
+    ContainerCorpus(Container &c): c_(c), position_(begin(c)) {}
+
+    operator bool() const noexcept { return c_.end() != position_; }
+
+    auto &key() { return *position_; }
+
+    void next() { ++position_; }
+};
+
+TEST_CASE("RH Validation") {
+    std::ifstream corpus("/tmp/RobinHood.corpus.txt");
+    if(!corpus) {
+        abort();
+    }
+    std::string line;
+    std::regex words{"\\w+"};
+    std::vector<std::string> strings;
+    std::vector<int> ints;
+    std::unordered_map<int, std::string> decoder;
+
+    auto initialize = [&]() {
+        corpus.clear();
+        corpus.seekg(0);
+        auto wordCount = 0, characterCount = 0, dfw = 0;
+        std::unordered_map<std::string, int> encoder;
+
+        while(corpus) {
+            getline(corpus, line);
+            
+            std::sregex_iterator
+                wordsEnd{},
+                wordIterator{line.begin(), line.end(), words};
+            while(wordsEnd != wordIterator) {
+                const auto &str = wordIterator->str();
+                strings.push_back(str);
+                auto fr = encoder.find(str);
+                if(encoder.end() == fr) {
+                    encoder.insert(fr, std::pair{str, dfw});
+                    decoder[dfw] = str;
+                    ints.push_back(dfw);
+                    ++dfw;
+                } else {
+                    ints.push_back(fr->second);
+                }
+                characterCount += str.size();
+                ++wordCount;
+                ++wordIterator;
+            }
+        }
+        return std::tuple(wordCount, characterCount);
+    };
+    auto [wc, cc] = initialize();
+
+    auto tcc = 0, twc = 0, tdwc = 0, tmax = 0;
+    if(true) {
+        ContainerCorpus corpus(ints);
+        auto wordCount = 0, characterCount = 0, differentWords = 0;
+        using Map = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 7000, 6, 2>;
+        Map m;
+        auto max = 0;
+        while(corpus) {
+            const auto &word = corpus.key();
+            ++wordCount;
+            characterCount += 1;
+            auto fr = m.find(word);
+            if(m.end() == fr) {
+                ++differentWords;
+                auto [where, whether] =
+                    m.insert(typename Map::value_type{word, 1});
+                REQUIRE(whether);
+                auto at = where - m.begin();
+                auto [consistent, ndx] = zoo::debug::rh::satisfiesInvariant(m, at - 20, at + 5);
+                INFO("inconsistency at " << ndx << " doing '" << decoder[word] << '\'');
+                INFO(zoo::debug::rh::display(
+                    m, ndx - 20, ndx + 2,
+                    [&](std::ostream &o, int code, int reps) {
+                        o << ' ' << decoder[code];
+                    }
+                ));
+                REQUIRE(consistent);
+            } else {
+                auto v = ++fr->value().second;
+                if(max < v) { max = v; }
+            }
+            corpus.next();
+        }
+        tcc = characterCount; twc = wordCount; tdwc = differentWords; tmax = max;
+        return std::tuple(tcc, twc, tdwc, max);
+    };
+    return std::tuple(twc, tcc, tdwc, tmax);
+}

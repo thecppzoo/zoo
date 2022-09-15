@@ -121,31 +121,17 @@ constexpr auto fibonacciIndexModulo(T index) {
             11400714819323198485ull,
         };
     constexpr T MagicalConstant =
-        T(GoldenRatioReciprocals[meta::logFloor(sizeof(T)) - 3]);
+        T(GoldenRatioReciprocals[meta::logFloor(sizeof(T))]);
     return index * MagicalConstant;
 }
-
-// Key needs to change to an integer.
-template<typename Key, typename T = u64> T fibhash(Key k) noexcept {
-    constexpr std::array<uint64_t, 4>
-        GoldenRatioReciprocals = {
-            159,
-            40503,
-            2654435769,
-            11400714819323198485ull,
-        };
-    constexpr T GoldenConstant =
-        T(GoldenRatioReciprocals[meta::logFloor(sizeof(T)) - 3]);
-    return k * GoldenConstant;
-}
-
 
 template<size_t Size, typename T>
 constexpr auto lemireModuloReductionAlternative(T input) noexcept {
     static_assert(sizeof(T) == sizeof(uint64_t));
-    static_assert(Size < (1ull << 32));
-    auto halved = uint32_t(input);
-    return Size * halved >> 32;
+    constexpr T MiddleBit = 1ull << 32;
+    static_assert(Size < MiddleBit);
+    auto lowerHalf = input & (MiddleBit - 1);
+    return Size * lowerHalf >> 32;
 }
 
 // Scatters a range onto itself
@@ -239,6 +225,8 @@ template<int NBits> auto badMixer(u64 h) noexcept {
 /// Evenly map a large int to an int without division or modulo.
 template<int SizeTable, typename T>
 constexpr int mapToSlotLemireReduction(T halved) {
+    // TODO: E and S think that the upper bits of are higher quality entropy,
+    // explore at some point.
     return (halved * T(SizeTable)) >> (sizeof(T)/2);
 }
 

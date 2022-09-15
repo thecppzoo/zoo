@@ -148,7 +148,7 @@ struct RH {
     /// pos, hash
     std::pair<u32, T> twoNumbers(Key k) {
         auto hash = h_(k);
-        const u32 pos = mapToSlotLemireReduction<Size, T>(fibhash<Key, T>(hash));
+        const u32 pos = mapToSlotLemireReduction<Size, T>(fibonacciIndexModulo(hash));
         const T thinhash = badMixer<NBitsHash> (hash);
         return {pos, thinhash};
     }
