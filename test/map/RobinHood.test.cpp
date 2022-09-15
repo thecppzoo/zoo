@@ -83,7 +83,7 @@ auto showMetadata(std::size_t index, MD *md) {
 #define ZOO_TEST_TRACE_WARN(...)
 //WARN(__VA_ARGS__)
 
-using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 155, 5, 3>;
+using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 255, 5, 3>;
 
 auto valueInvoker(void *p, std::size_t index) {
     return static_cast<SMap *>(p)->values_[index].value();
@@ -543,7 +543,7 @@ TEST_CASE("RH Validation") {
             corpus.next();
         }
         tcc = characterCount; twc = wordCount; tdwc = differentWords; tmax = max;
-        return std::tuple(tcc, twc, tdwc, max);
+        //return std::tuple(tcc, twc, tdwc, max);
     };
-    return std::tuple(twc, tcc, tdwc, tmax);
+    //return std::tuple(twc, tcc, tdwc, tmax);
 }
