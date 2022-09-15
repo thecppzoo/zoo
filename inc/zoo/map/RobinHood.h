@@ -222,7 +222,7 @@ template<
     typename KE = std::equal_to<K>,
     typename U = std::uint64_t,
     typename Scatter = FibonacciScatter<U>,
-    typename RangeReduce = LemireReduce<RequestedSize, U>,
+    typename RangeReduce = LemireReduce<RequestedSize_, U>,
     typename HashReduce = TopHashReducer<HashBits, U>
 >
 struct RH_Frontend_WithSkarupkeTail {
