@@ -19,8 +19,15 @@ set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Suppressing benchmark's tests" FORC
 
 add_subdirectory(dependencies/google_benchmark)
 
-add_executable(zooBenchmark cfs.cpp cfs/cfs_utility.cpp sort.cpp catch2BenchmarkMain.cpp catch2Functions.cpp)
+add_executable(
+    zooBenchmark
+        catch2BenchmarkMain.cpp
+        cfs.cpp cfs/cfs_utility.cpp sort.cpp  catch2Functions.cpp
+)
 
-add_executable(catch2Benchmark catch2BenchmarkMain.cpp catch2Functions.cpp egyptian.cpp)
+add_executable(
+  catch2Benchmark
+    catch2BenchmarkMain.cpp catch2Functions.cpp egyptian.cpp RobinHood.cpp
+)
 
 target_link_libraries(zooBenchmark benchmark)
