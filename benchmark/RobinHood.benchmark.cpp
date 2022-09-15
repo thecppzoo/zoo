@@ -37,7 +37,7 @@ auto benchmarkCore(
     BENCHMARK(what) {
         Corpus corpus(corpusArg);
         auto wordCount = 0, characterCount = 0, differentWords = 0;
-        temporaries.emplace_back();
+        temporaries.emplace_back(std::forward<MapConstructionParameters>(cps)...);
         auto &m = temporaries.back();
         auto max = 0;
         while(corpus) {
@@ -92,16 +92,17 @@ ostream &operator<<(ostream &out, const tuple<Ts...> &tu) {
 }
 
 TEST_CASE("Robin Hood") {
-    std::ifstream corpus("/tmp/RobinHood.corpus.txt");
-    if(!corpus) {
-        abort();
-    }
-    std::string line;
-    std::regex words{"\\w+"};
     std::vector<std::string> strings;
     std::vector<int> ints;
 
     auto initialize = [&]() {
+        std::ifstream corpus("/tmp/RobinHood.corpus.txt");
+        if(!corpus) {
+            abort();
+        }
+        std::string line;
+        std::regex words{"\\w+"};
+
         corpus.clear();
         corpus.seekg(0);
         auto wordCount = 0, characterCount = 0;
@@ -150,7 +151,4 @@ TEST_CASE("Robin Hood") {
     CHECK(rhR == mapR);
     auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map", 6000);
     CHECK(mapR == uoR);
-    benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
-    benchmarkCore<std::unordered_map<int, int>>(ContainerCorpus{ints}, "std::unordered_map -  int", 6000);
-    WARN("Results: " << mapR);
 }
