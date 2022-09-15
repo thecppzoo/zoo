@@ -4,6 +4,9 @@
 #include "zoo/map/RobinHoodUtil.h"
 #include "zoo/AlignedStorage.h"
 
+#include "zoo/debug/rh/RobinHood.debug.h"
+#include <iostream>
+
 #ifndef ZOO_CONFIG_DEEP_ASSERTIONS
     #define ZOO_CONFIG_DEEP_ASSERTIONS 0
 #endif
@@ -432,6 +435,8 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             if(HighestSafePSL < evictedPSL) {
+                auto correct = debug::rh::satisfiesInvariant(*this);
+                
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
             }
             

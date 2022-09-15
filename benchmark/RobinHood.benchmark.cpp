@@ -32,7 +32,7 @@ auto benchmarkCore(
 ) {
     // not measuring the performance of destruction
     std::vector<Map> temporaries;
-    temporaries.reserve(110);
+    temporaries.reserve(1000);
     auto tcc = 0, twc = 0, tdwc = 0, tmax = 0;
     BENCHMARK(what) {
         Corpus corpus(corpusArg);
@@ -105,7 +105,7 @@ TEST_CASE("Robin Hood") {
 
         corpus.clear();
         corpus.seekg(0);
-        auto wordCount = 0, characterCount = 0;
+        auto wordCount = 0, characterCount = 0, dwc = 0;
         std::unordered_map<std::string, int> converter;
 
         while(corpus) {
@@ -119,8 +119,9 @@ TEST_CASE("Robin Hood") {
                 strings.push_back(str);
                 auto fr = converter.find(str);
                 if(converter.end() == fr) {
-                    converter.insert(fr, std::pair{str, wordCount});
-                    ints.push_back(wordCount);
+                    converter.insert(fr, std::pair{str, dwc});
+                    ints.push_back(dwc);
+                    ++dwc;
                 } else {
                     ints.push_back(fr->second);
                 }
@@ -132,6 +133,11 @@ TEST_CASE("Robin Hood") {
         return std::tuple(wordCount, characterCount);
     };
     auto [wc, cc] = initialize();
+    using RH6000 = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 6000, 5, 3>;
+    auto rhR = benchmarkCore<RH6000>(ContainerCorpus{strings}, "RH");
+    using RH6000int = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 6000, 5, 3>;
+    auto rhRint = benchmarkCore<RH6000int>(ContainerCorpus{ints}, "RH - ints");
+
     auto count = 0;
     BENCHMARK("baseline") {
         ContainerCorpus fromStrings(strings);
@@ -144,11 +150,10 @@ TEST_CASE("Robin Hood") {
         return charCount;
     };
     REQUIRE(cc == count);
-    benchmarkCore<zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 7000, 6, 2>>(ContainerCorpus{ints}, "rh -  int");
+
     auto mapR = benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
-    using RH6000 = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 6000, 5, 3>;
-    auto rhR = benchmarkCore<RH6000>(ContainerCorpus{strings}, "RH");
     CHECK(rhR == mapR);
     auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map", 6000);
+    benchmarkCore<std::unordered_map<int, int>>(ContainerCorpus{ints}, "std::unordered_map - int", 6000);
     CHECK(mapR == uoR);
 }

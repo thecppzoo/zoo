@@ -3,6 +3,8 @@
 #include "zoo/map/RobinHoodUtil.h"
 #include "zoo/debug/rh/RobinHood.debug.h"
 
+#include "zoo/debug/rh/RobinHood.debug.h"
+
 #include <catch2/catch.hpp>
 
 #include <algorithm>
@@ -513,7 +515,7 @@ TEST_CASE("RH Validation") {
     if(true) {
         ContainerCorpus corpus(ints);
         auto wordCount = 0, characterCount = 0, differentWords = 0;
-        using Map = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 7000, 6, 2>;
+        using Map = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 6000, 5, 3>;
         Map m;
         auto max = 0;
         while(corpus) {
