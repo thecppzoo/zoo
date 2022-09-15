@@ -553,20 +553,21 @@ void setEntry(Metadata& md, Values& values,
 
 TEST_CASE("Robin Hood unitary insert saturation",
           "[api][mapping][swar][robin-hood]") {
-//void poke(MetadataCollection &collection, size_t index, u64 psl, u64 hash)
     FrontendUnitary32 table;
     auto top = 35;
+    // Poking to a top of 35 leaves entries >32 garbagey but we won't be able
+    // to look at them due to psl exhaustion deteciton.
     for (int i = 1; i < top; i++ ) {
-      setEntry(table.md_, table.values_, i, i, 1, i+5, i+3);
-      //CHECK(i+5 == table.find(i+5)->value().first);
-      //CHECK(i+3 == table.find(i+5)->value().first);
+        setEntry(table.md_, table.values_, i, i, 1, i+5, i+3);
     }
 
     for (int i = 1; i < top; i++ ) {
         // This will exhaust psl
         auto findResult = table.find(i+5);
-std::cerr << i << "\n";
-        CHECK(findResult->value().first == i+5);
-        CHECK(findResult == table.end());
+        if (i < 33) {
+            CHECK(findResult->value().first == i+5);
+        } else {
+            CHECK(findResult == table.end());
+        }
     }
 }

@@ -94,17 +94,11 @@ struct RH_Backend {
         auto saturation = greaterEqual_MSB_off(nPSL, saturatedPSL);
         auto invertSatMask = ((swar::isolateLSB(saturation.value()) - 1) );
         auto satMask = (~(swar::isolateLSB(saturation.value()) - 1) );
-std::cerr << std::setw(8) << std::hex << 
-" needlePSL " <<  nPSL.value()  << 
-" maxPSL " << Metadata::MaxPSL << 
-" saturation " << saturation.value() << 
-" invertSatMask " << invertSatMask << 
-" satMask " << satMask << "\n";
+//std::cerr << std::setw(8) << std::hex << " needlePSL " <<  nPSL.value()  << " maxPSL " << Metadata::MaxPSL << " saturation " << saturation.value() << " invertSatMask " << invertSatMask << " satMask " << satMask << "\n";
         //if (not bool(saturation)) return std::tuple{nPSL, false};
         // Least sig lane is saturated, all more sig must be made saturated.
         auto needlePSLsToSaturate = Metadata{satMask & saturatedPSL.value()};
-std:: cerr << " -- saturatedPSL " << saturatedPSL.value() << 
-" needlePSLsToSaturate " << needlePSLsToSaturate.value() << "\n";
+//std::cerr << " -- saturatedPSL " << saturatedPSL.value() << " needlePSLsToSaturate " << needlePSLsToSaturate.value() << "\n";
         // addition might have overflown nPSL before entering function
         return std::tuple{Metadata{nPSL.PSLs() | needlePSLsToSaturate}, bool(saturation)};  // saturated at any point, last swar to check.
     }
@@ -225,8 +219,7 @@ std:: cerr << " -- saturatedPSL " << saturatedPSL.value() <<
             auto [safeNeedlePSLs, shouldStop] =
                 needlePSLSaturation(needle.PSLs() + AllNSlots);
             PSLsAreUnsafe = shouldStop;
-std::cerr << std::setw(8) << std::hex << "needle " << needle.value()  << " safeNeedlePSLs " << safeNeedlePSLs.value() 
-<< " new needle " << (needle.hashes() | safeNeedlePSLs).value() << "\n";
+//std::cerr << std::setw(8) << std::hex << "needle " << needle.value()  << " safeNeedlePSLs " << safeNeedlePSLs.value() << " new needle " << (needle.hashes() | safeNeedlePSLs).value() << "\n";
             needle = needle.hashes() | safeNeedlePSLs;
             // TODO psl overflow must be checked.
         }
