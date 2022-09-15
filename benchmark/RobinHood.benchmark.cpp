@@ -1,4 +1,5 @@
 #include "zoo/map/RobinHood.h"
+#include "zoo/debug/rh/RobinHood.debug.h"
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <catch2/catch.hpp>
@@ -23,14 +24,18 @@ auto cc = 0, wc = 0, dwc = 0, max = 0;
 auto length(const std::string &s) { return s.length(); }
 auto length(int) { return 1; }
 
-template<typename Map, typename Corpus>
-auto benchmarkCore(Corpus &&corpus, const char *what) {
-    std::string line;
+template<typename Map, typename Corpus, typename... MapConstructionParameters>
+auto benchmarkCore(
+    Corpus &&corpusArg,
+    const char *what,
+    MapConstructionParameters &&...cps
+) {
     // not measuring the performance of destruction
     std::vector<Map> temporaries;
-    temporaries.reserve(2000);  // Without this present we see bad allocs in release mode in the benchmark for rh.
+    temporaries.reserve(110);
     auto tcc = 0, twc = 0, tdwc = 0, tmax = 0;
     BENCHMARK(what) {
+        Corpus corpus(corpusArg);
         auto wordCount = 0, characterCount = 0, differentWords = 0;
         temporaries.emplace_back();
         auto &m = temporaries.back();
@@ -50,7 +55,7 @@ auto benchmarkCore(Corpus &&corpus, const char *what) {
             corpus.next();
         }
         tcc = characterCount; twc = wordCount; tdwc = differentWords; tmax = max;
-        return std::tuple(wordCount, characterCount, differentWords, max);
+        return std::tuple(tcc, twc, tdwc, max);
     };
     return std::tuple(twc, tcc, tdwc, tmax);
 }
@@ -68,6 +73,23 @@ struct ContainerCorpus {
 
     void next() { ++position_; }
 };
+
+namespace std {
+
+template<typename... T>
+void f(T &&...) {}
+
+template<typename TT, size_t... Indices>
+ostream &printTupleElements(ostream &out, TT &&tu, index_sequence<Indices...>) {
+    [](...){}((out << ' ' << get<Indices>(tu), 0)...);
+    return out;
+}
+
+template<typename... Ts>
+ostream &operator<<(ostream &out, const tuple<Ts...> &tu) {
+    return printTupleElements(out, tu, make_index_sequence<sizeof...(Ts)>{});
+}
+}
 
 TEST_CASE("Robin Hood") {
     std::ifstream corpus("/tmp/RobinHood.corpus.txt");
@@ -121,12 +143,14 @@ TEST_CASE("Robin Hood") {
         return charCount;
     };
     REQUIRE(cc == count);
+    benchmarkCore<zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 7000, 6, 2>>(ContainerCorpus{ints}, "rh -  int");
+    auto mapR = benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
     using RH6000 = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 6000, 5, 3>;
     auto rhR = benchmarkCore<RH6000>(ContainerCorpus{strings}, "RH");
-    auto mapR = benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
     CHECK(rhR == mapR);
-    auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map");
+    auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map", 6000);
     CHECK(mapR == uoR);
     benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
-    //WARN()
+    benchmarkCore<std::unordered_map<int, int>>(ContainerCorpus{ints}, "std::unordered_map -  int", 6000);
+    WARN("Results: " << mapR);
 }

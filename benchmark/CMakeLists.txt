@@ -1,12 +1,13 @@
 cmake_minimum_required (VERSION 2.6)
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -g3 -march=native -fno-unroll-loops -fsanitize=address")
+set(CMAKE_CXX_FLAGS "-std=c++17 -g3 -march=native -fno-unroll-loops")
 
 set(CMAKE_BUILD_TYPE "Release")
 
 project(ZooBenchmark)
 
 include_directories(
+    ../test/inc
     ../../benchmark/include
     ../inc
     ../junkyard/inc
@@ -27,7 +28,8 @@ add_executable(
 
 add_executable(
   catch2Benchmark
-    catch2BenchmarkMain.cpp catch2Functions.cpp egyptian.cpp RobinHood.cpp
+    catch2BenchmarkMain.cpp catch2Functions.cpp egyptian.cpp
+    RobinHood.benchmark.cpp
 )
 
 target_link_libraries(zooBenchmark benchmark)

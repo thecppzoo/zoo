@@ -17,6 +17,9 @@
     #include <assert>
 #endif
 
+#include <iostream>
+#include "zoo/debug/rh/RobinHood.debug.h"
+
 namespace zoo {
 namespace rh {
 
@@ -299,9 +302,10 @@ struct RH_Frontend_WithSkarupkeTail {
 
     auto findParameters(const K &k) const noexcept {
         auto [hoisted, homeIndex] =
-            findBasicParameters 
-                <K, RequestedSize, HashBits, U,
-                Hash, Scatter, RangeReduce, HashReduce >(k);
+            findBasicParameters<
+                K, RequestedSize, HashBits, U,
+                Hash, Scatter, RangeReduce, HashReduce
+            >(k);
         return
             std::tuple{
                 hoisted,
@@ -338,6 +342,9 @@ struct RH_Frontend_WithSkarupkeTail {
         auto [iT, deadlineT, needleT] =
             be.findMisaligned_assumesSkarupkeTail(hoisted, homeIndex, kc);
         auto index = iT;
+        if(HighestSafePSL < index - homeIndex) {
+            throw MaximumProbeSequenceLengthExceeded("Scanning for eviction, from finding");
+        }
         auto deadline = deadlineT;
         if(!deadline) { return std::pair{values_.data() + index, false}; }
         auto needle = needleT;
@@ -428,6 +435,7 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             if(HighestSafePSL < evictedPSL) {
+                std::cerr << debug::rh::display(*this, index - HighestSafePSL - 5, index + 10);
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
             }
             
@@ -523,7 +531,8 @@ struct RH_Frontend_WithSkarupkeTail {
                     if(breaksRobinHood) { break; }
                     evictedPSL += MD::NSlots;
                     if(HighestSafePSL < evictedPSL) {
-                        throw MaximumProbeSequenceLengthExceeded("Scanning for eviction");
+                        std::cerr << debug::rh::display(*this, index - HighestSafePSL - 5, index + 10);
+                        throw MaximumProbeSequenceLengthExceeded("Scanning for eviction, insertion");
                     }
                     needlePSLs = needlePSLs + BroadcastSWAR_ElementCount;
                 }
@@ -535,6 +544,7 @@ struct RH_Frontend_WithSkarupkeTail {
         }
     }
 
+    auto begin() const noexcept { return this->values_.begin(); }
     auto end() const noexcept { return this->values_.end(); }
 };
 
