@@ -8,6 +8,7 @@
 #include <regex>
 #include <map>
 #include <unordered_map>
+#include <random>
 
 template<typename K, typename MV>
 auto &value(zoo::rh::KeyValuePairWrapper<K, MV> *p) {
@@ -34,7 +35,9 @@ auto benchmarkCore(
     std::vector<Map> temporaries;
     temporaries.reserve(1000);
     auto tcc = 0, twc = 0, tdwc = 0, tmax = 0;
+    auto pass = 0;
     BENCHMARK(what) {
+        ++pass;
         Corpus corpus(corpusArg);
         auto wordCount = 0, characterCount = 0, differentWords = 0;
         temporaries.emplace_back(std::forward<MapConstructionParameters>(cps)...);
@@ -47,7 +50,13 @@ auto benchmarkCore(
             auto fr = m.find(word);
             if(m.end() == fr) {
                 ++differentWords;
-                m.insert(typename Map::value_type{word, 1});
+                try {
+                    m.insert(typename Map::value_type{word, 1});
+                } catch(...) {
+                    //auto invariant = zoo::debug::rh::satisfiesInvariant(m);
+                    WARN(pass << ' ' << wordCount << ' ' << word);
+                    throw;
+                }
             } else {
                 auto v = ++value(fr).second;
                 if(max < v) { max = v; }
@@ -91,6 +100,9 @@ ostream &operator<<(ostream &out, const tuple<Ts...> &tu) {
 }
 }
 
+template<typename K, typename V>
+using RHF7000 = zoo::rh::RH_Frontend_WithSkarupkeTail<K, V, 7000, 5, 3>;
+
 TEST_CASE("Robin Hood") {
     std::vector<std::string> strings;
     std::vector<int> ints;
@@ -130,13 +142,12 @@ TEST_CASE("Robin Hood") {
                 ++wordIterator;
             }
         }
-        return std::tuple(wordCount, characterCount);
+        return std::tuple(wordCount, characterCount, dwc);
     };
-    auto [wc, cc] = initialize();
-    using RH6000 = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 6000, 5, 3>;
-    auto rhR = benchmarkCore<RH6000>(ContainerCorpus{strings}, "RH");
-    using RH6000int = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 6000, 5, 3>;
-    auto rhRint = benchmarkCore<RH6000int>(ContainerCorpus{ints}, "RH - ints");
+    auto [wc, cc, dwc] = initialize();
+    WARN("Number of different words" << dwc);
+    auto rhR = benchmarkCore<RHF7000<std::string, int>>(ContainerCorpus{strings}, "RH");
+    auto rhRint = benchmarkCore<RHF7000<int, int>>(ContainerCorpus{ints}, "RH - ints");
 
     auto count = 0;
     BENCHMARK("baseline") {
@@ -153,7 +164,67 @@ TEST_CASE("Robin Hood") {
 
     auto mapR = benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
     CHECK(rhR == mapR);
-    auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map", 6000);
-    benchmarkCore<std::unordered_map<int, int>>(ContainerCorpus{ints}, "std::unordered_map - int", 6000);
+    auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map", 7000);
+    benchmarkCore<std::unordered_map<int, int>>(ContainerCorpus{ints}, "std::unordered_map - int", 7000);
     CHECK(mapR == uoR);
+}
+
+TEST_CASE("Robin Hood - Random", "[robin-hood]") {
+    std::random_device rd;
+    auto seed = rd();
+    WARN("Seed:" << seed);
+    std::mt19937 g;
+    g.seed(seed);
+    std::array<uint64_t, 6000> elements;
+    auto counter = 0;
+    for(auto &e: elements) { e = counter++; }
+    std::shuffle(elements.begin(), elements.end(), g);
+    RHF7000<int, int> rh;
+    std::unordered_map<int, int> um;
+    std::map<int, int> m;
+    for(auto &e: elements) {
+        RHF7000<int, int>::value_type insertable{e, 1};
+        auto ir = rh.insert(insertable);
+        REQUIRE(ir.second);
+        um.insert(insertable);
+        m.insert(insertable);
+    }
+    BENCHMARK("baseline - running the mt19937") {
+        auto gc = g;
+        auto rv = 0;
+        for(auto count = 10000; count--; ) {
+            rv ^= gc();
+        }
+        return rv;
+    };
+    auto core = [&](auto &map, const char *name) {
+        auto found = 0, notFound = 0, max = 0;
+        auto end = map.end();
+        auto resultCode = 0;
+        auto passes = 0;
+        auto gc = g;
+        BENCHMARK(name) {
+            ++passes;
+            for(auto count = 10000; count--; ) {
+                auto key = gc() / 8192;
+                auto findResult = map.find(key);
+                if(end == findResult) {
+                    ++notFound;
+                } else {
+                    auto &v = value(findResult).second;
+                    ++v;
+                    ++found;
+                    if(max < v) { max = v; }
+                }
+            }
+            resultCode = found ^ notFound ^ max;
+            return resultCode;
+        };
+        return std::tuple(found, notFound, max, resultCode);
+    };
+    auto umr = core(um, "Unordered Map");
+    auto rhr = core(rh, "Robin Hood");
+    auto mr = core(m, "std::map");
+    CHECK(umr == rhr);
+    CHECK(mr == rhr);
 }
