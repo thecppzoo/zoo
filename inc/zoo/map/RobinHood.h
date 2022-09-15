@@ -17,9 +17,6 @@
     #include <assert>
 #endif
 
-#include <iostream>
-#include "zoo/debug/rh/RobinHood.debug.h"
-
 namespace zoo {
 namespace rh {
 
