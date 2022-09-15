@@ -23,15 +23,19 @@ auto cc = 0, wc = 0, dwc = 0, max = 0;
 auto length(const std::string &s) { return s.length(); }
 auto length(int) { return 1; }
 
-template<typename Map, typename Corpus>
-auto benchmarkCore(Corpus &&corpus, const char *what) {
+template<typename Map, typename Corpus, typename... MapConstructionParameters>
+auto benchmarkCore(
+    Corpus &&corpus,
+    const char *what,
+    MapConstructionParameters &&...cps
+) {
     std::string line;
     // not measuring the performance of destruction
     std::vector<Map> temporaries;
     auto tcc = 0, twc = 0, tdwc = 0, tmax = 0;
     BENCHMARK(what) {
         auto wordCount = 0, characterCount = 0, differentWords = 0;
-        temporaries.emplace_back();
+        temporaries.emplace_back(std::forward<MapConstructionParameters>(cps)...);
         auto &m = temporaries.back();
         auto max = 0;
         while(corpus) {
@@ -68,17 +72,21 @@ struct ContainerCorpus {
     void next() { ++position_; }
 };
 
+template<typename... Ts>
+std::ostream &operator<<(std::ostream &out, const std::tuple<Ts...> &tu);
+
 TEST_CASE("Robin Hood") {
-    std::ifstream corpus("/tmp/RobinHood.corpus.txt");
-    if(!corpus) {
-        abort();
-    }
-    std::string line;
-    std::regex words{"\\w+"};
     std::vector<std::string> strings;
     std::vector<int> ints;
 
     auto initialize = [&]() {
+        std::ifstream corpus("/tmp/RobinHood.corpus.txt");
+        if(!corpus) {
+            abort();
+        }
+        std::string line;
+        std::regex words{"\\w+"};
+
         corpus.clear();
         corpus.seekg(0);
         auto wordCount = 0, characterCount = 0;
@@ -126,6 +134,5 @@ TEST_CASE("Robin Hood") {
     CHECK(rhR == mapR);
     auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map");
     CHECK(mapR == uoR);
-    benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
-    //WARN()
+    //WARN("Results: " << mapR);
 }
