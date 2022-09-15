@@ -225,6 +225,8 @@ template<int NBits> auto badMixer(u64 h) noexcept {
 /// Evenly map a large int to an int without division or modulo.
 template<int SizeTable, typename T>
 constexpr int mapToSlotLemireReduction(T halved) {
+    // TODO: E and S think that the upper bits of are higher quality entropy,
+    // explore at some point.
     return (halved * T(SizeTable)) >> (sizeof(T)/2);
 }
 

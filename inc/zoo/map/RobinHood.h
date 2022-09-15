@@ -527,7 +527,6 @@ struct RH_Frontend_WithSkarupkeTail {
                     if(breaksRobinHood) { break; }
                     evictedPSL += MD::NSlots;
                     if(HighestSafePSL < evictedPSL) {
-                        std::cerr << debug::rh::display(*this, index - HighestSafePSL - 5, index + 10);
                         throw MaximumProbeSequenceLengthExceeded("Scanning for eviction, insertion");
                     }
                     needlePSLs = needlePSLs + BroadcastSWAR_ElementCount;
