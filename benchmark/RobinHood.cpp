@@ -28,6 +28,7 @@ auto benchmarkCore(Corpus &&corpus, const char *what) {
     std::string line;
     // not measuring the performance of destruction
     std::vector<Map> temporaries;
+    temporaries.reserve(2000);  // Without this present we see bad allocs in release mode in the benchmark for rh.
     auto tcc = 0, twc = 0, tdwc = 0, tmax = 0;
     BENCHMARK(what) {
         auto wordCount = 0, characterCount = 0, differentWords = 0;

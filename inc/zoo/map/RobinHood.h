@@ -257,28 +257,45 @@ struct RH_Frontend_WithSkarupkeTail {
         for(auto &mde: md_) { mde = MD{0}; }
     }
 
-    ~RH_Frontend_WithSkarupkeTail() {
-        #if ZOO_CONFIG_DEEP_ASSERTIONS
-            size_t destroyedCount = 0;
-        #endif
-        auto baseIndex = (SWARCount - 1) * MD::NSlots;
-        for(size_t ndx = SWARCount; ndx--; baseIndex -= MD::NSlots) {
-            auto PSLs = md_[ndx].PSLs();
+    template<typename Callable>
+    void traverse(Callable &&c) const {
+        for(size_t swarIndex = 0; swarIndex < SWARCount; ++swarIndex) {
+            auto PSLs = md_[swarIndex].PSLs();
             auto occupied = booleans(PSLs);
             while(occupied) {
-                auto subIndex = occupied.lsbIndex();
-                auto index = baseIndex + subIndex;
-                values_[index].destroy();
-                #if ZOO_CONFIG_DEEP_ASSERTIONS
-                    ++destroyedCount;
-                #endif
+                auto intraIndex = occupied.lsbIndex();
+                c(swarIndex, intraIndex);
                 occupied = occupied.clearLSB();
             }
         }
-        #if ZOO_CONFIG_DEEP_ASSERTIONS
-            assert(destroyedCount == elementCount_);
-        #endif
     }
+
+    ~RH_Frontend_WithSkarupkeTail() {
+        traverse([thy=this](std::size_t sI, std::size_t intra) {
+            thy->values_[intra + sI * MD::NSlots].destroy();
+        });
+    }
+
+    RH_Frontend_WithSkarupkeTail(const RH_Frontend_WithSkarupkeTail &model):
+        RH_Frontend_WithSkarupkeTail()
+    {
+        model.traverse([thy=this,other=&model](std::size_t sI, std::size_t intra) {
+            auto index = intra + sI * MD::NSlots;
+            thy->values_[index].build(other->values_[index].value());
+            thy->md_[sI] = thy->md_[sI].blitElement(other->md_[sI], intra);
+            ++thy->elementCount_;
+        });
+    }
+
+    RH_Frontend_WithSkarupkeTail(RH_Frontend_WithSkarupkeTail &&donor) noexcept:
+        md_(donor.md_), elementCount_(donor.elementCount_)
+    {
+        traverse([thy=this, other=&donor](std::size_t sI, std::size_t intra) {
+            auto index = intra + sI * MD::NSlots;
+            thy->values_[index].build(std::move(other->values_[index].value()));
+        });
+    }
+
 
     auto findParameters(const K &k) const noexcept {
         auto [hoisted, homeIndex] =

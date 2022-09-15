@@ -104,6 +104,12 @@ struct SWAR {
         return SWAR((m_v & ~elementMask) | (value << (index * NBits)));
     }
 
+    constexpr SWAR blitElement(int index, SWAR other) const noexcept {
+        constexpr auto OneElementMask = SWAR(~(~T(0) << NBits));
+        auto IsolationMask = OneElementMask.shiftLanesLeft(index);
+        return (*this & ~IsolationMask) | (other & IsolationMask);
+    }
+
     constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
         return SWAR(value() << (NBits * laneCount));
     }
