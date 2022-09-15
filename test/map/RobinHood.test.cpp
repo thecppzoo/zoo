@@ -1,6 +1,7 @@
 #include "zoo/map/RobinHood.h"
 #include "zoo/map/RobinHoodAlt.h"
 #include "zoo/map/RobinHoodUtil.h"
+#include "zoo/debug/rh/RobinHood.debug.h"
 
 #include <catch2/catch.hpp>
 
