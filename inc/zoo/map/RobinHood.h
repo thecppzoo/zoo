@@ -4,9 +4,6 @@
 #include "zoo/map/RobinHoodUtil.h"
 #include "zoo/AlignedStorage.h"
 
-#include "zoo/debug/rh/RobinHood.debug.h"
-#include <iostream>
-
 #ifndef ZOO_CONFIG_DEEP_ASSERTIONS
     #define ZOO_CONFIG_DEEP_ASSERTIONS 0
 #endif
@@ -120,7 +117,7 @@ struct RH_Backend {
     constexpr auto
     findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept {
+    ) const noexcept __attribute__((always_inline)) {
         auto misalignment = homeIndex % Metadata::NSlots;
         auto baseIndex = homeIndex / Metadata::NSlots;
         auto base = this->md_ + baseIndex;
@@ -185,7 +182,6 @@ struct RH_Backend {
             ++p;
             index += Metadata::NSlots;
             needle = needle + AllNSlots;
-            // TODO psl overflow must be checked.
         }
     }
 };
@@ -316,7 +312,7 @@ struct RH_Frontend_WithSkarupkeTail {
             };
     }
 
-    auto find(const K &k) noexcept {
+    inline auto find(const K &k) noexcept __attribute__((always_inline)) {
         auto [hoisted, homeIndex, keyChecker] = findParameters(k);
         Backend be{this->md_.data()};
         auto [index, deadline, dontcare] =
@@ -435,8 +431,6 @@ struct RH_Frontend_WithSkarupkeTail {
                 return std::pair{values_.data() + index, true};
             }
             if(HighestSafePSL < evictedPSL) {
-                auto correct = debug::rh::satisfiesInvariant(*this);
-                
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
             }
             

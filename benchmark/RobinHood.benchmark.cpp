@@ -207,7 +207,6 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         auto passes = 0;
         std::mt19937 gc;
         gc.seed(seed);
-        auto sc = 0;
         BENCHMARK(name) {
             ++passes;
             for(auto count = 10000; count--; ) {
