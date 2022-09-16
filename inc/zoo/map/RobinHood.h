@@ -114,11 +114,11 @@ struct RH_Backend {
     }
 
     template<typename KeyComparer>
-    constexpr
+    inline constexpr
     std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept;// __attribute__((always_inline));
+    ) const noexcept __attribute__((always_inline));
 };
 
 template<int PSL_Bits, int HashBits, typename U>
@@ -537,6 +537,8 @@ struct RH_Frontend_WithSkarupkeTail {
         }
     }
 
+    struct const_iterator;
+
     struct iterator {
         KeyValuePairWrapper<K, MV> *p;
 
@@ -545,14 +547,15 @@ struct RH_Frontend_WithSkarupkeTail {
         value_type &operator*() noexcept { return p->value(); }
         value_type *operator->() noexcept { return &p->value(); }
 
-        bool operator==(iterator &other) const noexcept {
+        bool operator==(iterator other) const noexcept {
             return p == other.p;
         }
 
-        bool operator!=(iterator &other) const noexcept {
+        bool operator!=(iterator other) const noexcept {
             return p == other.p;
         }
 
+        bool operator==(const_iterator c) const noexcept { return p == c.p; }
         iterator(KeyValuePairWrapper<K, MV> *p): p(p) {}
     };
 
@@ -561,11 +564,11 @@ struct RH_Frontend_WithSkarupkeTail {
         const value_type &operator*() noexcept { return p->value(); }
         const value_type *operator->() noexcept { return &p->value(); }
 
-        bool operator==(iterator &other) const noexcept {
+        bool operator==(const_iterator other) const noexcept {
             return p == other.p;
         }
 
-        bool operator!=(iterator &other) const noexcept {
+        bool operator!=(const_iterator other) const noexcept {
             return p == other.p;
         }
 
@@ -599,9 +602,7 @@ auto
 RH_Frontend_WithSkarupkeTail<
     K, MV, RequestedSize_, PSL_Bits, HashBits, Hash, KE, U, Scatter,
     RangeReduce, HashReduce
->::find(const K &k) noexcept ->
-//typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
-iterator
+>::find(const K &k) noexcept -> iterator
 {
         auto [hoisted, homeIndex, keyChecker] = findParameters(k);
         Backend be{this->md_.data()};

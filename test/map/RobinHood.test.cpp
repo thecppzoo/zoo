@@ -180,8 +180,8 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
             REQUIRE(allKeysThere());
         } else {
             ++mirror[word];
-            ++findResult->value().second;
-            REQUIRE(mirror[word] == findResult->value().second);
+            ++findResult->second;
+            REQUIRE(mirror[word] == findResult->second);
             ZOO_TEST_TRACE_WARN(word << ' ' << mirror[word]);
         }
         auto [ok, failureNdx] = zoo::debug::rh::satisfiesInvariant(ex);
@@ -527,7 +527,7 @@ TEST_CASE("RH Validation") {
                 auto [where, whether] =
                     m.insert(typename Map::value_type{word, 1});
                 REQUIRE(whether);
-                auto at = where - m.begin();
+                auto at = where.p - m.begin().p;
                 auto [consistent, ndx] = zoo::debug::rh::satisfiesInvariant(m, at - 20, at + 5);
                 INFO("inconsistency at " << ndx << " doing '" << decoder[word] << '\'');
                 INFO(zoo::debug::rh::display(
@@ -538,7 +538,7 @@ TEST_CASE("RH Validation") {
                 ));
                 REQUIRE(consistent);
             } else {
-                auto v = ++fr->value().second;
+                auto v = ++fr->second;
                 if(max < v) { max = v; }
             }
             corpus.next();
