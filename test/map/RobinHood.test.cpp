@@ -573,3 +573,112 @@ TEST_CASE("Robin Hood - big", "[robin-hood]") {
         REQUIRE(valid);
     }
 }
+
+struct TakeLamb {
+    template<typename Callable>
+    TakeLamb(Callable &&c) {
+        c();
+    }
+};
+
+template<typename K, typename MV>
+auto &value(zoo::rh::KeyValuePairWrapper<K, MV> *p) {
+    return p->value();
+};
+
+template<typename It>
+auto &value(It it) {
+    return *it;
+}
+
+#define Q(L)
+#define BENCHMARK(name) TakeLamb bla##__LINE__ = [&]()
+
+TEST_CASE("Robin Hood - Random", "[robin-hood]") {
+    std::random_device rd;
+    auto seed = rd();
+    //auto seed = 2334323242;
+    WARN("Seed:" << seed);
+    std::mt19937 g;
+    g.seed(seed);
+    std::array<uint64_t, 100000> elements;
+    auto counter = 0;
+    for(auto &e: elements) { e = counter++; }
+    std::shuffle(elements.begin(), elements.end(), g);
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 100000, 5, 11>;
+    RH rh;
+    std::unordered_map<int, int> um;
+    std::map<int, int> m;
+    for(auto &e: elements) {
+        RH::value_type insertable{e, 1};
+        try {
+            auto ir = rh.insert(insertable);
+            REQUIRE(ir.second);
+        } catch(std::exception &e) {
+            WARN("Exception: " << e.what());
+            auto [hoisted, homeIndex, dontcare] =
+                rh.findParameters(insertable.first);
+            std::ofstream bolted("/tmp/onException.txt");
+            bolted << "Inserting " << insertable.first << " failed\n";
+            bolted << "Hoisted code " << std::hex << hoisted << " @" << std::dec << homeIndex << '\n';
+            bolted << zoo::debug::rh::display(rh, 0, RH::SlotCount);
+            REQUIRE(false);
+        }
+        um.insert(insertable);
+        m.insert(insertable);
+    }
+    auto [valid, problem] = zoo::debug::rh::satisfiesInvariant(rh, 0, 0);
+    if(!valid) {
+        std::ofstream bug("/tmp/bug.txt");
+        bug << "seed " << seed << " counter " << (counter - 1) << '\n';
+        bug << "happened at " << problem << '\n';
+        bug << zoo::debug::rh::display(rh, 0, rh.SlotCount);
+        REQUIRE(valid);
+    }
+    WARN("Unordered Map load factor " << um.load_factor());
+    BENCHMARK("baseline - running the mt19937") {
+        auto gc = g;
+        auto rv = 0;
+        for(auto count = 10000; count--; ) {
+            rv ^= gc();
+        }
+        return rv;
+    };
+    constexpr auto drawFrom = 2 * elements.size();
+    auto core = [&](auto &map, const char *name) {
+        auto found = 0, notFound = 0, max = 0;
+        auto end = map.end();
+        auto resultCode = 0;
+        auto passes = 0;
+        std::mt19937 gc;
+        gc.seed(seed);
+        BENCHMARK(name) {
+            ++passes;
+            for(auto count = 10000; count--; ) {
+                auto key = gc() / drawFrom;
+                auto findResult = map.find(key);
+                if(end == findResult) {
+                    ++notFound;
+                } else {
+                    auto &v = value(findResult).second;
+                    ++v;
+                    ++found;
+                    if(max < v) { max = v; }
+                }
+            }
+            resultCode = found ^ notFound ^ max;
+            return resultCode;
+        };
+        return std::tuple(found, notFound, max, resultCode, passes);
+    };
+    auto umr = core(um, "Unordered Map");
+    auto rhr = core(rh, "Robin Hood");
+    auto mr = core(m, "std::map");
+
+    /*CHECK(umr == rhr);
+    CHECK(mr == rhr);
+    CHECK(mr == umr);*/
+    /*std::ofstream chain("/tmp/chain.txt");
+    chain << "Seed " << seed << '\n';
+    chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);*/
+}

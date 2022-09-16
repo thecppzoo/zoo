@@ -10,23 +10,11 @@
 #include <unordered_map>
 #include <random>
 
-template<typename K, typename MV>
-auto &value(zoo::rh::KeyValuePairWrapper<K, MV> *p) {
-    return p->value();
-};
-
-template<typename It>
-auto &value(It it) {
-    return *it;
-}
-
-auto cc = 0, wc = 0, dwc = 0, max = 0;
-
 auto length(const std::string &s) { return s.length(); }
 auto length(int) { return 1; }
 
 template<typename Map, typename Corpus, typename... MapConstructionParameters>
-auto benchmarkCore(
+auto nonRandom_insertion_find_benchmarkCore(
     Corpus &&corpusArg,
     const char *what,
     MapConstructionParameters &&...cps
@@ -52,13 +40,12 @@ auto benchmarkCore(
                 ++differentWords;
                 try {
                     m.insert(typename Map::value_type{word, 1});
-                } catch(...) {
-                    //auto invariant = zoo::debug::rh::satisfiesInvariant(m);
-                    WARN(pass << ' ' << wordCount << ' ' << word);
+                } catch(std::exception &e) {
+                    WARN(pass << ' ' << wordCount << ' ' << word << ' ' << e.what());
                     throw;
                 }
             } else {
-                auto v = ++value(fr).second;
+                auto v = ++(fr->second);
                 if(max < v) { max = v; }
             }
             corpus.next();
@@ -85,9 +72,6 @@ struct ContainerCorpus {
 
 namespace std {
 
-template<typename... T>
-void f(T &&...) {}
-
 template<typename TT, size_t... Indices>
 ostream &printTupleElements(ostream &out, TT &&tu, index_sequence<Indices...>) {
     [](...){}((out << ' ' << get<Indices>(tu), 0)...);
@@ -98,15 +82,20 @@ template<typename... Ts>
 ostream &operator<<(ostream &out, const tuple<Ts...> &tu) {
     return printTupleElements(out, tu, make_index_sequence<sizeof...(Ts)>{});
 }
+
 }
 
+// The canonical example: 5 bits for PSL, 3 for hoisted hashes
 template<typename K, typename V, std::size_t RS>
 using RHF = zoo::rh::RH_Frontend_WithSkarupkeTail<K, V, RS, 5, 3>;
+// Small, non-trivial size
 template<typename K, typename V>
 using RHF7000 = RHF<K, V, 7000>;
 
-TEST_CASE("Robin Hood") {
+TEST_CASE("Robin Hood - insertion and finding", "[robin-hood]") {
+    // the sequence of strings from a corpus
     std::vector<std::string> strings;
+    // a sequence of integers from the strings encoded as intgers
     std::vector<int> ints;
 
     auto initialize = [&]() {
@@ -148,46 +137,62 @@ TEST_CASE("Robin Hood") {
     };
     auto [wc, cc, dwc] = initialize();
     WARN("Number of different words" << dwc);
-    auto rhR = benchmarkCore<RHF7000<std::string, int>>(ContainerCorpus{strings}, "RH");
-    auto rhRint = benchmarkCore<RHF7000<int, int>>(ContainerCorpus{ints}, "RH - ints");
+    auto rhR =
+        nonRandom_insertion_find_benchmarkCore<
+            RHF7000<std::string, int>
+        >(ContainerCorpus{strings}, "RH");
+    auto rhRint =
+        nonRandom_insertion_find_benchmarkCore<
+            RHF7000<int, int>
+        >(ContainerCorpus{ints}, "RH - ints");
 
     auto count = 0;
-    BENCHMARK("baseline") {
+    BENCHMARK("baseline - hashing strings") {
         ContainerCorpus fromStrings(strings);
         auto charCount = 0;
+        auto xorAccumulatedHashes = std::hash<std::string>{}("Hello");
         while(fromStrings) {
             charCount += fromStrings.key().length();
+            xorAccumulatedHashes ^= std::hash<std::string>{}(fromStrings.key());
             fromStrings.next();
         }
         count = charCount;
-        return charCount;
+        return charCount ^ xorAccumulatedHashes;
     };
     REQUIRE(cc == count);
 
-    auto mapR = benchmarkCore<std::map<std::string, int>>(ContainerCorpus{strings}, "std::map");
+    auto mapR =
+        nonRandom_insertion_find_benchmarkCore<
+            std::map<std::string, int>
+        >(ContainerCorpus{strings}, "std::map");
     CHECK(rhR == mapR);
-    auto uoR = benchmarkCore<std::unordered_map<std::string, int>>(ContainerCorpus{strings}, "std::unordered_map", 7000);
-    benchmarkCore<std::unordered_map<int, int>>(ContainerCorpus{ints}, "std::unordered_map - int", 7000);
+    auto uoR =
+        nonRandom_insertion_find_benchmarkCore<
+            std::unordered_map<std::string, int>
+        >(ContainerCorpus{strings}, "std::unordered_map", 7000);
     CHECK(mapR == uoR);
+    nonRandom_insertion_find_benchmarkCore<
+        std::unordered_map<int, int>
+    >(ContainerCorpus{ints}, "std::unordered_map - int", 7000);
 }
 
 TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     std::random_device rd;
     auto seed = rd();
-    //auto seed = 2334323242;
     WARN("Seed:" << seed);
     std::mt19937 g;
     g.seed(seed);
-    std::array<uint64_t, 100000> elements;
+    constexpr auto ElementCount = 100000;
+    std::array<uint64_t, ElementCount> elements;
     auto counter = 0;
     for(auto &e: elements) { e = counter++; }
     std::shuffle(elements.begin(), elements.end(), g);
-    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 100000, 5, 11>;
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, ElementCount, 5, 3>;
     RH rh;
     std::unordered_map<int, int> um;
     std::map<int, int> m;
     for(auto &e: elements) {
-        RH::value_type insertable{counter++, 1};
+        RH::value_type insertable{e, 1};
         try {
             auto ir = rh.insert(insertable);
             REQUIRE(ir.second);
@@ -213,6 +218,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         REQUIRE(valid);
     }
     WARN("Unordered Map load factor " << um.load_factor());
+    WARN("Robin Hood load factor " << double(ElementCount)/RH::SlotCount);
     BENCHMARK("baseline - running the mt19937") {
         auto gc = g;
         auto rv = 0;
@@ -221,7 +227,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         }
         return rv;
     };
-    constexpr auto drawFrom = 2 * elements.size();
+    constexpr auto drawFrom = int(9 * elements.size());
     auto core = [&](auto &map, const char *name) {
         auto found = 0, notFound = 0, max = 0;
         auto end = map.end();
@@ -231,13 +237,13 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         gc.seed(seed);
         BENCHMARK(name) {
             ++passes;
-            for(auto count = 10000; count--; ) {
+            for(auto count = 2*drawFrom; count--; ) {
                 auto key = gc() / drawFrom;
                 auto findResult = map.find(key);
                 if(end == findResult) {
                     ++notFound;
                 } else {
-                    auto &v = value(findResult).second;
+                    auto &v = findResult->second;
                     ++v;
                     ++found;
                     if(max < v) { max = v; }
@@ -252,10 +258,18 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     auto rhr = core(rh, "Robin Hood");
     auto mr = core(m, "std::map");
 
-    /*CHECK(umr == rhr);
+    /*
+    Since the number of passes is not the same, some extra-logic is needed
+    to be able to compare the results.
+    CHECK(umr == rhr);
     CHECK(mr == rhr);
-    CHECK(mr == umr);*/
-    /*std::ofstream chain("/tmp/chain.txt");
+    CHECK(mr == umr);
+    */
+    std::ofstream chain("/tmp/chain.txt");
     chain << "Seed " << seed << '\n';
-    chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);*/
+    chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);
+
+    auto manyInsertions = [&](auto &map) {
+        
+    };
 }

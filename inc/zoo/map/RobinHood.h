@@ -537,13 +537,48 @@ struct RH_Frontend_WithSkarupkeTail {
         }
     }
 
-    auto begin() const noexcept { return this->values_.begin(); }
-    auto end() const noexcept { return this->values_.end(); }
+    struct iterator {
+        KeyValuePairWrapper<K, MV> *p;
 
-    typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
-    inline find(const K &k) noexcept __attribute__((always_inline));
+        // note: ++ not yet implemented
 
-    auto find(const K &k) const noexcept {
+        value_type &operator*() noexcept { return p->value(); }
+        value_type *operator->() noexcept { return &p->value(); }
+
+        bool operator==(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        bool operator!=(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        iterator(KeyValuePairWrapper<K, MV> *p): p(p) {}
+    };
+
+    struct const_iterator {
+        const KeyValuePairWrapper<K, MV> *p;
+        const value_type &operator*() noexcept { return p->value(); }
+        const value_type *operator->() noexcept { return &p->value(); }
+
+        bool operator==(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        bool operator!=(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        const_iterator(const KeyValuePairWrapper<K, MV> *p): p(p) {}
+        const_iterator(iterator other) noexcept: const_iterator(other.p) {}
+    };
+
+    const_iterator begin() const noexcept { return this->values_.begin(); }
+    const_iterator end() const noexcept { return this->values_.end(); }
+
+    inline iterator find(const K &k) noexcept __attribute__((always_inline));
+
+    const_iterator find(const K &k) const noexcept {
         const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
     }
 };
@@ -565,7 +600,8 @@ RH_Frontend_WithSkarupkeTail<
     K, MV, RequestedSize_, PSL_Bits, HashBits, Hash, KE, U, Scatter,
     RangeReduce, HashReduce
 >::find(const K &k) noexcept ->
-typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
+//typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
+iterator
 {
         auto [hoisted, homeIndex, keyChecker] = findParameters(k);
         Backend be{this->md_.data()};
