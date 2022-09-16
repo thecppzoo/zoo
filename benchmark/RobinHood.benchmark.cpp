@@ -238,7 +238,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         BENCHMARK(name) {
             ++passes;
             for(auto count = 2*drawFrom; count--; ) {
-                auto key = gc() / drawFrom;
+                auto key = gc() % (drawFrom/2);
                 auto findResult = map.find(key);
                 if(end == findResult) {
                     ++notFound;
@@ -268,8 +268,36 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     std::ofstream chain("/tmp/chain.txt");
     chain << "Seed " << seed << '\n';
     chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);
-
-    auto manyInsertions = [&](auto &map) {
-        
-    };
 }
+
+template<std::size_t InsertionCount, typename Map, typename... MapConstructionParms>
+void randomInsertionCore(std::mt19937 g, const char *name, MapConstructionParms &&...ps) {
+BENCHMARK(name) {
+    auto previouslyFound = 0;
+    Map m(std::forward<MapConstructionParms>(ps)...);
+    for(auto count = InsertionCount; count--; ) {
+        auto ir = m.insert(typename Map::value_type(g(), 1));
+        if(!ir.second) {
+            ++previouslyFound;
+        }
+    }
+};}
+
+template<std::size_t RS, int PSL, int H>
+using RHT = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, RS, PSL, H>;
+
+TEST_CASE("Robin Hood - insertions", "[robin-hood]") {
+    std::random_device rd;
+    std::mt19937 g;
+    auto seed = rd();
+    g.seed(seed);
+    WARN("Seed: " << seed);
+    using um = std::unordered_map<int, int>;
+    randomInsertionCore<1000, RHT<1500, 6, 2>>(g, "1000 - 6/2");
+    randomInsertionCore<1000, um>(g, "1000 - std", 1500);
+    randomInsertionCore<1000, RHT<1500, 5, 3>>(g, "1000 - 5/3");
+    randomInsertionCore<2000, RHT<2500, 6, 2>>(g, "2000 - 6/2");
+    randomInsertionCore<2000, um>(g, "2000 - std", 2000);
+    randomInsertionCore<50000, um>(g, "50000 - std", 50000);
+}
+

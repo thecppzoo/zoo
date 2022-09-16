@@ -337,7 +337,7 @@ struct RH_Frontend_WithSkarupkeTail {
             throw MaximumProbeSequenceLengthExceeded("Scanning for eviction, from finding");
         }
         auto deadline = deadlineT;
-        if(!deadline) { return std::pair{values_.data() + index, false}; }
+        if(!deadline) { return std::pair{iterator(values_.data() + index), false}; }
         auto needle = needleT;
         auto rv =
             insertionEvictionChain(
@@ -395,7 +395,7 @@ struct RH_Frontend_WithSkarupkeTail {
                         std::tuple(std::forward<VTC>(val).second)
                     );
                     *mdp = mdp->blitElement(intraIndex, elementToInsert);
-                    return std::pair{values_.data() + index, true};
+                    return std::pair{iterator(values_.data() + index), true};
                 }
                 // the last element is special because it is a
                 // move-construction, not a move-assignment
@@ -427,7 +427,7 @@ struct RH_Frontend_WithSkarupkeTail {
                 values_[index].value() = std::forward<VTC>(val);
                 md_[swarIndex] =
                     md_[swarIndex].blitElement(intraIndex, elementToInsert);
-                return std::pair{values_.data() + index, true};
+                return std::pair{iterator(values_.data() + index), true};
             }
             if(HighestSafePSL < evictedPSL) {
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
