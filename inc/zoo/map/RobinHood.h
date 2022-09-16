@@ -114,10 +114,20 @@ struct RH_Backend {
     }
 
     template<typename KeyComparer>
-    constexpr auto
+    constexpr
+    std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept __attribute__((always_inline)) {
+    ) const noexcept __attribute__((always_inline));
+};
+
+template<int PSL_Bits, int HashBits, typename U>
+template<typename KeyComparer>
+constexpr
+std::tuple<std::size_t, U, typename RH_Backend<PSL_Bits, HashBits, U>::Metadata>
+RH_Backend<PSL_Bits, HashBits, U>::findMisaligned_assumesSkarupkeTail(
+        U hoistedHash, int homeIndex, const KeyComparer &kc
+    ) const noexcept {
         auto misalignment = homeIndex % Metadata::NSlots;
         auto baseIndex = homeIndex / Metadata::NSlots;
         auto base = this->md_ + baseIndex;
@@ -184,7 +194,6 @@ struct RH_Backend {
             needle = needle + AllNSlots;
         }
     }
-};
 
 template<typename K, typename MV>
 struct KeyValuePairWrapper {
@@ -310,20 +319,6 @@ struct RH_Frontend_WithSkarupkeTail {
                     return KE{}(thy->values_[ndx].value().first, k);
                 }
             };
-    }
-
-    inline auto find(const K &k) noexcept __attribute__((always_inline)) {
-        auto [hoisted, homeIndex, keyChecker] = findParameters(k);
-        Backend be{this->md_.data()};
-        auto [index, deadline, dontcare] =
-            be.findMisaligned_assumesSkarupkeTail(
-                hoisted, homeIndex, keyChecker
-            );
-        return deadline ? values_.end() : values_.data() + index;
-    }
-
-    auto find(const K &k) const noexcept {
-        const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
     }
 
     template<typename ValuteTypeCompatible>
@@ -540,7 +535,42 @@ struct RH_Frontend_WithSkarupkeTail {
 
     auto begin() const noexcept { return this->values_.begin(); }
     auto end() const noexcept { return this->values_.end(); }
+
+    typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
+    find(const K &k) noexcept __attribute__((always_inline));
+
+    auto find(const K &k) const noexcept {
+        const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
+    }
 };
+
+template<
+    typename K,
+    typename MV,
+    size_t RequestedSize_,
+    int PSL_Bits, int HashBits,
+    typename Hash,
+    typename KE,
+    typename U,
+    typename Scatter,
+    typename RangeReduce,
+    typename HashReduce
+>
+auto
+RH_Frontend_WithSkarupkeTail<
+    K, MV, RequestedSize_, PSL_Bits, HashBits, Hash, KE, U, Scatter,
+    RangeReduce, HashReduce
+>::find(const K &k) noexcept ->
+typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
+{
+        auto [hoisted, homeIndex, keyChecker] = findParameters(k);
+        Backend be{this->md_.data()};
+        auto [index, deadline, dontcare] =
+            be.findMisaligned_assumesSkarupkeTail(
+                hoisted, homeIndex, keyChecker
+            );
+        return deadline ? values_.end() : values_.data() + index;
+    }
 
 } // rh
 
