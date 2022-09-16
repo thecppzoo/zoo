@@ -118,7 +118,7 @@ struct RH_Backend {
     std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept __attribute__((always_inline));
+    ) const noexcept;// __attribute__((always_inline));
 };
 
 template<int PSL_Bits, int HashBits, typename U>
@@ -136,7 +136,7 @@ RH_Backend<PSL_Bits, HashBits, U>::findMisaligned_assumesSkarupkeTail(
         constexpr auto Progression = Metadata{Ones * Ones};
         constexpr auto AllNSlots =
             Metadata{meta::BitmaskMaker<U, Metadata::NSlots, Width>::value};
-        MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
+        MisalignedGenerator_Dynamic<Metadata> p(base, int(Metadata::NBits * misalignment));
         auto index = homeIndex;
         auto needle = makeNeedle(0, hoistedHash);
 
@@ -363,7 +363,11 @@ struct RH_Frontend_WithSkarupkeTail {
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
         auto mdp = this->md_.data() + swarIndex;
-        constexpr auto MaxRelocations = 100;
+
+        // Because we have not decided about strong versus basic exception
+        // safety guarantee, for the time being we will just put a very large
+        // number here.
+        constexpr auto MaxRelocations = 100000;
         std::array<std::size_t, MaxRelocations> relocations;
         std::array<int, MaxRelocations> newElements;
         auto relocationsCount = 0;
@@ -441,7 +445,7 @@ struct RH_Frontend_WithSkarupkeTail {
             // we have a place for the element being inserted, at this index
             newElements[relocationsCount++] = elementToInsert;
             if(MaxRelocations <= relocationsCount) {
-                throw RelocationStackExhausted("");
+                throw RelocationStackExhausted("Relocation Stack");
             }
 
             // now the insertion will be for the old metadata entry

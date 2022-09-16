@@ -1,7 +1,6 @@
 #include "zoo/map/RobinHood.h"
 #include "zoo/map/RobinHoodAlt.h"
 #include "zoo/map/RobinHoodUtil.h"
-#include "zoo/debug/rh/RobinHood.debug.h"
 
 #include "zoo/debug/rh/RobinHood.debug.h"
 
@@ -545,7 +544,32 @@ TEST_CASE("RH Validation") {
             corpus.next();
         }
         tcc = characterCount; twc = wordCount; tdwc = differentWords; tmax = max;
-        //return std::tuple(tcc, twc, tdwc, max);
     };
-    //return std::tuple(twc, tcc, tdwc, tmax);
+}
+
+#include <random>
+
+TEST_CASE("Robin Hood - big", "[robin-hood]") {
+    std::random_device rd;
+    auto seed = rd();
+    WARN("Seed:" << seed);
+    std::mt19937 g;
+    g.seed(seed);
+    std::array<uint64_t, 40000> elements;
+    auto counter = 0;
+    for(auto &e: elements) { e = counter++; }
+    std::shuffle(elements.begin(), elements.end(), g);
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 50000, 11, 5>;
+    RH rh;
+    for(auto &e: elements) {
+        RH::value_type insertable{counter++, 1};
+        auto ir = rh.insert(insertable);
+        REQUIRE(ir.second);
+    }
+    auto [valid, problem] = zoo::debug::rh::satisfiesInvariant(rh, 0, 0);
+    if(!valid) {
+        std::ofstream bug("/tmp/bug.txt");
+        bug << zoo::debug::rh::display(rh, 0, rh.SlotCount);
+        REQUIRE(valid);
+    }
 }

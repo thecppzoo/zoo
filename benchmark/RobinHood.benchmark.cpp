@@ -174,24 +174,45 @@ TEST_CASE("Robin Hood") {
 TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     std::random_device rd;
     auto seed = rd();
+    //auto seed = 2334323242;
     WARN("Seed:" << seed);
     std::mt19937 g;
     g.seed(seed);
-    std::array<uint64_t, 40000> elements;
+    std::array<uint64_t, 50000> elements;
     auto counter = 0;
     for(auto &e: elements) { e = counter++; }
     std::shuffle(elements.begin(), elements.end(), g);
-    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 50000, 11, 5>;
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 50000, 6, 2>;
     RH rh;
     std::unordered_map<int, int> um;
     std::map<int, int> m;
     for(auto &e: elements) {
         RH::value_type insertable{counter++, 1};
-        auto ir = rh.insert(insertable);
-        REQUIRE(ir.second);
+        try {
+            auto ir = rh.insert(insertable);
+            REQUIRE(ir.second);
+        } catch(std::exception &e) {
+            WARN("Exception: " << e.what());
+            auto [hoisted, homeIndex, dontcare] =
+                rh.findParameters(insertable.first);
+            std::ofstream bolted("/tmp/onException.txt");
+            bolted << "Inserting " << insertable.first << " failed\n";
+            bolted << "Hoisted code " << std::hex << hoisted << " @" << std::dec << homeIndex << '\n';
+            bolted << zoo::debug::rh::display(rh, 0, RH::SlotCount);
+            REQUIRE(false);
+        }
         um.insert(insertable);
         m.insert(insertable);
     }
+    auto [valid, problem] = zoo::debug::rh::satisfiesInvariant(rh, 0, 0);
+    if(!valid) {
+        std::ofstream bug("/tmp/bug.txt");
+        bug << "seed " << seed << " counter " << (counter - 1) << '\n';
+        bug << "happened at " << problem << '\n';
+        bug << zoo::debug::rh::display(rh, 0, rh.SlotCount);
+        REQUIRE(valid);
+    }
+    WARN("Unordered Map load factor " << um.load_factor());
     BENCHMARK("baseline - running the mt19937") {
         auto gc = g;
         auto rv = 0;
@@ -229,7 +250,11 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     auto umr = core(um, "Unordered Map");
     auto rhr = core(rh, "Robin Hood");
     auto mr = core(m, "std::map");
+
     /*CHECK(umr == rhr);
     CHECK(mr == rhr);
     CHECK(mr == umr);*/
+    std::ofstream chain("/tmp/chain.txt");
+    
+    chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);
 }
