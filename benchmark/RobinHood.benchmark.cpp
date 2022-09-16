@@ -178,11 +178,11 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     WARN("Seed:" << seed);
     std::mt19937 g;
     g.seed(seed);
-    std::array<uint64_t, 50000> elements;
+    std::array<uint64_t, 100000> elements;
     auto counter = 0;
     for(auto &e: elements) { e = counter++; }
     std::shuffle(elements.begin(), elements.end(), g);
-    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 50000, 6, 2>;
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 100000, 5, 11>;
     RH rh;
     std::unordered_map<int, int> um;
     std::map<int, int> m;
@@ -221,6 +221,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         }
         return rv;
     };
+    constexpr auto drawFrom = 2 * elements.size();
     auto core = [&](auto &map, const char *name) {
         auto found = 0, notFound = 0, max = 0;
         auto end = map.end();
@@ -231,7 +232,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         BENCHMARK(name) {
             ++passes;
             for(auto count = 10000; count--; ) {
-                auto key = gc() / 8192;
+                auto key = gc() / drawFrom;
                 auto findResult = map.find(key);
                 if(end == findResult) {
                     ++notFound;
@@ -254,7 +255,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     /*CHECK(umr == rhr);
     CHECK(mr == rhr);
     CHECK(mr == umr);*/
-    std::ofstream chain("/tmp/chain.txt");
-    
-    chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);
+    /*std::ofstream chain("/tmp/chain.txt");
+    chain << "Seed " << seed << '\n';
+    chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);*/
 }
