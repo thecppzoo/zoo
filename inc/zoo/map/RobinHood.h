@@ -123,7 +123,7 @@ struct RH_Backend {
 
 template<int PSL_Bits, int HashBits, typename U>
 template<typename KeyComparer>
-constexpr
+inline constexpr
 std::tuple<std::size_t, U, typename RH_Backend<PSL_Bits, HashBits, U>::Metadata>
 RH_Backend<PSL_Bits, HashBits, U>::findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
@@ -537,7 +537,7 @@ struct RH_Frontend_WithSkarupkeTail {
     auto end() const noexcept { return this->values_.end(); }
 
     typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
-    find(const K &k) noexcept __attribute__((always_inline));
+    inline find(const K &k) noexcept __attribute__((always_inline));
 
     auto find(const K &k) const noexcept {
         const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
