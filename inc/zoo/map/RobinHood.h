@@ -118,7 +118,7 @@ struct RH_Backend {
     std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept;// __attribute__((always_inline));
+    ) const noexcept __attribute__((always_inline));
 };
 
 template<int PSL_Bits, int HashBits, typename U>

@@ -178,16 +178,21 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     WARN("Seed:" << seed);
     std::mt19937 g;
     g.seed(seed);
-    std::array<uint64_t, 50000> elements;
+    constexpr auto elementCount = 410000;
+    constexpr size_t elementCapacity = elementCount + 5000;
+    std::array<uint64_t, elementCount> elements;
     auto counter = 0;
-    for(auto &e: elements) { e = counter++; }
+    for(auto &e: elements) { 
+      //e = g();
+      e = counter++;
+    }
     std::shuffle(elements.begin(), elements.end(), g);
-    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 50000, 6, 2>;
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, elementCapacity, 6, 2>;
     RH rh;
     std::unordered_map<int, int> um;
     std::map<int, int> m;
     for(auto &e: elements) {
-        RH::value_type insertable{counter++, 1};
+        RH::value_type insertable{e, 1};
         try {
             auto ir = rh.insert(insertable);
             REQUIRE(ir.second);
@@ -216,7 +221,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     BENCHMARK("baseline - running the mt19937") {
         auto gc = g;
         auto rv = 0;
-        for(auto count = 10000; count--; ) {
+        for(auto count = elementCount; count--; ) {
             rv ^= gc();
         }
         return rv;
@@ -230,8 +235,8 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         gc.seed(seed);
         BENCHMARK(name) {
             ++passes;
-            for(auto count = 10000; count--; ) {
-                auto key = gc() / 8192;
+            for(auto count = elementCount; count--; ) {
+                auto key = gc() % 410000 + 1000000;
                 auto findResult = map.find(key);
                 if(end == findResult) {
                     ++notFound;
