@@ -298,6 +298,7 @@ TEST_CASE("Robin Hood - insertions", "[robin-hood]") {
     randomInsertionCore<1000, RHT<1500, 5, 3>>(g, "1000 - 5/3");
     randomInsertionCore<2000, RHT<2500, 6, 2>>(g, "2000 - 6/2");
     randomInsertionCore<2000, um>(g, "2000 - std", 2000);
-    randomInsertionCore<50000, um>(g, "50000 - std", 50000);
+    randomInsertionCore<50000, um>(g, "50000 - std", 60000);
+    randomInsertionCore<50000, RHT<60000, 6, 2>>(g, "50000 - 6/2");
 }
 
