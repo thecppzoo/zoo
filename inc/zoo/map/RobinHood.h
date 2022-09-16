@@ -367,7 +367,7 @@ struct RH_Frontend_WithSkarupkeTail {
         // Because we have not decided about strong versus basic exception
         // safety guarantee, for the time being we will just put a very large
         // number here.
-        constexpr auto MaxRelocations = 100000;
+        constexpr auto MaxRelocations = 150000;
         std::array<std::size_t, MaxRelocations> relocations;
         std::array<int, MaxRelocations> newElements;
         auto relocationsCount = 0;
