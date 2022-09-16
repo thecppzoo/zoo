@@ -114,8 +114,18 @@ struct RH_Backend {
     }
 
     template<typename KeyComparer>
-    constexpr auto
+    constexpr
+    std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
+        U hoistedHash, int homeIndex, const KeyComparer &kc
+    ) const noexcept;// __attribute__((always_inline));
+};
+
+template<int PSL_Bits, int HashBits, typename U>
+template<typename KeyComparer>
+inline constexpr
+std::tuple<std::size_t, U, typename RH_Backend<PSL_Bits, HashBits, U>::Metadata>
+RH_Backend<PSL_Bits, HashBits, U>::findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
     ) const noexcept {
         auto misalignment = homeIndex % Metadata::NSlots;
@@ -126,7 +136,7 @@ struct RH_Backend {
         constexpr auto Progression = Metadata{Ones * Ones};
         constexpr auto AllNSlots =
             Metadata{meta::BitmaskMaker<U, Metadata::NSlots, Width>::value};
-        MisalignedGenerator_Dynamic<Metadata> p(base, int(8*misalignment));
+        MisalignedGenerator_Dynamic<Metadata> p(base, int(Metadata::NBits * misalignment));
         auto index = homeIndex;
         auto needle = makeNeedle(0, hoistedHash);
 
@@ -182,10 +192,8 @@ struct RH_Backend {
             ++p;
             index += Metadata::NSlots;
             needle = needle + AllNSlots;
-            // TODO psl overflow must be checked.
         }
     }
-};
 
 template<typename K, typename MV>
 struct KeyValuePairWrapper {
@@ -313,20 +321,6 @@ struct RH_Frontend_WithSkarupkeTail {
             };
     }
 
-    auto find(const K &k) noexcept {
-        auto [hoisted, homeIndex, keyChecker] = findParameters(k);
-        Backend be{this->md_.data()};
-        auto [index, deadline, dontcare] =
-            be.findMisaligned_assumesSkarupkeTail(
-                hoisted, homeIndex, keyChecker
-            );
-        return deadline ? values_.end() : values_.data() + index;
-    }
-
-    auto find(const K &k) const noexcept {
-        const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
-    }
-
     template<typename ValuteTypeCompatible>
     auto insert(ValuteTypeCompatible &&val) {
         auto &k = val.first;
@@ -343,7 +337,7 @@ struct RH_Frontend_WithSkarupkeTail {
             throw MaximumProbeSequenceLengthExceeded("Scanning for eviction, from finding");
         }
         auto deadline = deadlineT;
-        if(!deadline) { return std::pair{values_.data() + index, false}; }
+        if(!deadline) { return std::pair{iterator(values_.data() + index), false}; }
         auto needle = needleT;
         auto rv =
             insertionEvictionChain(
@@ -369,7 +363,11 @@ struct RH_Frontend_WithSkarupkeTail {
         auto swarIndex = index / MD::Lanes;
         auto intraIndex = index % MD::Lanes;
         auto mdp = this->md_.data() + swarIndex;
-        constexpr auto MaxRelocations = 100;
+
+        // Because we have not decided about strong versus basic exception
+        // safety guarantee, for the time being we will just put a very large
+        // number here.
+        constexpr auto MaxRelocations = 100000;
         std::array<std::size_t, MaxRelocations> relocations;
         std::array<int, MaxRelocations> newElements;
         auto relocationsCount = 0;
@@ -397,7 +395,7 @@ struct RH_Frontend_WithSkarupkeTail {
                         std::tuple(std::forward<VTC>(val).second)
                     );
                     *mdp = mdp->blitElement(intraIndex, elementToInsert);
-                    return std::pair{values_.data() + index, true};
+                    return std::pair{iterator(values_.data() + index), true};
                 }
                 // the last element is special because it is a
                 // move-construction, not a move-assignment
@@ -429,7 +427,7 @@ struct RH_Frontend_WithSkarupkeTail {
                 values_[index].value() = std::forward<VTC>(val);
                 md_[swarIndex] =
                     md_[swarIndex].blitElement(intraIndex, elementToInsert);
-                return std::pair{values_.data() + index, true};
+                return std::pair{iterator(values_.data() + index), true};
             }
             if(HighestSafePSL < evictedPSL) {
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
@@ -447,7 +445,7 @@ struct RH_Frontend_WithSkarupkeTail {
             // we have a place for the element being inserted, at this index
             newElements[relocationsCount++] = elementToInsert;
             if(MaxRelocations <= relocationsCount) {
-                throw RelocationStackExhausted("");
+                throw RelocationStackExhausted("Relocation Stack");
             }
 
             // now the insertion will be for the old metadata entry
@@ -539,9 +537,80 @@ struct RH_Frontend_WithSkarupkeTail {
         }
     }
 
-    auto begin() const noexcept { return this->values_.begin(); }
-    auto end() const noexcept { return this->values_.end(); }
+    struct iterator {
+        KeyValuePairWrapper<K, MV> *p;
+
+        // note: ++ not yet implemented
+
+        value_type &operator*() noexcept { return p->value(); }
+        value_type *operator->() noexcept { return &p->value(); }
+
+        bool operator==(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        bool operator!=(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        iterator(KeyValuePairWrapper<K, MV> *p): p(p) {}
+    };
+
+    struct const_iterator {
+        const KeyValuePairWrapper<K, MV> *p;
+        const value_type &operator*() noexcept { return p->value(); }
+        const value_type *operator->() noexcept { return &p->value(); }
+
+        bool operator==(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        bool operator!=(iterator &other) const noexcept {
+            return p == other.p;
+        }
+
+        const_iterator(const KeyValuePairWrapper<K, MV> *p): p(p) {}
+        const_iterator(iterator other) noexcept: const_iterator(other.p) {}
+    };
+
+    const_iterator begin() const noexcept { return this->values_.begin(); }
+    const_iterator end() const noexcept { return this->values_.end(); }
+
+    inline iterator find(const K &k) noexcept __attribute__((always_inline));
+
+    const_iterator find(const K &k) const noexcept {
+        const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
+    }
 };
+
+template<
+    typename K,
+    typename MV,
+    size_t RequestedSize_,
+    int PSL_Bits, int HashBits,
+    typename Hash,
+    typename KE,
+    typename U,
+    typename Scatter,
+    typename RangeReduce,
+    typename HashReduce
+>
+auto
+RH_Frontend_WithSkarupkeTail<
+    K, MV, RequestedSize_, PSL_Bits, HashBits, Hash, KE, U, Scatter,
+    RangeReduce, HashReduce
+>::find(const K &k) noexcept ->
+//typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
+iterator
+{
+        auto [hoisted, homeIndex, keyChecker] = findParameters(k);
+        Backend be{this->md_.data()};
+        auto [index, deadline, dontcare] =
+            be.findMisaligned_assumesSkarupkeTail(
+                hoisted, homeIndex, keyChecker
+            );
+        return deadline ? values_.end() : values_.data() + index;
+    }
 
 } // rh
 

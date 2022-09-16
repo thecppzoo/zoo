@@ -19,43 +19,44 @@ auto display(
     std::ostringstream out;
 
     using MD = typename Table::MD;
+    constexpr auto HexPerSlot = (MD::NBits + 3) / 4;
+    constexpr auto HexPerPSL = (MD::NBitsLeast + 3) / 4;
+    constexpr auto HexPerHash = (MD::NBitsMost + 3) / 4;
+
+    char format[60];
+    snprintf(format, 59, "%%0%dllx %%0%dllx %%0%dllx", HexPerSlot, HexPerSlot, HexPerPSL);
+    
     auto swarNdx = begin / MD::NSlots;
-    auto intraNdx = begin % MD::NSlots;
+    auto swarEnd = end/MD::NSlots;
+
     auto initial = t.md_[swarNdx];
-    initial = initial.shiftLanesRight(intraNdx);
-    char buffer[30];
+    auto intra = 0;
     auto printLine =
         [&]() {
-            char buffer[10];
+            char buffer[100];
             sprintf(
                 buffer,
-                "%02llx %02llx %02llx",
+                format,
                 initial.at(0), initial.hashes().at(0), initial.PSLs().at(0)
             );
             out << buffer;
             if(initial.PSLs().at(0)) {
-                auto &v = t.values_[begin].value();
+                auto &v = t.values_[swarNdx * MD::NSlots + intra].value();
                 out << ' ' << v.first << ':' << v.second;
                 c(out, v.first, v.second);
             }
             out << '\n';
             initial = initial.shiftLanesRight(1);
-            ++begin;
+            ++intra;
         };
-    switch(intraNdx) {
-        do {
-            case 0: printLine();
-            case 1: printLine();
-            case 2: printLine();
-            case 3: printLine();
-            case 4: printLine();
-            case 5: printLine();
-            case 6: printLine();
-            case 7: printLine();
-            out << "- " << begin << '\n';
-            initial = t.md_[++swarNdx];
-        } while(begin < end);
-    }
+    do {
+        intra = 0;
+        for(auto n = MD::NSlots; n--; ) {
+            printLine();
+        }
+        initial = t.md_[++swarNdx];
+        out << "- " << (swarNdx * MD::NSlots) << '\n';
+    } while(swarNdx < swarEnd);
     return out.str();
 }
 
@@ -77,16 +78,16 @@ auto satisfiesInvariant(const Table &map, std::size_t begin = 0, std::size_t end
             (end + Table::MD::NSlots - 1)/Table::MD::NSlots; // ceiling
     auto prior = map.md_[swarIndexBegin].PSLs().at(0);
     for(
-        auto ndx = swarIndexBegin * Table::MD::NSlots;
+        ;
         swarIndexBegin != swarIndexEnd;
-        ++swarIndexBegin, ndx += Table::MD::NSlots
+        ++swarIndexBegin
     ) {
         auto md = map.md_[swarIndexBegin];
         auto v = md.PSLs();
-        for(auto n = Table::MD::NSlots; n--; ++ndx) {
+        for(auto n = Table::MD::NSlots; n--; ) {
             auto current = v.at(0);
             if(prior + 1 < current) {
-                return std::tuple(false, ndx);
+                return std::tuple(false, swarIndexBegin * Table::MD::NSlots + Table::MD::NSlots - n - 1);
             }
             v = v.shiftLanesRight(1);
             prior = current;
