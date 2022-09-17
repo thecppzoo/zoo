@@ -8,6 +8,8 @@ Roadmap items:
     Rotation
     Deletion opt by equivalence class
     Extended benchmarking via some mechanism
+    Add F14 to benchmarks
+    Add Swisstable to benchmarks
     Harden testing around lower level primitives
     Add alternate hash/scatter/hoist/reduce objects
     Add all-in-one hash strategy for using double-fibonacci or similar
