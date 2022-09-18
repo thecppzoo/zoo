@@ -127,10 +127,10 @@ struct RH_Backend {
         auto core = startingPSL | (hoistedHash << PSL_Bits);
         auto broadcasted = broadcast(Metadata(core));
         auto startingPSLmadePotentialPSLs = Metadata(Progression) + broadcasted;
-        return startingPSLmadePotentialPSLs;
+        return Metadata{startingPSLmadePotentialPSLs};
     }
 
-    template<typename KeyComparer>
+    ttemplate<typename KeyComparer>
     inline constexpr
     std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
@@ -138,79 +138,99 @@ struct RH_Backend {
     ) const noexcept __attribute__((always_inline));
 };
 
+// Returned metadata is irrelevant except for the element at the same index
+// as the deadline which contains the PSL and hash of the element which
+// matches the deadline. IE: it is returnedMetadata.at(deadline.lsbindex())
+// that is the PSL + hashbits
+// If we run out of psl bits returned index is homeindex+maxpsl+1
 template<int PSL_Bits, int HashBits, typename U>
 template<typename KeyComparer>
 inline constexpr
 std::tuple<std::size_t, U, typename RH_Backend<PSL_Bits, HashBits, U>::Metadata>
 RH_Backend<PSL_Bits, HashBits, U>::findMisaligned_assumesSkarupkeTail(
-        U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept {
-        auto misalignment = homeIndex % Metadata::NSlots;
-        auto baseIndex = homeIndex / Metadata::NSlots;
-        auto base = this->md_ + baseIndex;
+        U hoistedHash, int homeIndex, const KeyComparer &kc) const noexcept {
+    auto misalignment = homeIndex % Metadata::NSlots;
+    auto baseIndex = homeIndex / Metadata::NSlots;
+    auto base = this->md_ + baseIndex;
 
-        constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
-        constexpr auto Progression = Metadata{Ones * Ones};
-        constexpr auto AllNSlots =
-            Metadata{meta::BitmaskMaker<U, Metadata::NSlots, Width>::value};
-        MisalignedGenerator_Dynamic<Metadata> p(base, int(Metadata::NBits * misalignment));
-        auto index = homeIndex;
-        auto needle = makeNeedle(0, hoistedHash);
+    constexpr auto Ones = meta::BitmaskMaker<U, 1, Width>::value;
+    constexpr auto Progression = Metadata{Ones * Ones};
+    constexpr auto AllNSlots =
+        Metadata{meta::BitmaskMaker<U, Metadata::NSlots, Width>::value};
+    MisalignedGenerator_Dynamic<Metadata> p(base,
+        int(Metadata::NBits * misalignment));
+    auto index = homeIndex;
+    auto needle = makeNeedle(0, hoistedHash);
 
-        for(;;) {
-            auto hay = *p;
-            auto result = potentialMatches(needle, hay);
-            auto positives = result.potentialMatches;
-            while(positives.value()) {
-                auto matchSubIndex = positives.lsbIndex();
-                auto matchIndex = index + matchSubIndex;
-                // Possible specialist optimization to kick off all possible
-                // matches to an array (like chaining evict) and check them
-                // later.
-                if(kc(matchIndex)) {
-                    return std::tuple(matchIndex, U(0), Metadata(0));
-                }
-                positives = Metadata{swar::clearLSB(positives.value())};
+    // TODO This could be true for tiny PSLs and big lane widths.
+    bool PSLsAreUnsafe = false;
+    for(;;) {
+        auto hay = *p;
+        auto result = potentialMatches(needle, hay);
+        auto positives = result.potentialMatches;
+        while(positives.value()) {
+            auto matchSubIndex = positives.lsbIndex();
+            auto matchIndex = index + matchSubIndex;
+            // Possible specialist optimization to kick off all possible
+            // matches to an array (like chaining evict) and check them
+            // later.
+            if(kc(matchIndex)) {
+                return std::tuple(matchIndex, U(0), Metadata(0));
             }
-            auto deadline = result.deadline;
-            if(deadline) {
-                // The deadline is relative to the misalignment.
-                // To build an absolute deadline, there are two cases:
-                // the bit falls in the first SWAR or the second SWAR.
-                // The same applies for needle.
-                // in general, for example a misaglignment of 6:
-                // { . | . | . | . | . | . | . | .}{ . | . | . | . | . | . | . | . }
-                //                         { a | b | c | d | e | f | g | h }
-                // shift left (to higher bits) by the misalignment
-                // { 0 | 0 | 0 | 0 | 0 | 0 | a | b }
-                // shift right (to lower bits) by NSlots - misalignment:
-                // { c | d | e | f | g | h | 0 | 0 }
-                // One might hope undefined behavior might be reasonable (zero
-                // result, unchanged result), but ARM proves that undefined
-                // behavior is indeed undefined, so we do our right shift as a
-                // double: shift by n-1, then shift by 1.
-                auto mdd = Metadata{deadline};
-                auto toAbsolute = [](auto v, auto ma) {
-                    auto shiftedLeft = v.shiftLanesLeft(ma);
-                    auto shiftedRight =
-                        v.shiftLanesRight(Metadata::NSlots - ma - 1).shiftLanesRight(1);
-                    return Metadata{shiftedLeft | shiftedRight};
-                };
-                auto position = index + Metadata{deadline}.lsbIndex();
-                return
-                    std::tuple(
-                        position,
-                        toAbsolute(mdd, misalignment).value(),
-                        toAbsolute(needle, misalignment)
-                    );
-            }
-            // Skarupke's tail allows us to not have to worry about the end
-            // of the metadata
-            ++p;
-            index += Metadata::NSlots;
-            needle = needle + AllNSlots;
+            positives = Metadata{swar::clearLSB(positives.value())};
         }
+        auto deadline = result.deadline;
+        if(deadline) {
+            // The deadline is relative to the misalignment.
+            // To build an absolute deadline, there are two cases:
+            // the bit falls in the first SWAR or the second SWAR.
+            // The same applies for needle.
+            // in general, for example a misaglignment of 6:
+            // { . | . | . | . | . | . | . | .}{ . | . | . | . | . | . | . | . }
+            //                         { a | b | c | d | e | f | g | h }
+            // shift left (to higher bits) by the misalignment
+            // { 0 | 0 | 0 | 0 | 0 | 0 | a | b }
+            // shift right (to lower bits) by NSlots - misalignment:
+            // { c | d | e | f | g | h | 0 | 0 }
+            // One might hope undefined behavior might be reasonable (zero
+            // result, unchanged result), but ARM proves that undefined
+            // behavior is indeed undefined, so we do our right shift as a
+            // double: shift by n-1, then shift by 1.
+            auto mdd = Metadata{deadline};
+            auto toAbsolute = [](auto v, auto ma) {
+                auto shiftedLeft = v.shiftLanesLeft(ma);
+                auto shiftedRight =
+                    v.shiftLanesRight(Metadata::NSlots - ma - 1).shiftLanesRight(1);
+                return Metadata{shiftedLeft | shiftedRight};
+            };
+            auto position = index + Metadata{deadline}.lsbIndex();
+            return
+                std::tuple(
+                    position,
+                    toAbsolute(mdd, misalignment).value(),
+                    toAbsolute(needle, misalignment)
+                );
+        }
+        // If we marked last time around as unsafe, we just completed our
+        // last swar block check, fail.  This happens far less often than deadline miss, so place it after.
+        if (PSLsAreUnsafe) {
+          // Signal we ran out of psl by returning the first index that can't be
+          // reached with max PSL paired with a 'found' deadline.
+          return std::tuple{homeIndex + Metadata::MaxPSL + 1, U(0), Metadata{0}};
+          // All this said, it might be that inherent table characteristics
+          // prevent finds from overruning PSLs like inserts can, so this
+          // may be shiftable elsewhere.
+        }
+        // Skarupke's tail allows us to not have to worry about the end
+        // of the metadata
+        ++p;
+        index += Metadata::NSlots;
+        auto [safeNeedlePSLs, shouldStop] =
+             needlePSLSaturation(needle.PSLs() + AllNSlots);
+         PSLsAreUnsafe = shouldStop;
+         needle = needle.hashes() | safeNeedlePSLs;
     }
+}
 
 template<typename K, typename MV>
 struct KeyValuePairWrapper {
@@ -449,7 +469,7 @@ struct RH_Frontend_WithSkarupkeTail {
             if(HighestSafePSL < evictedPSL) {
                 throw MaximumProbeSequenceLengthExceeded("Encoding insertion");
             }
-            
+
             // evict the "deadline" element:
             // first, insert the element in its place (it "stole")
             // find the place for the evicted: when Robin Hood breaks again.
@@ -564,15 +584,15 @@ struct RH_Frontend_WithSkarupkeTail {
         value_type &operator*() noexcept { return p->value(); }
         value_type *operator->() noexcept { return &p->value(); }
 
-        bool operator==(iterator other) const noexcept {
-            return p == other.p;
-        }
+        bool operator==(iterator other) const noexcept { return p == other.p; }
+        bool operator==(const_iterator c) const noexcept { return p == c.p; }
 
         bool operator!=(iterator other) const noexcept {
-            return p == other.p;
+            return not(*this == other);
         }
-
-        bool operator==(const_iterator c) const noexcept { return p == c.p; }
+        bool operator!=(const_iterator other) const noexcept {
+            return not(*this == other);
+        }
         iterator(KeyValuePairWrapper<K, MV> *p): p(p) {}
     };
 
@@ -627,7 +647,10 @@ RH_Frontend_WithSkarupkeTail<
             be.findMisaligned_assumesSkarupkeTail(
                 hoisted, homeIndex, keyChecker
             );
-        return deadline ? values_.end() : values_.data() + index;
+        //deadline ? values_.end() : values_.data() + index;
+        auto pslDeadline = not (index - homeIndex - 1 - MD::MaxPSL);
+        //std::cerr << "pslDeadline " << pslDeadline << "\n";
+        return (deadline || pslDeadline) ? values_.end() : values_.data() + index;
     }
 
 } // rh

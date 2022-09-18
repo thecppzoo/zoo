@@ -20,14 +20,18 @@ auto display(
 
     using MD = typename Table::MD;
     constexpr auto HexPerSlot = (MD::NBits + 3) / 4;
-    constexpr auto HexPerPSL = (MD::NBitsLeast + 3) / 4;
     constexpr auto HexPerHash = (MD::NBitsMost + 3) / 4;
+    constexpr auto HexPerPSL = (MD::NBitsLeast + 3) / 4;
 
     char format[60];
-    snprintf(format, 59, "%%0%dllx %%0%dllx %%0%dllx", HexPerSlot, HexPerSlot, HexPerPSL);
+    snprintf(format, 59, "%%0%dllx %%0%dllx %%0%dllx", HexPerSlot, HexPerHash, HexPerPSL);
     
     auto swarNdx = begin / MD::NSlots;
+    if (begin == end) {
+      end = Table::SlotCount;
+    }
     auto swarEnd = end/MD::NSlots;
+    out << "disp: [" << begin << "," << end << "] sz " << Table::SlotCount << "\n";
 
     auto initial = t.md_[swarNdx];
     auto intra = 0;

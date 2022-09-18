@@ -6,6 +6,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <iostream>
+
 #include <algorithm>
 #include <regex>
 #include <map>
@@ -682,3 +684,64 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     chain << "Seed " << seed << '\n';
     chain << zoo::debug::rh::display(rh, 0, RH::SlotCount);*/
 }
+
+TEST_CASE("Robin Hood narrow unitary table find",
+          "[api][mapping][swar][robin-hood]") {
+    constexpr auto pslBits = 2;
+    constexpr auto hashBits = 6;
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, pslBits, hashBits,
+        UnitaryHash<u64>, std::equal_to<int>, u32,
+        UnitaryScatter<u64>, UnitaryReduce<u64>, UnitaryReducer<u64>> table;
+    zoo::rh::impl::poke(table.md_, 1, 1, 1);
+    table.values_[1].build(std::pair{5, 3});
+    {
+    auto findResult = table.find(5);
+    CHECK(findResult != table.end());
+    CHECK(value(findResult).first == 5);
+    CHECK(value(findResult).second == 3);
+    }
+}
+
+constexpr auto saturationPSL = 5;
+using FrontendUnitary32 =
+    zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, 16, saturationPSL, 3,
+        UnitaryHash<u64>, std::equal_to<int>, u32,
+        UnitaryScatter<u64>, UnitaryReduce<u64>, UnitaryReducer<u64>>;
+
+template<typename Metadata, typename Values>
+void setEntry(Metadata& md, Values& values,
+        int index, int psl, int hash, int key, int val) {
+    zoo::rh::impl::poke(md, index, psl, hash);
+    values[index].build(std::pair{key, val});
+}
+
+TEST_CASE("Robin Hood unitary insert saturation",
+          "[api][mapping][swar][robin-hood]") {
+    FrontendUnitary32 table;
+    auto top = 36;
+    // Poking to a top of 36 leaves entries >32 garbagey but we won't be able
+    // to look at them due to psl exhaustion detection.
+    for (int i = 1; i < top; i++ ) {
+        setEntry(table.md_, table.values_, i, i, 1, i+5, i+3);
+    }
+    auto [ok, failureNdx] = zoo::debug::rh::satisfiesInvariant(table);
+    CHECK(ok);
+    if (!ok) {
+        ZOO_TEST_TRACE_WARN("Failure index " << failureNdx);
+    }
+    std::cerr << zoo::debug::rh::display(table, 0,  table.md_.size());
+    for (int i = 1; i < top; i++ ) {
+        // This will exhaust psl
+        auto findResult = table.find(i+5);
+std::cerr << " i " << i << "  ";
+std::cerr << " value(findResult).first " << value(findResult).first
+<< "value(findResult).second " << value(findResult).second << "\n";
+        if (i < 33) {
+            CHECK(value(findResult).first == i+5);
+        } else {
+            CHECK(findResult == table.end());
+        }
+    }
+}
+
+
