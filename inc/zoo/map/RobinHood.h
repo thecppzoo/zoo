@@ -80,6 +80,23 @@ struct RH_Backend {
         return firstBreakage;
     }
 
+     // This should be more generic: if PSLs breach a broadcast PSL, saturate
+     // This should be more generic: if a SWAR breaches a SWAR condition, saturate.
+     constexpr static auto
+     needlePSLSaturation(Metadata nPSL) {
+         // create a saturator for max PSL.  If any needle saturates, all later PSLs will be set to saturated.
+         constexpr auto saturatedPSL = broadcast(Metadata(Metadata::MaxPSL));
+         //auto nPSL = needle.PSLs();
+         auto saturation = greaterEqual_MSB_off(nPSL, saturatedPSL);
+         auto invertSatMask = ((swar::isolateLSB(saturation.value()) - 1) );
+         auto satMask = (~(swar::isolateLSB(saturation.value()) - 1) );
+         //if (not bool(saturation)) return std::tuple{nPSL, false};
+         // Least sig lane is saturated, all more sig must be made saturated.
+         auto needlePSLsToSaturate = Metadata{satMask & saturatedPSL.value()};
+         // addition might have overflown nPSL before entering function
+         return std::tuple{Metadata{nPSL.PSLs() | needlePSLsToSaturate}, bool(saturation)};  // saturated at any point, last swar to check.
+     }
+
     constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
     potentialMatches(
         Metadata needle, Metadata haystack
@@ -114,11 +131,11 @@ struct RH_Backend {
     }
 
     template<typename KeyComparer>
-    constexpr
+    inline constexpr
     std::tuple<std::size_t, U, Metadata>
     findMisaligned_assumesSkarupkeTail(
         U hoistedHash, int homeIndex, const KeyComparer &kc
-    ) const noexcept;// __attribute__((always_inline));
+    ) const noexcept __attribute__((always_inline));
 };
 
 template<int PSL_Bits, int HashBits, typename U>
@@ -601,9 +618,7 @@ auto
 RH_Frontend_WithSkarupkeTail<
     K, MV, RequestedSize_, PSL_Bits, HashBits, Hash, KE, U, Scatter,
     RangeReduce, HashReduce
->::find(const K &k) noexcept ->
-//typename std::array<KeyValuePairWrapper<K, MV>, SlotCount>::iterator
-iterator
+>::find(const K &k) noexcept -> iterator
 {
         auto [hoisted, homeIndex, keyChecker] = findParameters(k);
         Backend be{this->md_.data()};

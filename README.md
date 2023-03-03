@@ -4,6 +4,13 @@
 
 # zoo
 
-Library of components.
+## CPPCon 2022:
+March 1: We're working on a release of the code this week (March 3): A complete implementation that may not be production-ready.  Thanks for the interest.
 
-The repository is being updated with work open sourced by Snap, Inc. you may check in the branch [`snapchat-release`](https://github.com/thecppzoo/zoo/tree/snapchat-release)
+Please contact us for information about the work we are doing for C++ Now 2023, we are working on it privately
+
+## Library of components.
+
+See the Catch2 based tests in
+`/test/`
+
