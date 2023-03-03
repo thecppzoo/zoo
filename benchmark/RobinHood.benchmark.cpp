@@ -176,18 +176,21 @@ TEST_CASE("Robin Hood - insertion and finding", "[robin-hood]") {
     >(ContainerCorpus{ints}, "std::unordered_map - int", 7000);
 }
 
-TEST_CASE("Robin Hood - Random", "[robin-hood]") {
+TEST_CASE("Robin Hood - Random", "[robin-hood][robin-hood-random]") {
     std::random_device rd;
     auto seed = rd();
     WARN("Seed:" << seed);
     std::mt19937 g;
     g.seed(seed);
-    constexpr auto ElementCount = 100000;
+    constexpr auto ElementCount = 300000;
+    constexpr auto ElementCapacity = ElementCount + 100;
+    constexpr auto PSLBits = 6;
+    constexpr auto HashBits = 2;
     std::array<uint64_t, ElementCount> elements;
     auto counter = 0;
     for(auto &e: elements) { e = counter++; }
     std::shuffle(elements.begin(), elements.end(), g);
-    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, ElementCount, 5, 3>;
+    using RH = zoo::rh::RH_Frontend_WithSkarupkeTail<int, int, ElementCapacity, PSLBits, HashBits>;
     RH rh;
     std::unordered_map<int, int> um;
     std::map<int, int> m;
@@ -219,6 +222,7 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
     }
     WARN("Unordered Map load factor " << um.load_factor());
     WARN("Robin Hood load factor " << double(ElementCount)/RH::SlotCount);
+    WARN("Element Count " << ElementCount << " RH Cap " << RH::SlotCount);
     BENCHMARK("baseline - running the mt19937") {
         auto gc = g;
         auto rv = 0;
@@ -227,7 +231,10 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         }
         return rv;
     };
-    constexpr auto drawFrom = int(9 * elements.size());
+    //constexpr auto drawFrom = int(9 * elements.size());
+    constexpr auto Iterations = ElementCount;
+    constexpr auto missOffset = ElementCount * 5;
+    constexpr auto hitOffset = 0;
     auto core = [&](auto &map, const char *name) {
         auto found = 0, notFound = 0, max = 0;
         auto end = map.end();
@@ -237,8 +244,8 @@ TEST_CASE("Robin Hood - Random", "[robin-hood]") {
         gc.seed(seed);
         BENCHMARK(name) {
             ++passes;
-            for(auto count = 2*drawFrom; count--; ) {
-                auto key = gc() % (drawFrom/2);
+            for(auto count = Iterations; count--; ) {
+                auto key = gc() % ElementCount + missOffset;
                 auto findResult = map.find(key);
                 if(end == findResult) {
                     ++notFound;

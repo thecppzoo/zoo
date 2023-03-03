@@ -234,7 +234,12 @@ struct KeyValuePairWrapper {
 
     void destroy() noexcept { pair_.template destroy<type>(); }
 
-    auto &value() noexcept { return *this->pair_.template as<type>(); }
+    auto valuePtr() const noexcept {
+        auto deconstified = const_cast<KeyValuePairWrapper *>(this);
+        return deconstified->pair_.template as<type>();
+    }
+
+    auto &value() noexcept { return *valuePtr(); }
     const auto &value() const noexcept { return const_cast<KeyValuePairWrapper *>(this)->value(); }
 };
 
@@ -384,7 +389,7 @@ struct RH_Frontend_WithSkarupkeTail {
         // Because we have not decided about strong versus basic exception
         // safety guarantee, for the time being we will just put a very large
         // number here.
-        constexpr auto MaxRelocations = 100000;
+        constexpr auto MaxRelocations = 150000;
         std::array<std::size_t, MaxRelocations> relocations;
         std::array<int, MaxRelocations> newElements;
         auto relocationsCount = 0;
@@ -554,52 +559,46 @@ struct RH_Frontend_WithSkarupkeTail {
         }
     }
 
-    struct const_iterator;
-
-    struct iterator {
-        KeyValuePairWrapper<K, MV> *p;
-
-        // note: ++ not yet implemented
-
-        value_type &operator*() noexcept { return p->value(); }
-        value_type *operator->() noexcept { return &p->value(); }
-
-        bool operator==(iterator other) const noexcept {
-            return p == other.p;
-        }
-
-        bool operator!=(iterator other) const noexcept {
-            return p == other.p;
-        }
-
-        bool operator==(const_iterator c) const noexcept { return p == c.p; }
-        iterator(KeyValuePairWrapper<K, MV> *p): p(p) {}
-    };
-
     struct const_iterator {
-        const KeyValuePairWrapper<K, MV> *p;
-        const value_type &operator*() noexcept { return p->value(); }
-        const value_type *operator->() noexcept { return &p->value(); }
+        const KeyValuePairWrapper<K, MV> *p_;
 
-        bool operator==(const_iterator other) const noexcept {
-            return p == other.p;
+        // note: ++ not yet implemented, we can't iterate ;-)
+
+        const value_type &operator*() noexcept { return p_->value(); }
+        const value_type *operator->() noexcept { return &p_->value(); }
+
+        bool operator==(const const_iterator &other) const noexcept {
+            return p_ == other.p_;
         }
 
-        bool operator!=(const_iterator other) const noexcept {
-            return p == other.p;
+        bool operator!=(const const_iterator &other) const noexcept {
+            return p_ == other.p_;
         }
 
-        const_iterator(const KeyValuePairWrapper<K, MV> *p): p(p) {}
-        const_iterator(iterator other) noexcept: const_iterator(other.p) {}
+        const_iterator(const KeyValuePairWrapper<K, MV> *p): p_(p) {}
+        const_iterator(const const_iterator &) = default;
     };
 
-    const_iterator begin() const noexcept { return this->values_.begin(); }
-    const_iterator end() const noexcept { return this->values_.end(); }
+    struct iterator: const_iterator {
+        value_type *ncp() { return const_cast<value_type *>(&this->p_->value()); }
+        value_type &operator*() noexcept { return *ncp(); }
+        value_type *operator->() noexcept { return ncp(); }
+        using const_iterator::const_iterator;
+    };
+
+    const_iterator begin() const noexcept { return this->values_.data(); }
+    const_iterator end() const noexcept {
+        return this->values_.data() + this->values_.size();
+    }
 
     inline iterator find(const K &k) noexcept __attribute__((always_inline));
 
     const_iterator find(const K &k) const noexcept {
         const_cast<RH_Frontend_WithSkarupkeTail *>(this)->find(k);
+    }
+
+    auto displacement(const_iterator from, const_iterator to) {
+        return to.p_ - from.p_;
     }
 };
 

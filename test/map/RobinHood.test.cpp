@@ -527,7 +527,7 @@ TEST_CASE("RH Validation") {
                 auto [where, whether] =
                     m.insert(typename Map::value_type{word, 1});
                 REQUIRE(whether);
-                auto at = where.p - m.begin().p;
+                auto at = m.displacement(m.begin(), where);
                 auto [consistent, ndx] = zoo::debug::rh::satisfiesInvariant(m, at - 20, at + 5);
                 INFO("inconsistency at " << ndx << " doing '" << decoder[word] << '\'');
                 INFO(zoo::debug::rh::display(
