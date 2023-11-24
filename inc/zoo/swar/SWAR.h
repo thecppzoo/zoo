@@ -50,6 +50,9 @@ struct SWAR {
     constexpr static T BitMod = sizeof(T)*8 % NBits;
     constexpr static T ValidBitsCount = sizeof(T)*8 - BitMod;
     constexpr static T AllOnes = (BitMod == 0) ? ~(T(0)) : ((T(1) << ValidBitsCount) -1);
+    constexpr static T LeastSignificantBit =
+        meta::BitmaskMaker<T, SWAR{1}.value(), NBits>::value;
+    constexpr static T MostSignificantBit = LeastSignificantBit << (NBits - 1);
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -61,7 +64,8 @@ struct SWAR {
         X(SWAR, ~)
     //constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
     #define SWAR_BINARY_OPERATORS_X_LIST \
-        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) \
+        X(SWAR, &=) X(SWAR, ^=) X(SWAR, |=) X(SWAR, -=) X(SWAR, +=)
 
     #define X(rt, op) constexpr rt operator op() const noexcept { return rt(op m_v); }
     SWAR_UNARY_OPERATORS_X_LIST
@@ -292,7 +296,7 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
 /// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
 template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
-    // Booleanness is stored in MSB of a given swar.
+    // Booleanness is stored in the MSBs
     static constexpr auto MaskLaneMSB =
         broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1)));
     constexpr explicit BooleanSWAR(T v): SWAR<NBits, T>(v) {}

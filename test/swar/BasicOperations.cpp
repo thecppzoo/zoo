@@ -4,8 +4,111 @@
 
 #include <type_traits>
 
+namespace zoo::swar {
+
+template<int NB, typename B>
+struct ArithmeticResultTriplet {
+    SWAR<NB, B> result;
+    BooleanSWAR<NB, B> carry, overflow;
+};
+
+template<int NB, typename B>
+constexpr auto makeElementMaskFromLSB(SWAR<NB, B> input) {
+    auto lsb = input.value() & SWAR<NB, B>::LeastSignificantBit;
+    // copy the LSB to the MSB position
+    auto msb = lsb << (NB - 1);
+    // subtracting one we "copy" the msb to all lower positions, but the
+    // msb is cleared: 0x80 -> 0x7F
+    // subtracting zero there is no change
+    auto zeroOrMsbCopiedDown = msb - lsb;
+    // copy again the msb: 0x7F | 0x80 = 0xFF
+    return SWAR<NB, B>(zeroOrMsbCopiedDown | msb);
+}
+
+template<int NB, typename B>
+constexpr auto fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
+    using S = SWAR<NB, B>;
+    constexpr auto
+        SignBit = S{S::MostSignificantBit},
+        LowerBits = SignBit - S{S::LeastSignificantBit};
+    // prevent overflow by clearing the most significant bits
+    auto
+        s1prime = LowerBits & s1,
+        s2prime = LowerBits & s2,
+        resultPrime = s1prime + s2prime,
+        s1Sign = SignBit & s1,
+        s2Sign = SignBit & s2,
+        signPrime = SignBit & resultPrime,
+        result = resultPrime ^ s1Sign ^ s2Sign,
+        // carry is set whenever at least two of the sign bits of s1, s2,
+        // signPrime are set
+        carry = (s1Sign & s2Sign) | (s1Sign & signPrime) | (s2Sign & signPrime),
+        // overflow: the inputs have the same sign and different to result
+        // same sign: s1Sign ^ s2Sign
+        overflow = (s1Sign ^ s2Sign ^ SignBit) & (s1Sign ^ result);
+    return ArithmeticResultTriplet<NB, <#typename B#>>
+}
+
+
+template<int ActualBits, int NB, typename T>
+constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
+    SWAR<NB, T> multiplicand,
+    SWAR<NB, T> multiplier
+) {
+    using S = SWAR<NB, T>;
+    constexpr auto LeastBit = S::LeastSignificantBit;
+    auto multiplicandDoubling = multiplicand.value();
+    auto mplier = multiplier.value();
+    auto product = S{0};
+    for(auto count = ActualBits;;) {
+        auto multiplicandDoublingMask = makeElementMaskFromLSB(S{mplier});
+        product =
+            product + (multiplicandDoublingMask & S{multiplicandDoubling});
+        if(!--count) { break; }
+        multiplicandDoubling <<= 1;
+        auto leastBitCleared = mplier & ~LeastBit;
+        mplier = leastBitCleared >> 1;
+    }
+    return product;
+}
+
+template<int NB, typename T>
+constexpr auto multiplication_OverflowUnsafe(
+    SWAR<NB, T> multiplicand,
+    SWAR<NB, T> multiplier
+) {
+    return
+        multiplication_OverflowUnsafe_SpecificBitCount<NB>(
+            multiplicand, multiplier
+        );
+}
+
+}
+
 using namespace zoo;
 using namespace zoo::swar;
+
+namespace Multiplication {
+
+constexpr SWAR<8, u32> Micand{0x5030201};
+constexpr SWAR<8, u32> Mplier{0xA050301};
+
+// expected:
+// 5*0xA = 5*10 = 50 = 0x32,
+// 3*5 = 15 = 0xF,
+// 3*2 = 6,
+// 1*1 = 1
+constexpr auto Expected = 0x320F0601;
+
+static_assert(
+    Expected == multiplication_OverflowUnsafe(Micand, Mplier).value()
+);
+static_assert(
+    0x320F0601 != // intentionally use a too-small bit count
+    multiplication_OverflowUnsafe_SpecificBitCount<3>(Micand, Mplier).value()
+);
+
+}
 
 #define HE(nbits, t, v0, v1) \
     static_assert(horizontalEquality<nbits, t>(\
