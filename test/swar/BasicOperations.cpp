@@ -46,7 +46,7 @@ constexpr auto fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
         // overflow: the inputs have the same sign and different to result
         // same sign: s1Sign ^ s2Sign
         overflow = (s1Sign ^ s2Sign ^ SignBit) & (s1Sign ^ result);
-    return ArithmeticResultTriplet<NB, <#typename B#>>
+    return ArithmeticResultTriplet<NB, B>(result, carry, overflow);
 }
 
 
