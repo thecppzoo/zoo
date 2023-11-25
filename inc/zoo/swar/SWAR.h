@@ -122,6 +122,16 @@ struct SWAR {
         return SWAR(value() >> (NBits * laneCount));
     }
 
+    /// \param protectiveMask should clear the bits that would cross the lane
+    constexpr SWAR shiftIntraLaneLeft(int bitCount, SWAR protectiveMask) const noexcept {
+        return SWAR{(*this & protectiveMask).value() << bitCount};
+    }
+
+    /// \param protectiveMask should clear the bits that would cross the lane
+    constexpr SWAR shiftIntraLaneRight(int bitCount, SWAR protectiveMask) const noexcept {
+        return SWAR{(*this & protectiveMask).value() >> bitCount};
+    }
+
     T m_v;
 };
 

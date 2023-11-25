@@ -7,6 +7,87 @@
 namespace zoo::swar {
 
 template<int NB, typename B>
+constexpr SWAR<NB, B> parity(SWAR<NB, B> input) {
+    using S = SWAR<NB, B>;
+    auto
+        shiftClearingMask = ~S::MostSignificantBit,
+        doubling = input,
+        result{0};
+    auto
+        count = NB,
+        power = 1;
+    for(;;) {
+        if(1 & count) {
+            result ^= doubling;
+            doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
+        }
+        count >>= 1; // every iteration doubles the number of bits taken into account
+        if(!count) { break; }
+        doubling ^= doubling.shiftIntraLaneLeft(power, shiftClearingMask);
+        // 01...1
+        // 001...1
+        // 00001...1
+        // 000000001...1
+        shiftClearingMask &= S{shiftClearingMask.value() >> power};
+        power <<= 1;
+    }
+    return result;
+}
+
+/*
+Execution trace at two points:
+1. when checking `if(1 & count)`
+2. when checking `if(!count)`
+If the variable did not change from the last value, it may be ommitted
+input       Count       x       d       power   mask
+1           1           0       x0      1       01111...
+            0           x0
+2           2           0       x0      1       01111...
+            1           0       x0      1       01111...
+            1           0       x01     2       00111...
+            0           x01
+3           3           0       x0      1       01111...
+            1           x0      x1      1       01111...
+            1           x0      x12     2       00111...
+            0           x012    x23
+4           4           0       x0      1       01111...
+            2           0       x0      1       01111...
+            2           0       x01     2       00111...
+            1           0       x01
+            1           0       x0123   4       00001...
+            0           x0123   x01234567
+5           5           0       x0      1       01111...
+            2           x0      x1
+            2           x0      x12     2       00111...
+            1
+            1                   x1234   4       00001...
+            0           x01234
+6           6           0       x0      1       01111...
+            3
+            3                   x01     2       00111...
+            1           x01     x23     
+            1                   x2345   4       00001...
+            0           x012345 x6789
+7           7           0       x0      1       01......
+            3           x0      x1
+            3                   x12     2       001.....
+            1           x012    x34
+            1                   x3456   4       00001...
+            0           x0-6    x789A
+25 = 16 + 8 + 1
+25          25          0       x0      1       01111...
+            12          x0      x1
+            12                  x12     2       00111...
+            6
+            6                   x1234   4       {0}4
+            3
+            3                   x1-8    8       {0}8
+            1           x0-8    x9-16
+            1                   x9-24   16      {0}16
+            0           x0-24   x25-?
+*/
+
+template<int NB, typename B>
 struct ArithmeticResultTriplet {
     SWAR<NB, B> result;
     BooleanSWAR<NB, B> carry, overflow;
@@ -62,8 +143,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     auto product = S{0};
     for(auto count = ActualBits;;) {
         auto multiplicandDoublingMask = makeElementMaskFromLSB(S{mplier});
-        product =
-            product + (multiplicandDoublingMask & S{multiplicandDoubling});
+        product += multiplicandDoublingMask & S{multiplicandDoubling};
         if(!--count) { break; }
         multiplicandDoubling <<= 1;
         auto leastBitCleared = mplier & ~LeastBit;
