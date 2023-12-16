@@ -2,9 +2,9 @@ name: C++ CI
 
 on:
   push:
-    branches: [ main, em/github-actions ]
+    branches: [ master, em/github-actions ]
   pull_request:
-    branches: [ main, em/github-actions ]
+    branches: [ master, em/github-actions ]
 
 jobs:
   build:
