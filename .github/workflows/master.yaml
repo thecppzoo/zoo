@@ -2,9 +2,9 @@ name: zoo library GitHub actions configuration
 
 on:
   push:
-    branches: [ main, em-github-actions ]
+    branches: [ main, em/github-actions ]
   pull_request:
-    branches: [ main, em-github-actions ]
+    branches: [ main, em/github-actions ]
 
 jobs:
   build:
