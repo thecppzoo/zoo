@@ -1,4 +1,4 @@
-name: zoo library GitHub actions configuration
+name: C++ CI
 
 on:
   push:
@@ -12,25 +12,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: 'recursive'
+
     - name: Install g++-9
       run: |
         sudo apt-get update
         sudo apt-get install -y g++-9
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
-    - name: Install clang++-10
+
+    - name: Add LLVM Repository for clang-10
       run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 10
+
+    - name: Install clang-10
+      run: |
+        sudo apt-get update
         sudo apt-get install -y clang-10
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 90
-    - name: Configure CMake
-      run: cmake -S test -B build
+
+    - name: Configure CMake for g++
+      run: cmake -S test -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
+
     - name: Build with g++
-      run: |
-        cmake -S test -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
-        cmake --build build-gcc
+      run: cmake --build build-gcc
+
+    - name: Configure CMake for clang++
+      run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-10
+
     - name: Build with clang++
-      run: |
-        cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-10
-        cmake --build build-clang
+      run: cmake --build build-clang
