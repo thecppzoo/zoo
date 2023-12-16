@@ -31,8 +31,8 @@ jobs:
     - name: Install clang-10
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang-10
-        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 90
+        sudo apt-get install -y clang-17
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 90
 
     - name: Configure CMake for g++
       run: cmake -S test -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
@@ -41,7 +41,7 @@ jobs:
       run: cmake --build build-gcc
 
     - name: Configure CMake for clang++
-      run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-10
+      run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-17
 
     - name: Build with clang++
       run: cmake --build build-clang
