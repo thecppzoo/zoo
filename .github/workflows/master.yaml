@@ -22,6 +22,16 @@ jobs:
         sudo apt-get install -y g++-9
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
 
+    - name: Configure CMake for g++
+      run: cmake -S test -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
+
+    - name: Build with g++
+      run: cmake --build build-gcc
+
+    - name: Test with g++
+      run: |
+        cd build-gcc
+        ctest
     - name: Add LLVM Repository for clang-17
       run: |
         wget https://apt.llvm.org/llvm.sh
@@ -33,12 +43,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y clang-17
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 90
-
-    - name: Configure CMake for g++
-      run: cmake -S test -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
-
-    - name: Build with g++
-      run: cmake --build build-gcc
 
     - name: Configure CMake for clang++
       run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-17
