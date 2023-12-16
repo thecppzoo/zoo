@@ -64,8 +64,7 @@ struct SWAR {
         X(SWAR, ~)
     //constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
     #define SWAR_BINARY_OPERATORS_X_LIST \
-        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) \
-        X(SWAR, &=) X(SWAR, ^=) X(SWAR, |=) X(SWAR, -=) X(SWAR, +=)
+        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +)
 
     #define X(rt, op) constexpr rt operator op() const noexcept { return rt(op m_v); }
     SWAR_UNARY_OPERATORS_X_LIST

@@ -143,7 +143,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     auto product = S{0};
     for(auto count = ActualBits;;) {
         auto multiplicandDoublingMask = makeElementMaskFromLSB(S{mplier});
-        product += multiplicandDoublingMask & S{multiplicandDoubling};
+        product = product + (multiplicandDoublingMask & S{multiplicandDoubling});
         if(!--count) { break; }
         multiplicandDoubling <<= 1;
         auto leastBitCleared = mplier & ~LeastBit;
@@ -203,6 +203,14 @@ HE(8, u16, 0x0808, 0x8);
 HE(3, u8, 0xFF, 0x7);
 HE(2, u8, 0xAA, 0x2);
 #undef HE
+
+TEST_CASE("REMOVE") {
+    SWAR<8, u32> Micand{0x5030201};
+    SWAR<8, u32> Mplier{0xA050301};
+    auto Expected = 0x320F0601;
+    auto result = multiplication_OverflowUnsafe_SpecificBitCount<4>(Micand, Mplier);
+    CHECK(Expected == result.value());
+}
 
 TEST_CASE(
     "Isolate",
