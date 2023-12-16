@@ -28,9 +28,9 @@ jobs:
       run: cmake -S . -B build
     - name: Build with g++
       run: |
-        sudo update-alternatives --set g++ /usr/bin/g++-9
-        cmake --build build
+        cmake -S . -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
+        cmake --build build-gcc
     - name: Build with clang++
       run: |
-        sudo update-alternatives --set clang++ /usr/bin/clang++-10
-        cmake --build build
+        cmake -S . -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-10
+        cmake --build build-clang
