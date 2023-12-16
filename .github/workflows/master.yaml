@@ -22,13 +22,13 @@ jobs:
         sudo apt-get install -y g++-9
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
 
-    - name: Add LLVM Repository for clang-10
+    - name: Add LLVM Repository for clang-17
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
-        sudo ./llvm.sh 10
+        sudo ./llvm.sh 17
 
-    - name: Install clang-10
+    - name: Install clang-17
       run: |
         sudo apt-get update
         sudo apt-get install -y clang-17
