@@ -35,14 +35,14 @@ static_assert(alignof(A1::space_) == 1, "specific alignment not honored");
 template<typename Class, typename T>
 std::false_type MayCallBuild(...);
 template<typename Class, typename T, typename... As>
-auto MayCallBuild(int, As &&...as) ->
+auto MayCallBuild(As &&...as) ->
     decltype(
         std::declval<Class &>().template build<T>(std::forward<As>(as)...),
         std::true_type{}
     );
 template<typename Class, typename T, typename... As>
 constexpr auto MayCallBuild_(As &&...as) {
-    return decltype(MayCallBuild<Class, T>(0, std::forward<As>(as)...))::value;
+    return decltype(MayCallBuild<Class, T>(std::forward<As>(as)...))::value;
 }
 
 static_assert(
@@ -160,6 +160,7 @@ struct Typical {
     Typical() = default;
     Typical(const Typical &) = default;
     Typical(Typical &&) = default;
+    Typical(long s): state_(s) {}
     long state_;
 };
 

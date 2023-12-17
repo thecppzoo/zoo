@@ -1,29 +1,24 @@
 #ifndef ZOO_CFS_CACHE_FRIENDLY_SEARCH
 #define ZOO_CFS_CACHE_FRIENDLY_SEARCH
 
-#include <zoo/algorithm/less.h>
+#include "zoo/algorithm/less.h"
+#include "zoo/meta/log.h"
 
 #ifndef SIMPLIFY_INCLUDES
 // because of std::declval needed to default comparator
 #include <utility>
 // because of std::decay needed to decay deferenced iterator
 #include <type_traits>
+
+#include <ciso646>
 #endif
 
 namespace zoo {
 
-constexpr unsigned long long log2Floor(unsigned long long arg) {
-    return 63 - __builtin_clzll(arg);
-}
-
-constexpr unsigned long long log2Ceiling(unsigned long long arg) {
-    return 63 - __builtin_clzll(2*arg - 1);
-}
-
 template<typename Output, typename Input>
 void transformToCFS(Output output, Input base, Input end) {
     auto s = end - base;
-    auto logP = log2Floor(s + 1); // n
+    auto logP = meta::logFloor(s + 1); // n
     auto power2 = 1ul << logP;
     auto fullSubtreeSize = power2 - 1;
     // Full tree has (2^n) - 1 elements
@@ -52,7 +47,8 @@ void transformToCFS(Output output, Input base, Input end) {
     }
 
     // now just write the excess leaves
-    for(auto ndx = 0ul, top = 2*excess; ndx < top; ndx += 2) {
+    auto top = 2*excess;
+    for(auto ndx = 0ll; ndx < top; ndx += 2) {
         *output++ = *(base + ndx);
     }
 }
@@ -167,7 +163,7 @@ struct ValidResult {
 
 template<typename I, typename Comparator = Less>
 auto validHeap(
-    I base, int current, int max, Comparator c = Comparator{}
+    I base, long current, long max, Comparator c = Comparator{}
 ) -> ValidResult {
     for(;;) {
         auto higherSubtree = current*2 + 2;

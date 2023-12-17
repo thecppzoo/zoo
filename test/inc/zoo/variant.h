@@ -90,7 +90,7 @@ struct Variant {
         visit(
             [&](const auto &c) {
                 using Source = meta::remove_cr_t<decltype(c)>;
-                meta::copy_in_place(as<Source>(), c);
+                meta::copy_in_place(this->as<Source>(), c);
             },
             v
         );
@@ -100,7 +100,7 @@ struct Variant {
         visit(
             [&](auto &&m) {
                 using Source = meta::remove_cr_t<decltype(m)>;
-                meta::move_in_place(as<Source>(), std::move(m));
+                meta::move_in_place(this->as<Source>(), std::move(m));
             },
             v
         );

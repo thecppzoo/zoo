@@ -39,7 +39,13 @@ struct Constructible<T[L], Source>:
 {};
 
 template<typename T, typename... Args>
-constexpr auto Constructible_v = Constructible<T, Args &&...>::value;
+constexpr
+#ifndef _MSC_VER
+    auto
+#else
+    bool
+#endif
+Constructible_v = Constructible<T, Args &&...>::value;
 
 template<typename T>
 void destroy(T &t) noexcept { t.~T(); }
@@ -122,13 +128,13 @@ struct AlignedStorage {
 
     template<typename T, typename... Args>
         #define PP_ZOO_BUILD_EXPRESSION \
-            impl::build(*as<T>(), std::forward<Args>(args)...)
-    auto build(Args  &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION)) ->
+            impl::build(*this->as<T>(), std::forward<Args>(args)...)
         std::enable_if_t<
             SuitableType<T>() &&
                 impl::Constructible_v<T, Args...>,
             T *
         >
+        build(Args  &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION))
     {
         PP_ZOO_BUILD_EXPRESSION;
         #undef PP_ZOO_BUILD_EXPRESSION
