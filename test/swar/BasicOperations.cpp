@@ -107,6 +107,18 @@ constexpr auto makeElementMaskFromLSB(SWAR<NB, B> input) {
 }
 
 template<int NB, typename B>
+constexpr auto makeElementMaskFromMSB(SWAR<NB, B> input) {
+    auto msb = input.value() & SWAR<NB, B>::MostSignificantBit;
+    auto copyMsbToLsb = msb >> (NB - 1);
+    // subtracting one we "copy" the msb to all lower positions, but the
+    // msb is cleared: 0x80 -> 0x7F
+    // subtracting zero there is no change
+    auto zeroOrMsbCopiedDown = msb - copyMsbToLsb;
+    // copy again the msb: 0x7F | 0x80 = 0xFF
+    return SWAR<NB, B>(zeroOrMsbCopiedDown | msb);
+}
+
+template<int NB, typename B>
 constexpr auto fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
     using S = SWAR<NB, B>;
     constexpr auto
@@ -130,9 +142,53 @@ constexpr auto fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
     return ArithmeticResultTriplet<NB, B>(result, carry, overflow);
 }
 
+/// \note The convention in Abstract Algebra is to refer to "product" to the result of applying an arbitrary
+/// associative operator, then, exponentiation is to repeatedly apply an operation to an argument
+/// \tparam Operator a callable with three arguments: the left and right arguments to the operation
+/// and the count to be used, the "count" is an artifact of this generalization
+/// \param forSquaring is an artifact of this generalization
+/// \todo Identify what is the role of the count and forSquaring in this example
+template<typename Base, typename Count, typename Operator, typename CountHalver>
+constexpr auto countedAssociativeExponentiation(
+    Base base, Base neutral, Count count, Count forSquaring,
+    Operator op, unsigned log2Count, CountHalver ch
+) {
+    auto result = neutral;
+    if(!log2Count) { return result; }
+    for(;;) {
+        result = op(result, base, count);
+        if(!--log2Count) { break; }
+        result = op(result, result, forSquaring);
+        count = ch(count);
+    }
+    return result;
+}
 
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
+    SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto left, auto right, auto counts) {
+        auto addendums = makeElementMaskFromMSB(counts);
+        return left + (addendums & right);
+    };
+
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        return S{msbCleared.value() << 1};
+    };
+
+    multiplier = S{multiplier.value() << (NB - ActualBits)};
+    return countedAssociativeExponentiation(
+        multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
+        ActualBits, halver
+    );
+}
+
+template<int ActualBits, int NB, typename T>
+constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     SWAR<NB, T> multiplicand,
     SWAR<NB, T> multiplier
 ) {
@@ -204,11 +260,14 @@ HE(3, u8, 0xFF, 0x7);
 HE(2, u8, 0xAA, 0x2);
 #undef HE
 
-TEST_CASE("REMOVE") {
+TEST_CASE("Old version", "[deprecated]") {
     SWAR<8, u32> Micand{0x5030201};
     SWAR<8, u32> Mplier{0xA050301};
     auto Expected = 0x320F0601;
-    auto result = multiplication_OverflowUnsafe_SpecificBitCount<4>(Micand, Mplier);
+    auto result =
+        multiplication_OverflowUnsafe_SpecificBitCount_deprecated<4>(
+            Micand, Mplier
+        );
     CHECK(Expected == result.value());
 }
 
