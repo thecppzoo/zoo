@@ -20,3 +20,5 @@ Create a build directory (we suggest ~/builds)
 Create a sub-dir of that directory per branch to build in (this maintains build isolation and avoids polluting your checked out repository)
 Execute `cmake -g "Unix Makefiles" ~/<path to test>` to generate makefiles.
 Use `make -j16` (for some parallelism in building) to build testing binaries.
+
+If you understand GitHub actions, see our "actions configuration" file, [`.github/workflows/master.yaml`](https://github.com/thecppzoo/zoo/blob/master/.github/workflows/master.yaml)
