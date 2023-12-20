@@ -1,6 +1,5 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)	
-
-[![Build Status](https://travis-ci.com/thecppzoo/zoo.svg?branch=master)](https://travis-ci.com/thecppzoo/zoo)
+[![C++ CI](https://github.com/thecppzoo/zoo/actions/workflows/master.yaml/badge.svg)](https://github.com/thecppzoo/zoo/actions/workflows/master.yaml)
 
 # zoo
 
