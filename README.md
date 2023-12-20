@@ -3,10 +3,14 @@
 
 ## Build suggestion
 
-Create a build directory (we suggest ~/builds)
-Create a sub-dir of that directory per branch to build in (this maintains build isolation and avoids polluting your checked out repository)
-Execute `cmake -g "Unix Makefiles" ~/<path to test>` to generate makefiles.
-Use `make -j16` (for some parallelism in building) to build testing binaries.
+This library is header-only.
+There are comprehensive examples in the Catch2 based tests.
+
+1. Do not forget to initialize at lest the Catch2 submodule (`git submodule update --init --recursive`)
+2. Create a build directory (we suggest ~/builds)
+3. Create a sub-dir of that directory per branch to build in (this maintains build isolation and avoids polluting your checked out repository)
+4. Execute `cmake -g "Unix Makefiles" ~/<path to repository root of your checkout>/test` to generate makefiles.
+5. Use `make -j16` (for some parallelism in building) to build testing binaries.
 
 If you understand GitHub actions, see our "actions configuration" file, [`.github/workflows/master.yaml`](https://github.com/thecppzoo/zoo/blob/master/.github/workflows/master.yaml)
 
