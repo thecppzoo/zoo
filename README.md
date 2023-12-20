@@ -3,8 +3,9 @@
 
 ## Build suggestion
 
-This library is header-only.
-There are comprehensive examples in the Catch2 based tests.
+This library is header-only, written in portable C++ 17.  MSVC is supported, but occasionally some bugs in MSVC take a long time to be identified, please report MSVC compilation issues.  We're working on including MSVC to continuous integration.
+
+There are comprehensive examples in the Catch2 based tests, here's a simple way to build them:
 
 1. Do not forget to initialize at lest the Catch2 submodule (`git submodule update --init --recursive`)
 2. Create a build directory (we suggest ~/builds)
