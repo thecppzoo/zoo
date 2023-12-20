@@ -6,33 +6,48 @@
 
 namespace zoo::swar {
 
+/// \note This code should be substituted by an application of "progressive" associative exponentiation
+/// \note There is also parallelSuffix (to be implemented)
 template<int NB, typename B>
-constexpr SWAR<NB, B> parity(SWAR<NB, B> input) {
+constexpr SWAR<NB, B> parallelPrefix(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto
-        shiftClearingMask = ~S::MostSignificantBit,
+        shiftClearingMask = S{~S::MostSignificantBit},
         doubling = input,
-        result{0};
+        result = S{0};
     auto
-        count = NB,
+        bitsToXOR = NB,
         power = 1;
     for(;;) {
-        if(1 & count) {
-            result ^= doubling;
+        if(1 & bitsToXOR) {
+            result = result ^ doubling;
             doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
         }
-        count >>= 1; // every iteration doubles the number of bits taken into account
-        if(!count) { break; }
-        doubling ^= doubling.shiftIntraLaneLeft(power, shiftClearingMask);
+        bitsToXOR >>= 1;
+        if(!bitsToXOR) { break; }
+        auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
+        doubling = doubling ^ shifted;
         // 01...1
         // 001...1
         // 00001...1
         // 000000001...1
-        shiftClearingMask &= S{shiftClearingMask.value() >> power};
+        shiftClearingMask =
+            shiftClearingMask & S{shiftClearingMask.value() >> power};
         power <<= 1;
     }
-    return result;
+    return S{result};
 }
+
+/// \todo because of the desirability of "accumuating" the XORs at the MSB,
+/// the parallel suffix operation is more suitable.
+template<int NB, typename B>
+constexpr SWAR<NB, B> parity(SWAR<NB, B> input) {
+    using S = SWAR<NB, B>;
+    auto preResult = parallelPrefix(input);
+    auto onlyMSB = preResult.value() & S::MostSignificantBit;
+    return S{onlyMSB};
+}
+
 
 /*
 Execution trace at two points:
@@ -93,29 +108,29 @@ struct ArithmeticResultTriplet {
     BooleanSWAR<NB, B> carry, overflow;
 };
 
+namespace impl {
+template<int NB, typename B>
+constexpr auto makeLaneMaskFromMSB_and_LSB(SWAR<NB, B> msb, SWAR<NB, B> lsb) {
+    auto msbCopiedDown = msb - lsb;
+    auto msbReintroduced = msbCopiedDown | msb;
+    return msbReintroduced;
+}
+}
+
 template<int NB, typename B>
 constexpr auto makeElementMaskFromLSB(SWAR<NB, B> input) {
-    auto lsb = input.value() & SWAR<NB, B>::LeastSignificantBit;
-    // copy the LSB to the MSB position
-    auto msb = lsb << (NB - 1);
-    // subtracting one we "copy" the msb to all lower positions, but the
-    // msb is cleared: 0x80 -> 0x7F
-    // subtracting zero there is no change
-    auto zeroOrMsbCopiedDown = msb - lsb;
-    // copy again the msb: 0x7F | 0x80 = 0xFF
-    return SWAR<NB, B>(zeroOrMsbCopiedDown | msb);
+    using S = SWAR<NB, B>;
+    auto lsb = input & S{S::LeastSignificantBit};
+    auto lsbCopiedToMSB = S{lsb.value() << (NB - 1)};
+    return impl::makeLaneMaskFromMSB_and_LSB(lsbCopiedToMSB, lsb);
 }
 
 template<int NB, typename B>
 constexpr auto makeElementMaskFromMSB(SWAR<NB, B> input) {
-    auto msb = input.value() & SWAR<NB, B>::MostSignificantBit;
-    auto copyMsbToLsb = msb >> (NB - 1);
-    // subtracting one we "copy" the msb to all lower positions, but the
-    // msb is cleared: 0x80 -> 0x7F
-    // subtracting zero there is no change
-    auto zeroOrMsbCopiedDown = msb - copyMsbToLsb;
-    // copy again the msb: 0x7F | 0x80 = 0xFF
-    return SWAR<NB, B>(zeroOrMsbCopiedDown | msb);
+    using S = SWAR<NB, B>;
+    auto msb = input & S{S::MostSignificantBit};
+    auto msbCopiedToLSB = S{msb.value() >> (NB - 1)};
+    return impl::makeLaneMaskFromMSB_and_LSB(msb, msbCopiedToLSB);
 }
 
 template<int NB, typename B>
@@ -142,15 +157,35 @@ constexpr auto fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
     return ArithmeticResultTriplet<NB, B>(result, carry, overflow);
 }
 
-/// \note The convention in Abstract Algebra is to refer to "product" to the result of applying an arbitrary
-/// associative operator, then, exponentiation is to repeatedly apply an operation to an argument
+/// \brief Performs a generalized iterated application of an associative operator to a base
+///
+/// In algebra, the repeated application of an operator to a "base" has different names depending on the
+/// operator, for example "a + a + a + ... + a" n-times would be called "repeated addition",
+/// if * is numeric multiplication, "a * a * a * ... * a" n-times would be called "exponentiation of a to the n power"
+/// the generic term we use is "iteration" for naming this function.
+/// Since * and "product" are frequently used in Algebra to denote the application of a general operator, we
+/// keep the option to use the imprecise language of "product, base and exponent".  "Iteration" has a very
+/// different meaning in programming and especially different in C++.
+/// There may be iteration over an operator that is not associative (such as quaternion multiplication), this
+/// function leverages the associative property of the operator to "halve" the count of iterations at each step.
+/// \note There is a symmetrical operation to be implemented of associative iteration in the
+/// "progressive" direction: instead of starting with the most significant bit of the count, down to the lsb,
+/// and doing "op(result, base, count)"; going from lsb to msb doing "op(result, square, exponent)"
 /// \tparam Operator a callable with three arguments: the left and right arguments to the operation
 /// and the count to be used, the "count" is an artifact of this generalization
+/// \tparam IterationCount loosely models the "exponent" in "exponentiation", however, it may not
+/// be a number, the iteration count is part of the execution context to apply the operator
 /// \param forSquaring is an artifact of this generalization
-/// \todo Identify what is the role of the count and forSquaring in this example
-template<typename Base, typename Count, typename Operator, typename CountHalver>
-constexpr auto countedAssociativeExponentiation(
-    Base base, Base neutral, Count count, Count forSquaring,
+/// \param log2Count is to potentially reduce the number of iterations if the caller a-priory knows
+/// there are fewer iterations than what the type of exponent would allow
+template<
+    typename Base, typename IterationCount, typename Operator,
+    // the critical use of associativity is that it allows halving the
+    // iteration count
+    typename CountHalver
+>
+constexpr auto associativeOperatorIterated_regressive(
+    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
     Operator op, unsigned log2Count, CountHalver ch
 ) {
     auto result = neutral;
@@ -181,12 +216,13 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     };
 
     multiplier = S{multiplier.value() << (NB - ActualBits)};
-    return countedAssociativeExponentiation(
+    return associativeOperatorIterated_regressive(
         multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
         ActualBits, halver
     );
 }
 
+/// \note Not removed yet because it is an example of "progressive" associative exponentiation
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     SWAR<NB, T> multiplicand,
@@ -219,12 +255,62 @@ constexpr auto multiplication_OverflowUnsafe(
         );
 }
 
+template<int NB, typename T>
+struct SWAR_Pair{
+    SWAR<NB, T> even, odd;
+};
+
+template<int NB, typename T>
+constexpr SWAR<NB, T> doublingMask() {
+    using S = SWAR<NB, T>;
+    static_assert(0 == S::Lanes % 2, "Only even number of elements supported");
+    using D = SWAR<NB * 2, T>;
+    return S{(D::LeastSignificantBit << NB) - D::LeastSignificantBit};
+}
+
+template<int NB, typename T>
+constexpr auto doublePrecision(SWAR<NB, T> input) {
+    using S = SWAR<NB, T>;
+    static_assert(
+        0 == S::NSlots % 2,
+        "Precision can only be doubled for SWARs of even element count"
+    );
+    using RV = SWAR<NB * 2, T>;
+    constexpr auto DM = doublingMask<NB, T>();
+    return SWAR_Pair<NB * 2, T>{
+        RV{(input & DM).value()},
+        RV{(input.value() >> NB) & DM.value()}
+    };
+}
+
+template<int NB, typename T>
+constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
+    using S = SWAR<NB, T>;
+    static_assert(0 == NB % 2, "Only even lane-bitcounts supported");
+    using RV = SWAR<NB/2, T>;
+    constexpr auto HalvingMask = doublingMask<NB/2, T>();
+    auto
+        evenHalf = RV{even.value()} & HalvingMask,
+        oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};
+    return evenHalf | oddHalf;
+}
+
 }
 
 using namespace zoo;
 using namespace zoo::swar;
 
 namespace Multiplication {
+
+static_assert(0x0F0F0F0F == doublingMask<4, uint32_t>().value());
+
+constexpr auto PrecisionFixtureTest = 0x89ABCDEF;
+constexpr auto Doubled =
+    doublePrecision(SWAR<4, uint32_t>{PrecisionFixtureTest});
+
+static_assert(0x090B0D0F == Doubled.even.value());
+static_assert(0x080A0C0E == Doubled.odd.value());
+static_assert(PrecisionFixtureTest == halvePrecision(Doubled.even, Doubled.odd).value());
 
 constexpr SWAR<8, u32> Micand{0x5030201};
 constexpr SWAR<8, u32> Mplier{0xA050301};
@@ -260,7 +346,7 @@ HE(3, u8, 0xFF, 0x7);
 HE(2, u8, 0xAA, 0x2);
 #undef HE
 
-TEST_CASE("Old version", "[deprecated]") {
+TEST_CASE("Old version", "[deprecated][swar]") {
     SWAR<8, u32> Micand{0x5030201};
     SWAR<8, u32> Mplier{0xA050301};
     auto Expected = 0x320F0601;
@@ -269,6 +355,18 @@ TEST_CASE("Old version", "[deprecated]") {
             Micand, Mplier
         );
     CHECK(Expected == result.value());
+}
+
+TEST_CASE("Parity", "[swar]") {
+    // For each nibble, E indicates (E)ven and O (O)dd parities
+    //                EEOEEOOO
+    auto Examples = 0xFF13A7E4;
+    SWAR<4, u32> casesBy4{Examples};
+    SWAR<8, u32> casesBy8{Examples};
+    auto by4 = parity(casesBy4);
+    auto by8 = parity(casesBy8);
+    CHECK(by4.value() == 0x00800888);
+    CHECK(by8.value() == 0x00808000);
 }
 
 TEST_CASE(
