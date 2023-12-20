@@ -7,7 +7,7 @@ This library is header-only, written in portable C++ 17.  MSVC is supported, but
 
 There are comprehensive examples in the Catch2 based tests, here's a simple way to build them:
 
-1. Do not forget to initialize at lest the Catch2 submodule (`git submodule update --init --recursive`)
+1. Do not forget to initialize at least the Catch2 submodule (`git submodule update --init --recursive`)
 2. Create a build directory (we suggest ~/builds)
 3. Create a sub-dir of that directory per branch to build in (this maintains build isolation and avoids polluting your checked out repository)
 4. Execute `cmake -g "Unix Makefiles" ~/<path to repository root of your checkout>/test` to generate makefiles.
