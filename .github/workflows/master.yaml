@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
@@ -49,3 +49,21 @@ jobs:
 
     - name: Build with clang++
       run: cmake --build build-clang
+  windows_build:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Configure CMake for MSVC
+      run: cmake -S test -B build-msvc
+
+    - name: Build with MSVC
+      run: cmake --build build-msvc
+
+    - name: Test with MSVC
+      run: |
+        cd build-msvc
+        ctest
