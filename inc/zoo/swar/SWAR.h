@@ -6,6 +6,10 @@
 
 #include <type_traits>
 
+#ifdef _MSC_VER
+#include <iso646.h>
+#endif
+
 namespace zoo { namespace swar {
 
 using u64 = uint64_t;
@@ -27,13 +31,14 @@ constexpr uint64_t popcount(uint64_t a) noexcept {
 /// Index into the bits of the type T that contains the MSB.
 template<typename T>
 constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
-    return 8*sizeof(T) - 1 - __builtin_clzll(v);
+    return meta::logFloor(v);
 }
 
 /// Index into the bits of the type T that contains the LSB.
 template<typename T>
 constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
-    return __builtin_ctzll(v) + 1;
+    // ~v & (v - 1) turns on all trailing zeroes, zeroes the rest
+    return meta::logFloor(1 + (~v & (v - 1)));
 }
 
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
@@ -44,12 +49,14 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
     using type = T;
-    constexpr static inline auto NBits = NBits_;
-    constexpr static inline auto Lanes = sizeof(T) * 8 / NBits;
-    constexpr static inline auto NSlots = Lanes;
-    constexpr static T BitMod = sizeof(T)*8 % NBits;
-    constexpr static T ValidBitsCount = sizeof(T)*8 - BitMod;
-    constexpr static T AllOnes = (BitMod == 0) ? ~(T(0)) : ((T(1) << ValidBitsCount) -1);
+    constexpr static inline std::make_unsigned_t<T>
+        NBits = NBits_,
+        BitWidth = sizeof(T) * 8,
+        Lanes = BitWidth / NBits,
+        NSlots = Lanes,
+        PaddingBitsCount = BitWidth % NBits,
+        SignificantBitsCount = BitWidth - PaddingBitsCount,
+        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount;
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -92,11 +99,19 @@ struct SWAR {
 
     /// The SWAR lane index that contains the MSB.  It is not the bit index of the MSB.
     /// IE: 4 bit wide 32 bit SWAR: 0x0040'0000 will return 5, not 22 (0 indexed).
-    constexpr int top() const noexcept { return msbIndex(m_v) / NBits; }
-    constexpr int lsbIndex() const noexcept { return __builtin_ctzll(m_v) / NBits; }
+    constexpr auto top() const noexcept { return msbIndex(m_v) / NBits; }
+    constexpr auto lsbIndex() const noexcept { return swar::lsbIndex(m_v) / NBits; }
 
     constexpr SWAR setBit(int index, int bit) const noexcept {
         return SWAR(m_v | (T(1) << (index * NBits + bit)));
+    }
+
+    constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
+        return SWAR(value() << (NBits * laneCount));
+    }
+
+    constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
+        return SWAR(value() >> (NBits * laneCount));
     }
 
     constexpr auto blitElement(int index, T value) const noexcept {
@@ -108,14 +123,6 @@ struct SWAR {
         constexpr auto OneElementMask = SWAR(~(~T(0) << NBits));
         auto IsolationMask = OneElementMask.shiftLanesLeft(index);
         return (*this & ~IsolationMask) | (other & IsolationMask);
-    }
-
-    constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
-        return SWAR(value() << (NBits * laneCount));
-    }
-
-    constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
-        return SWAR(value() >> (NBits * laneCount));
     }
 
     T m_v;

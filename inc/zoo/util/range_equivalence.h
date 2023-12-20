@@ -8,8 +8,8 @@ namespace zoo {
 template<typename C1, typename C2>
 auto operator==(const C1 &l, const C2 &r)
 -> std::enable_if_t<
-    zoo::is_container_v<C1> and
-        zoo::is_container_v<C2>,
+    bool(zoo::is_container_v<C1>) and
+        bool(zoo::is_container_v<C2>),
     bool
 >
 {

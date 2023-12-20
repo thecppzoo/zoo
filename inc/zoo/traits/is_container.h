@@ -3,6 +3,11 @@
 
 #ifndef SIMPLIFY_INCLUDES
 #include <type_traits>
+
+#ifdef _MSC_VER
+#include <iso646.h>
+#endif
+
 #endif
 
 namespace zoo {

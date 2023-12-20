@@ -122,13 +122,21 @@ struct AlignedStorage {
 
     template<typename T, typename... Args>
         #define PP_ZOO_BUILD_EXPRESSION \
-            impl::build(*as<T>(), std::forward<Args>(args)...)
-    auto build(Args  &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION)) ->
+            impl::build(*this->as<T>(), std::forward<Args>(args)...)
         std::enable_if_t<
             SuitableType<T>() &&
-                impl::Constructible_v<T, Args...>,
+                #ifdef _MSC_VER
+                bool(
+                #endif
+                impl::Constructible_v<T, Args...>
+                #ifdef _MSC_VER
+                )
+                #endif
+                ,
+
             T *
         >
+        build(Args  &&...args) noexcept(noexcept(PP_ZOO_BUILD_EXPRESSION))
     {
         PP_ZOO_BUILD_EXPRESSION;
         #undef PP_ZOO_BUILD_EXPRESSION
