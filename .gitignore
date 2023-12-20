@@ -1,0 +1,5 @@
+# Vscode does not like to build outside of the source tree
+# (multiple glitches)
+
+.vscode
+test/.vscode

@@ -507,12 +507,12 @@ static_assert(0x0E0E'0E0E == u32(broadcast<8>(SWAR<8, u32>(0x0000'000E))));
 static_assert(0x6B6B'6B6B == u32(broadcast<8>(SWAR<8, u32>(0x0000'006B))));
 static_assert(0x0808'0808'0808'0808ull == u64(broadcast<8>(SWAR<8, u64>(0x0000'0000'0000'0008ull))));
 
-static_assert(2 == lsbIndex(1<<1));
-static_assert(4 == lsbIndex(1<<3));
-static_assert(6 == lsbIndex(1<<5));
-static_assert(9 == lsbIndex(1<<8));
-static_assert(18 == lsbIndex(1<<17));
-static_assert(31 == lsbIndex(1<<30));
+static_assert(1 == lsbIndex(1<<1));
+static_assert(3 == lsbIndex(1<<3));
+static_assert(5 == lsbIndex(1<<5));
+static_assert(8 == lsbIndex(1<<8));
+static_assert(17 == lsbIndex(1<<17));
+static_assert(30 == lsbIndex(1<<30));
 
 /*
 These tests were not catching errors known to have been present

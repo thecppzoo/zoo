@@ -69,6 +69,10 @@ constexpr T PopcountLogic<LogarithmOfGroupSize, T>::execute(T input) {
         Recursion::execute((input >> HalvedGroupSize) & CombiningMask);
 }
 
+#ifdef _MSC_VER
+template<int LogarithmOfGroupSize, typename T = uint64_t>
+using  PopcountIntrinsic = PopcountLogic<LogarithmOfGroupSize, T>;
+#else
 template<int LogarithmOfGroupSize, typename T = uint64_t>
 struct PopcountIntrinsic {
     constexpr static T execute(T input) {
@@ -84,6 +88,7 @@ struct PopcountIntrinsic {
         return rv;
     }
 };
+#endif
 
 }}
 

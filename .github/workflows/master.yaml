@@ -1,0 +1,69 @@
+name: C++ CI
+
+on:
+  push:
+    branches: [ master, em/github-actions ]
+  pull_request:
+    branches: [ master, em/github-actions ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install g++-9
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++-9
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
+
+    - name: Configure CMake for g++
+      run: cmake -S test -B build-gcc -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
+
+    - name: Build with g++
+      run: cmake --build build-gcc
+
+    - name: Test with g++
+      run: |
+        cd build-gcc
+        ctest
+    - name: Add LLVM Repository for clang-17
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 17
+
+    - name: Install clang-17
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-17
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 90
+
+    - name: Configure CMake for clang++
+      run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-17
+
+    - name: Build with clang++
+      run: cmake --build build-clang
+  windows_build:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Configure CMake for MSVC
+      run: cmake -S test -B build-msvc
+
+    - name: Build with MSVC
+      run: cmake --build build-msvc
+
+    - name: Test with MSVC
+      run: |
+        cd build-msvc
+        ctest -C Debug

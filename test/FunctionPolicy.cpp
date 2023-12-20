@@ -173,6 +173,7 @@ TEST_CASE(
         F fun;
         REQUIRE(!fun);
         auto anythingTriviallyDestructible = [](){};
+        static_assert(std::is_trivially_destructible_v<decltype(anythingTriviallyDestructible)>);
         fun = anythingTriviallyDestructible;
         CHECK(fun);
         REQUIRE(!fun.isDefault());
