@@ -14,7 +14,7 @@ if(MSVC)
     # MSVC specific configuration
     # Avoids multiple problems
 
-    # Due to multiple SFINAE bugs, forced upgrade to C++ 20 to use "concepts"
+    # Due to multiple bugs, forced upgrade to C++ 20
     set(CMAKE_CXX_STANDARD 20)
 
     # Set the policy to use the new behavior

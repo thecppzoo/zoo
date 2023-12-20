@@ -7,6 +7,7 @@
 
 #include <array> // for temporary storage
 #include <stdexcept>
+#include <ciso646>
 
 namespace zoo {
 

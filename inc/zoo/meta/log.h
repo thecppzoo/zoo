@@ -19,6 +19,8 @@ constexpr int logFloor_WithoutIntrinsic(T value) {
 }
 
 #ifdef _MSC_VER
+// change to use the relevant functions in C++ 20's <bit> header
+// when bumping to C++ 20
 constexpr int logFloor(uint64_t arg) {
     return logFloor_WithoutIntrinsic(arg);
 }

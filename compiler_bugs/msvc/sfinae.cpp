@@ -7,7 +7,7 @@ constexpr auto Constructible_v = std::is_constructible_v<T, Args...>;
 
 template<typename Q>
 struct ATemplate {
-    Q space_;
+    alignas(alignof(Q)) char space_[sizeof(Q)];
 
     template<typename T>
     constexpr static auto FitsInSpace_v = sizeof(T) <= sizeof(Q);
@@ -16,16 +16,18 @@ struct ATemplate {
     std::enable_if_t<
         FitsInSpace_v<T>
         &&
-        #ifdef TRIGGER_MSVC_SFINAE_BUG
+            #ifndef TRIGGER_MSVC_SFINAE_BUG
+            bool(
+            #endif
             Constructible_v<T, Args...>
-        #else
-            std::is_constructible_v<T, Args...>
-        #endif
+            #ifndef TRIGGER_MSVC_SFINAE_BUG
+            )
+            #endif
         ,
         T *
     >
     sfinaeFunction(Args &&...args) {
-        T *rv = new(static_cast<void *>(&space_)) T(std::forward<Args>(args)...); 
+        T *rv = new(static_cast<void *>(space_)) T(std::forward<Args>(args)...); 
         return rv;
     }
 

@@ -10,7 +10,10 @@
 // because of std::decay needed to decay deferenced iterator
 #include <type_traits>
 
-#include <ciso646>
+#ifdef _MSC_VER
+#include <iso646.h>
+#endif
+
 #endif
 
 namespace zoo {

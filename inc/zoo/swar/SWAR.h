@@ -6,6 +6,8 @@
 
 #include <type_traits>
 
+#include <ciso646>
+
 namespace zoo { namespace swar {
 
 using u64 = uint64_t;
