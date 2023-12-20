@@ -66,4 +66,4 @@ jobs:
     - name: Test with MSVC
       run: |
         cd build-msvc
-        ctest
+        ctest -C Debug
