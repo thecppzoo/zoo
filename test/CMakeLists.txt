@@ -44,9 +44,12 @@ if(MSVC)
         egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp
     )
 
+    add_subdirectory(third_party EXCLUDE_FROM_ALL)
+
     # Simple executable for MSVC
     add_executable(ZooTest ${ZOO_TEST_SOURCES})
-    target_compile_definitions(ZooTest PUBLIC AVOID_MSVC_BUG_SFINAE_INVALID_EXPLICIT_TEMPLATE_ARGUMENT)
+    enable_testing()
+    ParseAndAddCatchTests(ZooTest)
 
     try_compile(
         MSVC_BUG_BUILD_RESULT
@@ -76,7 +79,6 @@ if(MSVC)
     else()
         MESSAGE(FATAL_ERROR "CMAKE try_compile of non-problematic file did not succeed: ${MSVC_OK_OUTPUT}")
     endif()
-
 else()
     # Non-MSVC specific configuration (original content)
     set(CMAKE_CXX_STANDARD 17)
@@ -151,5 +153,4 @@ else()
     include_directories(${TEST_THIRD_PARTY_INCLUDE_PATH})
     enable_testing()
     ParseAndAddCatchTests(${TEST_APP_NAME})
-
 endif()
