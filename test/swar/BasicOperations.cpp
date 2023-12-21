@@ -206,7 +206,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     using S = SWAR<NB, T>;
 
     auto operation = [](auto left, auto right, auto counts) {
-        auto addendums = makeElementMaskFromMSB(counts);
+        auto addendums = makeLaneMaskFromMSB(counts);
         return left + (addendums & right);
     };
 
