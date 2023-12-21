@@ -43,7 +43,7 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
 template<int NB, typename B>
 constexpr SWAR<NB, B> parity(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
-    auto preResult = parallelPrefix(input);
+    auto preResult = parallelSuffix(input);
     auto onlyMSB = preResult.value() & S::MostSignificantBit;
     return S{onlyMSB};
 }
