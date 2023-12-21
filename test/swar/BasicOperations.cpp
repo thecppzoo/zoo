@@ -118,7 +118,7 @@ constexpr auto makeLaneMaskFromMSB_and_LSB(SWAR<NB, B> msb, SWAR<NB, B> lsb) {
 }
 
 template<int NB, typename B>
-constexpr auto makeElementMaskFromLSB(SWAR<NB, B> input) {
+constexpr auto makeLaneMaskFromLSB(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto lsb = input & S{S::LeastSignificantBit};
     auto lsbCopiedToMSB = S{lsb.value() << (NB - 1)};
