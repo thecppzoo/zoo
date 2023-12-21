@@ -57,7 +57,7 @@ struct SWAR {
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
-        LeastSignificantBit = meta::BitmaskMaker<T, SWAR{1}.value(), NBits>::value,
+        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1);
 
     SWAR() = default;
