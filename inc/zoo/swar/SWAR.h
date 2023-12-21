@@ -131,7 +131,7 @@ struct SWAR {
     /// \param protectiveMask should clear the bits that would cross the lane.
     /// The bits that will be cleared are directly related to the count of shifts, it is natural to maintain
     /// the protective mask by the caller, otherwise, the mask will be computed on all invocations.
-    /// Not sure the optimizer would maintain this mask somewhere to not calculate it.
+    /// We are not sure the optimizer would maintain this mask somewhere, if it was to recalculate it it would be disastrous for performance.
     constexpr SWAR
     shiftIntraLaneLeft(int bitCount, SWAR protectiveMask) const noexcept {
         return SWAR{(*this & protectiveMask).value() << bitCount};
