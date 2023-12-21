@@ -45,7 +45,7 @@ jobs:
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 90
 
     - name: Configure CMake for clang++
-      run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-10 -DCMAKE_CXX_COMPILER=clang++-17
+      run: cmake -S test -B build-clang -DCMAKE_C_COMPILER=clang-17 -DCMAKE_CXX_COMPILER=clang++-17
 
     - name: Build with clang++
       run: cmake --build build-clang
