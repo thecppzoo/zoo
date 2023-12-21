@@ -56,7 +56,9 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount;
+        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
+        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
+        MostSignificantBit = LeastSignificantBit << (NBits - 1);
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -68,7 +70,7 @@ struct SWAR {
         X(SWAR, ~)
     //constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
     #define SWAR_BINARY_OPERATORS_X_LIST \
-        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +) X(SWAR, *)
+        X(SWAR, &) X(SWAR, ^) X(SWAR, |) X(SWAR, -) X(SWAR, +)
 
     #define X(rt, op) constexpr rt operator op() const noexcept { return rt(op m_v); }
     SWAR_UNARY_OPERATORS_X_LIST
@@ -106,14 +108,6 @@ struct SWAR {
         return SWAR(m_v | (T(1) << (index * NBits + bit)));
     }
 
-    constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
-        return SWAR(value() << (NBits * laneCount));
-    }
-
-    constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
-        return SWAR(value() >> (NBits * laneCount));
-    }
-
     constexpr auto blitElement(int index, T value) const noexcept {
         auto elementMask = ((T(1) << NBits) - 1) << (index * NBits);
         return SWAR((m_v & ~elementMask) | (value << (index * NBits)));
@@ -123,6 +117,31 @@ struct SWAR {
         constexpr auto OneElementMask = SWAR(~(~T(0) << NBits));
         auto IsolationMask = OneElementMask.shiftLanesLeft(index);
         return (*this & ~IsolationMask) | (other & IsolationMask);
+    }
+
+    constexpr SWAR shiftLanesLeft(int laneCount) const noexcept {
+        return SWAR(value() << (NBits * laneCount));
+    }
+
+    constexpr SWAR shiftLanesRight(int laneCount) const noexcept {
+        return SWAR(value() >> (NBits * laneCount));
+    }
+
+    /// \brief as the name suggests
+    /// \param protectiveMask should clear the bits that would cross the lane.
+    /// The bits that will be cleared are directly related to the count of shifts, it is natural to maintain
+    /// the protective mask by the caller, otherwise, the mask will be computed on all invocations.
+    /// We are not sure the optimizer would maintain this mask somewhere, if it was to recalculate it it would be disastrous for performance.
+    constexpr SWAR
+    shiftIntraLaneLeft(int bitCount, SWAR protectiveMask) const noexcept {
+        return SWAR{(*this & protectiveMask).value() << bitCount};
+    }
+
+    /// \param protectiveMask should clear the bits that would cross the lane
+    /// \sa shiftIntraLaneLeft
+    constexpr SWAR
+    shiftIntraLaneRight(int bitCount, SWAR protectiveMask) const noexcept {
+        return SWAR{(*this & protectiveMask).value() >> bitCount};
     }
 
     T m_v;
@@ -299,7 +318,7 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
 /// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
 template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
-    // Booleanness is stored in MSB of a given swar.
+    // Booleanness is stored in the MSBs
     static constexpr auto MaskLaneMSB =
         broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1)));
     constexpr explicit BooleanSWAR(T v): SWAR<NBits, T>(v) {}
