@@ -9,7 +9,7 @@ namespace zoo::swar {
 /// \note This code should be substituted by an application of "progressive" algebraic iteration
 /// \note There is also parallelSuffix (to be implemented)
 template<int NB, typename B>
-constexpr SWAR<NB, B> parallelPrefix(SWAR<NB, B> input) {
+constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto
         shiftClearingMask = S{~S::MostSignificantBit},
