@@ -176,7 +176,7 @@ constexpr auto fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
 /// \tparam IterationCount loosely models the "exponent" in "exponentiation", however, it may not
 /// be a number, the iteration count is part of the execution context to apply the operator
 /// \param forSquaring is an artifact of this generalization
-/// \param log2Count is to potentially reduce the number of iterations if the caller a-priory knows
+/// \param log2Count is to potentially reduce the number of iterations if the caller a-priori knows
 /// there are fewer iterations than what the type of exponent would allow
 template<
     typename Base, typename IterationCount, typename Operator,
