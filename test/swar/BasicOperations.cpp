@@ -234,7 +234,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     auto mplier = multiplier.value();
     auto product = S{0};
     for(auto count = ActualBits;;) {
-        auto multiplicandDoublingMask = makeElementMaskFromLSB(S{mplier});
+        auto multiplicandDoublingMask = makeLaneMaskFromLSB(S{mplier});
         product = product + (multiplicandDoublingMask & S{multiplicandDoubling});
         if(!--count) { break; }
         multiplicandDoubling <<= 1;
