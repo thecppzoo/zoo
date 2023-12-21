@@ -7,7 +7,7 @@
 namespace zoo::swar {
 
 /// \note This code should be substituted by an application of "progressive" algebraic iteration
-/// \note There is also parallelSuffix (to be implemented)
+/// \note There is also parallelPrefix (to be implemented)
 template<int NB, typename B>
 constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
