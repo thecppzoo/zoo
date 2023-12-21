@@ -3,7 +3,7 @@
 
 ## Build suggestion
 
-This library is header-only, written in portable C++ 17.  MSVC is supported, but occasionally some bugs in MSVC take a long time to be identified, please report MSVC compilation issues.  We're working on including MSVC to continuous integration.
+This library is header-only, written in portable C++ 17.  MSVC is supported, but occasionally some bugs in MSVC take a long time to be identified, please report MSVC compilation issues.  MSVC is integrated into our continuous integration, but failure to build in MSVC does not block repository changes.
 
 There are comprehensive examples in the Catch2 based tests, here's a simple way to build them:
 
