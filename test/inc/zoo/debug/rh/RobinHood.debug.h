@@ -87,7 +87,8 @@ auto satisfiesInvariant(const Table &map, std::size_t begin = 0, std::size_t end
         for(auto n = Table::MD::NSlots; n--; ) {
             auto current = v.at(0);
             if(prior + 1 < current) {
-                return std::tuple(false, swarIndexBegin * Table::MD::NSlots + Table::MD::NSlots - n - 1);
+                std::size_t index = swarIndexBegin * Table::MD::NSlots + Table::MD::NSlots - n - 1;
+                return std::tuple(false, index);
             }
             v = v.shiftLanesRight(1);
             prior = current;
