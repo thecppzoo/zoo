@@ -56,7 +56,7 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
+        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, //AllOnes occurs in two places, PaddingBitsCount only in one...possible error?
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1);
 
@@ -146,6 +146,20 @@ struct SWAR {
 
     T m_v;
 };
+
+using S4_64 = SWAR<4, uint64_t>;
+using S4_32 = SWAR<4, uint32_t>;
+using S4_16 = SWAR<4, uint16_t>;
+using S4_8 = SWAR<4, uint8_t>;
+
+using S8_64 = SWAR<8, uint64_t>;
+using S8_32 = SWAR<8, uint32_t>;
+using S8_16 = SWAR<8, uint16_t>;
+using S8_8 = SWAR<8, uint8_t>;
+
+using S16_64 = SWAR<16, uint64_t>;
+using S16_32 = SWAR<16, uint32_t>;
+using S16_16 = SWAR<16, uint16_t>;
 
 // SWAR is a useful abstraction for performing computations in lanes overlaid
 // over any given integral type.
@@ -321,6 +335,11 @@ struct BooleanSWAR: SWAR<NBits, T> {
     // Booleanness is stored in the MSBs
     static constexpr auto MaskLaneMSB =
         broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1)));
+    static constexpr auto MaskLaneLSB =
+        broadcast<NBits, T>(SWAR<NBits, T>(T(1)));
+    // Turns off LSB of each lane
+    static constexpr auto MaskLaneLSBInverse = 
+        ~broadcast<NBits, T>(SWAR<NBits, T>(T(1)));
     constexpr explicit BooleanSWAR(T v): SWAR<NBits, T>(v) {}
 
     constexpr BooleanSWAR clear(int bit) const noexcept {
@@ -336,6 +355,11 @@ struct BooleanSWAR: SWAR<NBits, T> {
     /// not ones or twos complement.
     constexpr auto operator not() const noexcept {
         return BooleanSWAR(MaskLaneMSB ^ *this);
+    }
+
+    // BooleanSWAR as a mask: BooleanSWAR<4, u16>(0x0800).asMask() => SWAR<4,u16>(0x0F00)
+    constexpr auto asMask() const noexcept {
+      return SWAR<NBits,T>(this->m_v - (this->m_v >> (NBits-1)) | this->m_v);
     }
 
     explicit
