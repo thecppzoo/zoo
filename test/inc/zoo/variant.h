@@ -3,7 +3,6 @@
 #include <tuple>
     // provides std::tuple_element to be able to index a pack of types,
     // indirectly includes type traits and utility
-#include <new>
 #include <zoo/meta/in_place_operations.h>
 #include <zoo/meta/traits.h>
 

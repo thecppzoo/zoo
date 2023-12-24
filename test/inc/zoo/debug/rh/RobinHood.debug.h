@@ -1,8 +1,6 @@
 #ifndef ZOO_TEST_ROBINHOOD_DEBUGGING
 #define ZOO_TEST_ROBINHOOD_DEBUGGING
 
-#include "zoo/map/RobinHood.h"
-
 #include <sstream>
 #include <stdio.h>
 
@@ -24,8 +22,9 @@ auto display(
     constexpr auto HexPerHash = (MD::NBitsMost + 3) / 4;
 
     char format[60];
-    snprintf(format, 59, "%%0%dllx %%0%dllx %%0%dllx", HexPerSlot, HexPerSlot, HexPerPSL);
-    
+    const auto hexPerSlot = static_cast<int>(HexPerSlot);
+    snprintf(format, 59, "%%0%dllx %%0%dllx %%0%dllx", hexPerSlot, hexPerSlot, HexPerPSL);
+
     auto swarNdx = begin / MD::NSlots;
     auto swarEnd = end/MD::NSlots;
 
@@ -34,8 +33,9 @@ auto display(
     auto printLine =
         [&]() {
             char buffer[100];
-            sprintf(
+            snprintf(
                 buffer,
+                sizeof(buffer),
                 format,
                 initial.at(0), initial.hashes().at(0), initial.PSLs().at(0)
             );

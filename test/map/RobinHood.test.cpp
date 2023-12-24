@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <regex>
 #include <map>
-#include <sstream>
 #include <fstream>
 #include <unordered_map>
 
@@ -54,22 +53,23 @@ struct V {
 
 std::ostream &operator<<(std::ostream &out, V v) {
     char buffer[30];
+    const auto bufferSize = sizeof(buffer);
     char *ptr = buffer;
     auto val = v.v;
     auto printHalf = [&](auto low, auto high) {
         for(auto ndx = low; ndx < high; ++ndx) {
             if(v.intraIndex == ndx) {
-                ptr += sprintf(ptr, "<");
+                ptr += snprintf(ptr, bufferSize, "<");
             }
-            ptr += sprintf(ptr, "%02lx", val & 0xFF);
+            ptr += snprintf(ptr, bufferSize, "%02lx", val & 0xFF);
             if(v.intraIndex == ndx) {
-                ptr += sprintf(ptr, ">");
+                ptr += snprintf(ptr, bufferSize, ">");
             }
             val >>= 8;
         }
     };
     printHalf(0, 4);
-    ptr += sprintf(ptr, "'");
+    ptr += snprintf(ptr, bufferSize, "'");
     printHalf(4, 8);
     out << buffer;
     return out;
