@@ -105,7 +105,7 @@ struct ArithmeticResultTriplet {
 /// the carry and overflow flags are mostly useful in SWAR for detection of unsigned overflow (as for unsigned addition they are semantically identical.
 ///
 /// The signed integer interpretation is two's complement, which
-/// routinely overflows (as interpreted as unsigned).  Signed overflow may only
+/// routinely overflows (when interpreted as unsigned).  Signed overflow may only
 /// occur if the inputs have the same sign, it is detected when the sign of the
 /// result is opposite that of the inputs.
 ///
