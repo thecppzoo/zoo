@@ -113,6 +113,9 @@ struct ArithmeticResultTriplet {
 /// operator+ is only useful with the unsigned interpretation.  A decision
 /// must be made to either keep the library as is, or to promote full addition
 /// to operator+, and the rationale for the decision
+///
+/// \todo What is the right place for this function?
+/// It was added here because in practice multiplication overflows, as a draft
 template<int NB, typename B>
 constexpr ArithmeticResultTriplet<NB, B>
 fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
@@ -140,10 +143,6 @@ fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
 };
 
 /// \brief Negation is useful only for the signed integer interpretation
-/// @tparam B 
-/// @tparam NB 
-/// @param input 
-/// @return 
 template<int NB, typename B>
 constexpr auto negate(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
