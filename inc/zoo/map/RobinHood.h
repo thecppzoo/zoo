@@ -299,7 +299,7 @@ struct KeyValuePairWrapper {
 /// a search must terminate in failure if the maximum PSL is reached, then,
 /// by just adding the maximum PSL entries to the table, while keeping the
 /// slot indexing function the same, searches at the end of the table will never
-/// atempt to go past the real end, but return not-found within the tail.
+/// attempt to go past the real end, but return not-found within the tail.
 template<
     typename K,
     typename MV,
