@@ -101,7 +101,7 @@ struct ArithmeticResultTriplet {
 /// The carry bit is essential to increase the precision of the results in
 /// normal arithmetic, but in unsigned SWAR it is preferable to double the
 /// precision before executing addition, thus guaranteeing no overflow will
-/// occur and using the more performing operator+ addition.  Hence,
+/// occur and using the more performant operator+ addition.  Hence,
 /// the carry flag is mostly useful in SWAR for detection of unsigned overflow.
 ///
 /// The signed integer interpretation is the technique of two's complement, that
