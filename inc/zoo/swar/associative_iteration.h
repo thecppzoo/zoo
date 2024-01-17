@@ -86,7 +86,7 @@ struct ArithmeticResultTriplet {
 /// unsigned overflow)
 ///
 /// This function is called "full addition" because it can perform the addition
-/// with all the bits of the inputs by making sure the overflowing (in the
+/// with all the bits of the inputs by making sure the overflow (in the
 /// unsigned sense) does not cross the lane boundary.
 /// This function has less performance than "optimistic" addition (operator+).
 /// The mechanism to manage potential overflow naturally allows the calculation
