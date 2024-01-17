@@ -102,7 +102,7 @@ struct ArithmeticResultTriplet {
 /// normal arithmetic, but in unsigned SWAR it is preferable to double the
 /// precision before executing addition, thus guaranteeing no overflow will
 /// occur and using the more performant operator+ addition.  Hence,
-/// the carry flag is mostly useful in SWAR for detection of unsigned overflow.
+/// the carry and overflow flags are mostly useful in SWAR for detection of unsigned overflow (as for unsigned addition they are semantically identical.
 ///
 /// The signed integer interpretation is the technique of two's complement, that
 /// routinely overflows (as interpreted as unsigned).  Signed overflow may only
