@@ -124,8 +124,8 @@ struct RH_Backend {
     The first time the needle has a PSL greater than the haystacks' means the
     matching will fail, because the hypothetical prior insertion would have
     "stolen" that slot.
-    If there is an equal, it would start a sequence of potential matches.  To
-    determine an actual match:
+    If the PSLs are equal, it starts a sequence of potential matches.  To
+    determine if there is an actual match, perform:
     1. A cheap SWAR check of hoisted hashes
     2. If there are still potential matches (now also the hoisted hashes), fall
     back to non-SWAR, or iterative and expensive "deep equality" test for each
@@ -133,13 +133,13 @@ struct RH_Backend {
 
     The above makes it very important to detect the first case in which the PSL
     is greater equal to the needle.  We call this the "deadline".
-    Because we assume the LITTLE ENDIAN byte ordering, the first element would
+    We assume the LITTLE ENDIAN byte ordering: the first element will
     be the least significant non-false Boolean SWAR.
 
     Note about performance:
     Every "early exit" faces a big justification hurdle, the proportion of cases
-    they intercept to be large enough that the branch prediction penalty of the
-    entropy introduced is overcompensated.
+    they intercept must be large enough that the branch prediction penalty of the
+    entropy introduced (by the early exit) is overcompensated.
     */
 
     constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
