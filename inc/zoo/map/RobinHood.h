@@ -295,9 +295,9 @@ struct KeyValuePairWrapper {
 ///
 /// Normally we need to explicitly check for whether key searches have reached
 /// the end of the table.  Malte Skarupke devised a tail of table entries to
-/// make this explicit check innecessary: Regardless of the end of the table,
+/// make this explicit check unnecessary: Regardless of the end of the table,
 /// a search must terminate in failure if the maximum PSL is reached, then,
-/// by just adding the maximum PSL entries to the table, while keeping the
+/// by just adding an extra maximum PSL entries to the table, while keeping the
 /// slot indexing function the same, searches at the end of the table will never
 /// attempt to go past the real end, but return not-found within the tail.
 template<
