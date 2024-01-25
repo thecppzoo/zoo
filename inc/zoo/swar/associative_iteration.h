@@ -80,6 +80,42 @@ struct ArithmeticResultTriplet {
 };
 
 
+/// \brief "Safe" addition, meaning non-corrupting unsigned overflow addition
+/// and producing the flags for unsigned overflow (carry) and signed overflow.
+/// This is the function to perform signed addition (that relies on supporting
+/// unsigned overflow)
+///
+/// This function is called "full addition" because it can perform the addition
+/// with all the bits of the inputs by making sure the overflow (in the
+/// unsigned sense) does not cross the lane boundary.
+/// This function has less performance than "optimistic" addition (operator+).
+/// The mechanism to manage potential overflow naturally allows the calculation
+/// of the carry and signed overflow flags for no extra performance cost.
+///
+/// The performance relies on the optimizer removing the calculation of
+/// the carry or signed overflow if they are not used.
+///
+/// When interpreted as unsigned addition, carrying out of the result is
+/// overflow.
+///
+/// The carry bit is essential to increase the precision of the results in
+/// normal arithmetic, but in unsigned SWAR it is preferable to double the
+/// precision before executing addition, thus guaranteeing no overflow will
+/// occur and using the more performant operator+ addition.  Hence,
+/// the carry and overflow flags are mostly useful in SWAR for detection of unsigned overflow (as for unsigned addition they are semantically identical.
+///
+/// The signed integer interpretation is two's complement, which
+/// routinely overflows (when interpreted as unsigned).  Signed overflow may only
+/// occur if the inputs have the same sign, it is detected when the sign of the
+/// result is opposite that of the inputs.
+///
+/// \todo The library is not explicit with regards to the fact that
+/// operator+ is only useful with the unsigned interpretation.  A decision
+/// must be made to either keep the library as is, or to promote full addition
+/// to operator+, and the rationale for the decision
+///
+/// \todo What is the right place for this function?
+/// It was added here because in practice multiplication overflows, as a draft
 template<int NB, typename B>
 constexpr ArithmeticResultTriplet<NB, B>
 fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
@@ -106,7 +142,7 @@ fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
     return { result, BS{carry.value()}, BS{overflow.value()} };
 };
 
-
+/// \brief Negation is useful only for the signed integer interpretation
 template<int NB, typename B>
 constexpr auto negate(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;

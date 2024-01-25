@@ -17,6 +17,43 @@
     #include <assert>
 #endif
 
+/*! \file RobinHood.h
+\brief User entry point to the implementation of hash tables using the "Robin
+Hood" invariant.
+
+The "Robin Hood" monicker means that each key has a preferred or "home" slot
+in the hash table.  If, upon insertion, the key can not be inserted into its
+home slot, then the insertion would look to insert it as close as possible to
+the home slot.
+
+In this code base, the acronym PSL is used frequently, it means "Probe Sequence
+Length", this is the distance from the preferred or "home" slot and the current
+search position.
+For a practical reason, a key inserted into its home has a PSL of 1, in this
+way, the metadata indicates with a PSL of 0 that no key is in the slot,
+or that the slot is free.
+
+The invariant is that a key won't be inserted further away from its home than
+the key in the current slot.  That is, a key is "richer" than another if it is
+closer to its "home", the insertion mechanism would "evict" a key that would be
+richer than the key being inserted.  In this regard, the "Robin Hood" metaphor
+is realized: the insertion "steals" from the rich to give it to the poor.
+
+\note All of this codebase makes the unchecked assumption that the byte ordering
+is LITTLE ENDIAN
+
+\todo complement with the other theoretical and practical comments relevant,
+including:
+1. How the table is not stable with regards to insetions and deletions,
+2. How an insertion can cascade into very long chains of evictions/reinsertions
+3. The theoretical guarantee that the longest PSL is in the order of Log(N)
+4. How it seems that in practice the theoretical guarantee is not achieved.
+...
+
+\todo determine a moment to endure the version control pain of making the
+indentation consistent.
+*/
+
 namespace zoo {
 namespace rh {
 
@@ -31,6 +68,7 @@ struct RelocationStackExhausted: RobinHoodException {
     using RobinHoodException::RobinHoodException;
 };
 
+/// \brief The canonical backend (implementation)
 template<int PSL_Bits, int HashBits, typename U = std::uint64_t>
 struct RH_Backend {
     using Metadata = impl::Metadata<PSL_Bits, HashBits, U>;
@@ -38,31 +76,8 @@ struct RH_Backend {
     constexpr static inline auto Width = Metadata::NBits;
     Metadata *md_;
 
-    /*! \brief SWAR check for a potential match
-    The invariant in Robin Hood is that the element being looked for, the "needle", is "richer"
-    than the elements already present, the "haystack".
-    "Richer" means that the PSL is smaller.
-    A PSL of 0 can only happen in the haystack, to indicate the slot is empty, this is "richest".
-    The first time the needle has a PSL greater than the haystacks' means the matching will fail,
-    because the hypothetical prior insertion would have "stolen" that slot.
-    If there is an equal, it would start a sequence of potential matches.  To determine an actual match:
-    1. A cheap SWAR check of hoisted hashes
-    2. If there are still potential matches (now also the hoisted hashes), fall back to non-SWAR,
-    or iterative and expensive "deep equality" test for each potential match, outside of this function
-
-    The above makes it very important to detect the first case in which the PSL is greater equal to the needle.
-    We call this the "deadline".
-    Because we assume the LITTLE ENDIAN byte ordering, the first element would be the least significant
-    non-false Boolean SWAR.
-
-    Note about performance:
-    Every "early exit" faces a big justification hurdle, the proportion of cases
-    they intercept to be large enough that the branch prediction penalty of the entropy introduced is
-    overcompensated.
-    */
-
-    /// Boolean SWAR true in the first element/lane of the needle strictly poorer than its corresponding
-    /// haystack
+    /// Boolean SWAR true in the first element/lane of the needle strictly
+    /// poorer than its corresponding haystack
     constexpr static auto
     firstInvariantBreakage(Metadata needle, Metadata haystack) {
         auto nPSL = needle.PSLs();
@@ -96,6 +111,36 @@ struct RH_Backend {
          // addition might have overflown nPSL before entering function
          return std::tuple{Metadata{nPSL.PSLs() | needlePSLsToSaturate}, bool(saturation)};  // saturated at any point, last swar to check.
      }
+
+
+    /*! \brief SWAR check for a potential match
+
+    The invariant in Robin Hood is that the element being looked for, the
+    "needle", is at least as "rich" as the elements already present (the
+    "haystack").
+    "Richer" means that the PSL is smaller.
+    A PSL of 0 can only happen in the haystack, to indicate the slot is empty,
+    this is "richest".
+    The first time the needle has a PSL greater than the haystacks' means the
+    matching will fail, because the hypothetical prior insertion would have
+    "stolen" that slot.
+    If the PSLs are equal, it starts a sequence of potential matches.  To
+    determine if there is an actual match, perform:
+    1. A cheap SWAR check of hoisted hashes
+    2. If there are still potential matches (now also the hoisted hashes), fall
+    back to non-SWAR, or iterative and expensive "deep equality" test for each
+    potential match, outside of this function.
+
+    The above makes it very important to detect the first case in which the PSL
+    is greater equal to the needle.  We call this the "deadline".
+    We assume the LITTLE ENDIAN byte ordering: the first element will
+    be the least significant non-false Boolean SWAR.
+
+    Note about performance:
+    Every "early exit" faces a big justification hurdle, the proportion of cases
+    they intercept must be large enough that the branch prediction penalty of the
+    entropy introduced (by the early exit) is overcompensated.
+    */
 
     constexpr static impl::MatchResult<PSL_Bits, HashBits, U>
     potentialMatches(
@@ -212,6 +257,9 @@ RH_Backend<PSL_Bits, HashBits, U>::findMisaligned_assumesSkarupkeTail(
         }
     }
 
+/// \brief The slots in the table may have a key-value pair or not, this
+/// optionality is not suitably captured by any standard library component,
+/// hence we need to implement our own.
 template<typename K, typename MV>
 struct KeyValuePairWrapper {
     using type = std::pair<K, MV>;
@@ -243,6 +291,15 @@ struct KeyValuePairWrapper {
     const auto &value() const noexcept { return const_cast<KeyValuePairWrapper *>(this)->value(); }
 };
 
+/// \brief Frontend with the "Skarupke Tail"
+///
+/// Normally we need to explicitly check for whether key searches have reached
+/// the end of the table.  Malte Skarupke devised a tail of table entries to
+/// make this explicit check unnecessary: Regardless of the end of the table,
+/// a search must terminate in failure if the maximum PSL is reached, then,
+/// by just adding an extra maximum PSL entries to the table, while keeping the
+/// slot indexing function the same, searches at the end of the table will never
+/// attempt to go past the real end, but return not-found within the tail.
 template<
     typename K,
     typename MV,
