@@ -82,8 +82,12 @@ struct ArithmeticResultTriplet {
 
 /// \brief "Safe" addition, meaning non-corrupting unsigned overflow addition
 /// and producing the flags for unsigned overflow (carry) and signed overflow.
+///
 /// This is the function to perform signed addition (that relies on supporting
 /// unsigned overflow)
+///
+/// Notice that the support for unsigned overflow directly allows signed
+/// addition (and both signed and unsigned substraction).
 ///
 /// This function is called "full addition" because it can perform the addition
 /// with all the bits of the inputs by making sure the overflow (in the
@@ -102,7 +106,15 @@ struct ArithmeticResultTriplet {
 /// normal arithmetic, but in unsigned SWAR it is preferable to double the
 /// precision before executing addition, thus guaranteeing no overflow will
 /// occur and using the more performant operator+ addition.  Hence,
-/// the carry and overflow flags are mostly useful in SWAR for detection of unsigned overflow (as for unsigned addition they are semantically identical.
+/// the carry flag is mostly useful in SWAR for detection of unsigned overflow,
+/// as opposed to a helper to achieve higher precision as it is normally used:
+/// Once we support non-power-of-two sizes of lanes in number of bits, we could
+/// have transformations that would convert a SWAR of lanes of N bits to a SWAR
+/// of (N + 1) bits, however, functionally, the performance cost of doing this
+/// will be strictly higher than doubling the bit count of the current SWAR.
+/// With double the number of bits, not only are additions guaranteed to not
+/// overflow (as unsigned) but even multiplications won't.  Then it is not
+/// practical to use the carry bit for other than detection of unsigned overflow.
 ///
 /// The signed integer interpretation is two's complement, which
 /// routinely overflows (when interpreted as unsigned).  Signed overflow may only
