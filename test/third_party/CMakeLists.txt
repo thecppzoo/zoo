@@ -1,19 +1,21 @@
 # CMake build : third party
 
-#configure directories
-set(THIRD_PARTY_MODULE_PATH "${PROJECT_SOURCE_DIR}/third_party")
+message(STATUS "cmake-csd ${CMAKE_CURRENT_SOURCE_DIR}")
 
-# catch
+# Configure directories
+set(THIRD_PARTY_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 
-#configure directories
-set (CATCH_MODULE_PATH "${THIRD_PARTY_MODULE_PATH}/Catch2")
-set (CATCH_INCLUDE_PATH "${CATCH_MODULE_PATH}/single_include")
+# Catch
 
-#include custom cmake function
+# Configure directories
+set(CATCH_MODULE_PATH "${THIRD_PARTY_MODULE_PATH}/Catch2")
+set(CATCH_INCLUDE_PATH "${CATCH_MODULE_PATH}/single_include")
+
+# Include custom cmake function
 include("${CATCH_MODULE_PATH}/contrib/ParseAndAddCatchTests.cmake")
 
-#set variables for tests
+# Set variables for tests
 set(TEST_THIRD_PARTY_INCLUDE_PATH ${CATCH_INCLUDE_PATH})
 
-#export vars
+# Export vars
 set(TEST_THIRD_PARTY_INCLUDE_PATH ${TEST_THIRD_PARTY_INCLUDE_PATH} PARENT_SCOPE)
