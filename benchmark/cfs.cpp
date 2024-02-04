@@ -311,6 +311,3 @@ BENCHMARK(genLinearVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Uni
 BENCHMARK(randomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(sortSTLRandomVector)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
 BENCHMARK(transformationToCFS)->RangeMultiplier(10)->Range(RangeLow, RangeHigh)->Unit(benchmark::kMicrosecond);//->Complexity();
-
-BENCHMARK_MAIN();
-
