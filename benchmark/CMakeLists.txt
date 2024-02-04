@@ -9,7 +9,7 @@ project(ZooBenchmark)
 
 include_directories(
     ../test/inc
-    ../../benchmark/include
+    dependencies/google_benchmark/include
     ../inc
     ../junkyard/inc
     ../test/third_party/Catch2/single_include
@@ -30,4 +30,9 @@ add_executable(
     zoo-google-benchmark benchmark_main.cpp cfs.cpp cfs/cfs_utility.cpp
 )
 
+add_executable(
+    zoo-atoi-benchmark benchmark_main.cpp atoi.cpp
+)
+
 target_link_libraries(zoo-google-benchmark benchmark::benchmark)
+target_link_libraries(zoo-atoi-benchmark benchmark::benchmark)

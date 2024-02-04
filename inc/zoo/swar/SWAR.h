@@ -144,6 +144,8 @@ struct SWAR {
         return SWAR{(*this & protectiveMask).value() >> bitCount};
     }
 
+    constexpr SWAR
+    multiply(T multiplier) const noexcept { return SWAR{m_v * multiplier}; }
     T m_v;
 };
 
