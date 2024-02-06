@@ -23,7 +23,9 @@ add_subdirectory(dependencies/google_benchmark)
 
 add_executable(
   catch2Benchmark
-    catch2BenchmarkMain.cpp catch2Functions.cpp egyptian.cpp
+    catch2BenchmarkMain.cpp catch2Functions.cpp catch2swar-demo.cpp
+    atoi.cpp
+    egyptian.cpp
     RobinHood.benchmark.cpp
 )
 
@@ -32,7 +34,7 @@ add_executable(
 )
 
 add_executable(
-    zoo-atoi-benchmark benchmark_main.cpp atoi.cpp
+    zoo-atoi-benchmark benchmark_main.cpp bm-swar.cpp atoi.cpp
 )
 
 target_link_libraries(zoo-google-benchmark benchmark::benchmark)
