@@ -18,6 +18,7 @@ include_directories(
 # build google benchmark (target: benchmark)
 # do not build tests of benchmarking lib
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Suppressing benchmark's tests" FORCE)
+set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
 add_subdirectory(dependencies/google_benchmark)
 
 add_executable(
