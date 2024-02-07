@@ -365,12 +365,14 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
     template<int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
-    asBooleanSWAR(SWAR<NB, TT> arg) noexcept;
+    convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
-asBooleanSWAR(SWAR<NBits, T> arg) noexcept { return arg; }
+convertToBooleanSWAR(SWAR<NBits, T> arg) noexcept {
+    return SWAR<NBits, T>{SWAR<NBits, T>::MostSignificantBit} & arg;
+}
 
 template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>

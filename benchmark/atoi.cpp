@@ -1,6 +1,8 @@
 #include "zoo/swar/SWAR.h"
 #include "zoo/swar/associative_iteration.h"
 
+#include <immintrin.h>
+
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -53,10 +55,36 @@ auto lemire_as_zoo_swar(const char *chars) {
 namespace zoo {
 
 std::size_t c_strLength(const char *s) {
-    std::size_t rv = 0;
+    using S = swar::SWAR<8, std::size_t>;
+    constexpr auto
+        MSBs = S{S::MostSignificantBit},
+        Ones = S{S::LeastSignificantBit};
+    S bytes;
+    for(auto base = s;; base += 8) {
+        memcpy(&bytes.m_v, base, 8);
+        auto firstNullTurnsOnMSB = bytes - Ones;
+        // The first lane with a null will borrow and set its MSB on when
+        // subtracted one.
+        // The borrowing from the first null interferes with the subsequent
+        // lanes, that's why we focus on the first null.
+        // The lanes previous to the first null might keep their MSB on after
+        // subtracting one (if their value is greater than 0x80).
+        // This provides a way to detect the first null: It is the first lane
+        // in firstNullTurnsOnMSB that "flipped on" its MSB
+        auto cheapestInversionOfMSBs = ~bytes;
+        auto firstMSBsOnIsFirstNull =
+            firstNullTurnsOnMSB & cheapestInversionOfMSBs;
+        auto onlyMSBs = zoo::swar::convertToBooleanSWAR(firstMSBsOnIsFirstNull);
+        if(onlyMSBs) { // there is a null!
+            auto firstNullIndex = onlyMSBs.lsbIndex();
+            return firstNullIndex + (base - s);
+        }
+    }
+}
+
+std::size_t c_strLength_natural(const char *s) {
     using S = swar::SWAR<8, std::size_t>;
     S bytes;
-    constexpr auto MSBs = S{S::MostSignificantBit};
     for(auto base = s;; base += 8) {
         memcpy(&bytes.m_v, base, 8);
         auto nulls = zoo::swar::equals(bytes, S{0});
@@ -67,8 +95,7 @@ std::size_t c_strLength(const char *s) {
     }
 }
 
-std::size_t c_strLength_ManualComparison(const char *s) {
-    std::size_t rv = 0;
+std::size_t c_strLength_manualComparison(const char *s) {
     using S = swar::SWAR<8, std::size_t>;
     S bytes;
     constexpr auto MSBs = S{S::MostSignificantBit};
@@ -76,18 +103,42 @@ std::size_t c_strLength_ManualComparison(const char *s) {
         memcpy(&bytes.m_v, base, 8);
         // A null byte is detected in two steps:
         // 1. it has the MSB off, and
-        // the least significant bits are also off.
+        // 2. the least significant bits are also off.
         // The swar library allows the detection of lsbs off
         // By comparing greater equal to 0,
         // 0 can only be greater-equal to a byte with LSBs 0
         auto haveMSB_cleared = bytes ^ MSBs;
         auto lsbNulls = zoo::swar::greaterEqual_MSB_off(S{0}, bytes & ~MSBs);
-        auto nulls = swar::asBooleanSWAR(haveMSB_cleared & lsbNulls);
-        if(nulls) {
+        auto nulls = haveMSB_cleared & lsbNulls;
+        if(nulls.value()) {
             auto firstNullIndex = nulls.lsbIndex();
             return firstNullIndex + (base - s);
         }
     }
+}
+
+size_t avx2_strlen(const char* str) {
+    const __m256i zero = _mm256_setzero_si256(); // Vector of 32 zero bytes
+    size_t offset = 0;
+
+    // Loop over the string in blocks of 32 bytes
+    for (;; offset += 32) {
+        // Load 32 bytes of the string into a __m256i vector
+        __m256i data;// = _mm256_load_si256((const __m256i*)(str + offset));
+        memcpy(&data, str + offset, 32);
+        // Compare each byte with '\0'
+        __m256i cmp = _mm256_cmpeq_epi8(data, zero);
+        // Create a mask indicating which bytes are '\0'
+        int mask = _mm256_movemask_epi8(cmp);
+
+        // If mask is not zero, we found a '\0' byte
+        if (mask) {
+            // Calculate the index of the first '\0' byte using ctz (Count Trailing Zeros)
+            return offset + __builtin_ctz(mask);
+        }
+    }
+    // Unreachable, but included to avoid compiler warnings
+    return offset;
 }
 
 }

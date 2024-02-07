@@ -27,15 +27,15 @@ void runBenchmark(benchmark::State &s) {
 }
 
 
-#define X(Typename, FunctionToCall) \
-    BENCHMARK(runBenchmark<CORPUS, Invoke##Typename>);
-
-#define CORPUS Corpus8DecimalDigits
+#define X(Typename, _) \
+    BENCHMARK(runBenchmark<Corpus8DecimalDigits, Invoke##Typename>);
     PARSE8BYTES_CORPUS_X_LIST
-#undef CORPUS
-
-#define CORPUS CorpusStringLength
-    STRLEN_CORPUS_X_LIST
-#undef CORPUS
-
 #undef X
+
+#define X(Typename, _) \
+    BENCHMARK(runBenchmark<CorpusStringLength, Invoke##Typename>);
+    STRLEN_CORPUS_X_LIST
+#undef X
+
+using RepeatZooStrlen = InvokeZOO_STRLEN;
+BENCHMARK(runBenchmark<CorpusStringLength, RepeatZooStrlen>);

@@ -32,9 +32,11 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     #undef X
     REQUIRE(fromLemire == fromZoo);
     REQUIRE(fromLIBC == fromZoo);
+    REQUIRE(fromZOO_STRLEN == fromLIBC_STRLEN);
     REQUIRE(fromLIBC_STRLEN == fromZOO_NATURAL_STRLEN);
     REQUIRE(fromZOO_NATURAL_STRLEN == fromZOO_MANUAL_STRLEN);
     REQUIRE(fromGENERIC_GLIBC_STRLEN == fromZOO_NATURAL_STRLEN);
+    REQUIRE(fromZOO_AVX == fromZOO_STRLEN);
 
     auto haveTheRoleOfMemoryBarrier = -1;
     #define X(Type, Fun) \

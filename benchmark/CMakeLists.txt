@@ -15,6 +15,18 @@ if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
     endif()
 endif()
 
+# Macro to set properties for Xcode targets
+macro(set_xcode_properties TARGET_NAME)
+    if(CMAKE_GENERATOR STREQUAL Xcode)
+        set_target_properties(${TARGET_NAME} PROPERTIES
+            XCODE_ATTRIBUTE_ENABLE_AVX YES
+            XCODE_ATTRIBUTE_ENABLE_AVX2 YES
+            XCODE_ATTRIBUTE_OTHER_CPLUSPLUSFLAGS "-mavx -mavx2"
+            XCODE_ATTRIBUTE_OTHER_CFLAGS "-mavx -mavx2"
+        )
+    endif()
+endmacro()
+
 include_directories(
     ../test/inc
     dependencies/google_benchmark/include
@@ -36,14 +48,17 @@ add_executable(
     egyptian.cpp
     # RobinHood.benchmark.cpp
 )
+set_xcode_properties(catch2Benchmark)
 
 add_executable(
     zoo-google-benchmark benchmark_main.cpp cfs.cpp cfs/cfs_utility.cpp
 )
+set_xcode_properties(zoo-google-benchmark)
 
 add_executable(
     zoo-atoi-benchmark benchmark_main.cpp bm-swar.cpp atoi.cpp
 )
+set_xcode_properties(zoo-atoi-benchmark)
 
 target_link_libraries(zoo-google-benchmark benchmark::benchmark)
 target_link_libraries(zoo-atoi-benchmark benchmark::benchmark)

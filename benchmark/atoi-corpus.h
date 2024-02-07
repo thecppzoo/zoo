@@ -121,8 +121,10 @@ struct CorpusStringLength {
 
 #define STRLEN_CORPUS_X_LIST \
     X(LIBC_STRLEN, strlen) \
-    X(ZOO_NATURAL_STRLEN, zoo::c_strLength) \
-    X(ZOO_MANUAL_STRLEN, zoo::c_strLength_ManualComparison) \
+    X(ZOO_STRLEN, zoo::c_strLength) \
+    X(ZOO_NATURAL_STRLEN, zoo::c_strLength_natural) \
+    X(ZOO_MANUAL_STRLEN, zoo::c_strLength_manualComparison) \
+    X(ZOO_AVX, zoo::avx2_strlen) \
     X(GENERIC_GLIBC_STRLEN, STRLEN_old)
 
 #define X(Typename, FunctionToCall) \
