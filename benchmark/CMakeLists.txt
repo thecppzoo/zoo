@@ -1,11 +1,19 @@
 cmake_minimum_required (VERSION 3.8)
 
+project(ZooBenchmark)
+
+
 set(CMAKE_CXX_FLAGS "-fno-unroll-loops")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 
-project(ZooBenchmark)
+if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " -march=native -fno-unroll-loops")
+        string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -march=native -fno-unroll-loops")
+    endif()
+endif()
 
 include_directories(
     ../test/inc
@@ -26,7 +34,7 @@ add_executable(
     catch2BenchmarkMain.cpp catch2Functions.cpp catch2swar-demo.cpp
     atoi.cpp
     egyptian.cpp
-    RobinHood.benchmark.cpp
+    # RobinHood.benchmark.cpp
 )
 
 add_executable(

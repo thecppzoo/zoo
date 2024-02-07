@@ -59,29 +59,6 @@ std::size_t c_strLength(const char *s) {
     constexpr auto MSBs = S{S::MostSignificantBit};
     for(auto base = s;; base += 8) {
         memcpy(&bytes.m_v, base, 8);
-        // A null byte is detected in two steps:
-        // 1. it has the MSB off, and
-        // the least significant bits are also off.
-        // The swar library allows the detection of lsbs off
-        // By comparing greater equal to 0,
-        // 0 can only be greater-equal to a byte with LSBs 0
-        auto haveMSB_cleared = bytes ^ MSBs;
-        auto lsbNulls = zoo::swar::greaterEqual_MSB_off(S{0}, bytes);
-        auto nulls = swar::asBooleanSWAR(haveMSB_cleared & lsbNulls);
-        if(nulls) {
-            auto firstNullIndex = nulls.lsbIndex();
-            return firstNullIndex + (base - s);
-        }
-    }
-}
-
-std::size_t c_strLength_MoreNaturalButSlightlyWorse(const char *s) {
-    std::size_t rv = 0;
-    using S = swar::SWAR<8, std::size_t>;
-    S bytes;
-    constexpr auto MSBs = S{S::MostSignificantBit};
-    for(auto base = s;; base += 8) {
-        memcpy(&bytes.m_v, base, 8);
         auto nulls = zoo::swar::equals(bytes, S{0});
         if(nulls) { // there is a null!
             auto firstNullIndex = nulls.lsbIndex();
@@ -90,4 +67,102 @@ std::size_t c_strLength_MoreNaturalButSlightlyWorse(const char *s) {
     }
 }
 
+std::size_t c_strLength_ManualComparison(const char *s) {
+    std::size_t rv = 0;
+    using S = swar::SWAR<8, std::size_t>;
+    S bytes;
+    constexpr auto MSBs = S{S::MostSignificantBit};
+    for(auto base = s;; base += 8) {
+        memcpy(&bytes.m_v, base, 8);
+        // A null byte is detected in two steps:
+        // 1. it has the MSB off, and
+        // the least significant bits are also off.
+        // The swar library allows the detection of lsbs off
+        // By comparing greater equal to 0,
+        // 0 can only be greater-equal to a byte with LSBs 0
+        auto haveMSB_cleared = bytes ^ MSBs;
+        auto lsbNulls = zoo::swar::greaterEqual_MSB_off(S{0}, bytes & ~MSBs);
+        auto nulls = swar::asBooleanSWAR(haveMSB_cleared & lsbNulls);
+        if(nulls) {
+            auto firstNullIndex = nulls.lsbIndex();
+            return firstNullIndex + (base - s);
+        }
+    }
+}
+
+}
+
+/// \brief This is the last non-platform specific "generic" strlen in GLibC.
+/// Taken from https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=string/strlen.c;hb=6d7e8eda9b85b08f207a6dc6f187e94e4817270f
+/// that dates to 2023-01-06 (a year ago at the time of writing)
+std::size_t
+STRLEN_old (const char *str)
+{
+  const char *char_ptr;
+  const unsigned long int *longword_ptr;
+  unsigned long int longword, himagic, lomagic;
+
+  /* Handle the first few characters by reading one character at a time.
+     Do this until CHAR_PTR is aligned on a longword boundary.  */
+  for (char_ptr = str; ((unsigned long int) char_ptr
+			& (sizeof (longword) - 1)) != 0;
+       ++char_ptr)
+    if (*char_ptr == '\0')
+      return char_ptr - str;
+
+  /* All these elucidatory comments refer to 4-byte longwords,
+     but the theory applies equally well to 8-byte longwords.  */
+
+  longword_ptr = (unsigned long int *) char_ptr;
+
+  /* Computing (longword - lomagic) sets the high bit of any corresponding
+     byte that is either zero or greater than 0x80.  The latter case can be
+     filtered out by computing (~longword & himagic).  The final result
+     will always be non-zero if one of the bytes of longword is zero.  */
+  himagic = 0x80808080L;
+  lomagic = 0x01010101L;
+  if (sizeof (longword) > 4)
+    {
+      /* 64-bit version of the magic.  */
+      /* Do the shift in two steps to avoid a warning if long has 32 bits.  */
+      himagic = ((himagic << 16) << 16) | himagic;
+      lomagic = ((lomagic << 16) << 16) | lomagic;
+    }
+  if (sizeof (longword) > 8)
+    abort ();
+
+  /* Instead of the traditional loop which tests each character,
+     we will test a longword at a time.  The tricky part is testing
+     if *any of the four* bytes in the longword in question are zero.  */
+  for (;;)
+    {
+      longword = *longword_ptr++;
+
+      if (((longword - lomagic) & ~longword & himagic) != 0)
+	{
+	  /* Which of the bytes was the zero?  */
+
+	  const char *cp = (const char *) (longword_ptr - 1);
+
+	  if (cp[0] == 0)
+	    return cp - str;
+	  if (cp[1] == 0)
+	    return cp - str + 1;
+	  if (cp[2] == 0)
+	    return cp - str + 2;
+	  if (cp[3] == 0)
+	    return cp - str + 3;
+	  if (sizeof (longword) > 4)
+	    {
+	      if (cp[4] == 0)
+		return cp - str + 4;
+	      if (cp[5] == 0)
+		return cp - str + 5;
+	      if (cp[6] == 0)
+		return cp - str + 6;
+	      if (cp[7] == 0)
+		return cp - str + 7;
+	    }
+	}
+    }
 }

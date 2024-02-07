@@ -26,13 +26,16 @@ void runBenchmark(benchmark::State &s) {
     }
 }
 
+
 #define X(Typename, FunctionToCall) \
-    BENCHMARK(runBenchmark<Corpus8DecimalDigits, Invoke##Typename>);
+    BENCHMARK(runBenchmark<CORPUS, Invoke##Typename>);
 
-PARSE8BYTES_CORPUS_X_LIST
-#undef X
+#define CORPUS Corpus8DecimalDigits
+    PARSE8BYTES_CORPUS_X_LIST
+#undef CORPUS
 
-#define X(TN, FTC) \
-    BENCHMARK(runBenchmark<CorpusStringLength, Invoke##TN>);
-STRLEN_CORPUS_X_LIST
+#define CORPUS CorpusStringLength
+    STRLEN_CORPUS_X_LIST
+#undef CORPUS
+
 #undef X

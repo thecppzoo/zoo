@@ -82,7 +82,7 @@ struct CorpusStringLength {
         std::uniform_int_distribution<> strSize(0, 101); // again a prime
         std::uniform_int_distribution<> characters(1, 255); // notice 0 excluded
 
-        for(;;) {
+        while(count--) {
             auto length = strSize(generator);
             sizes.push_back(length);
             for(auto i = length; i--; ) {
@@ -121,8 +121,9 @@ struct CorpusStringLength {
 
 #define STRLEN_CORPUS_X_LIST \
     X(LIBC_STRLEN, strlen) \
-    X(ZOO_BEST_STRLEN, zoo::c_strLength) \
-    X(ZOO_NATURAL_STRLEN, zoo::c_strLength_MoreNaturalButSlightlyWorse)
+    X(ZOO_NATURAL_STRLEN, zoo::c_strLength) \
+    X(ZOO_MANUAL_STRLEN, zoo::c_strLength_ManualComparison) \
+    X(GENERIC_GLIBC_STRLEN, STRLEN_old)
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };
