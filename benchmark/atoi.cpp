@@ -49,3 +49,45 @@ auto lemire_as_zoo_swar(const char *chars) {
     auto by10001base2to32 = byteQuads.multiply(1 + (10000ull << 32));
     return uint32_t(by10001base2to32.value() >> 32);
 }
+
+namespace zoo {
+
+std::size_t c_strLength(const char *s) {
+    std::size_t rv = 0;
+    using S = swar::SWAR<8, std::size_t>;
+    S bytes;
+    constexpr auto MSBs = S{S::MostSignificantBit};
+    for(auto base = s;; base += 8) {
+        memcpy(&bytes.m_v, base, 8);
+        // A null byte is detected in two steps:
+        // 1. it has the MSB off, and
+        // the least significant bits are also off.
+        // The swar library allows the detection of lsbs off
+        // By comparing greater equal to 0,
+        // 0 can only be greater-equal to a byte with LSBs 0
+        auto haveMSB_cleared = bytes ^ MSBs;
+        auto lsbNulls = zoo::swar::greaterEqual_MSB_off(S{0}, bytes);
+        auto nulls = swar::asBooleanSWAR(haveMSB_cleared & lsbNulls);
+        if(nulls) {
+            auto firstNullIndex = nulls.lsbIndex();
+            return firstNullIndex + (base - s);
+        }
+    }
+}
+
+std::size_t c_strLength_MoreNaturalButSlightlyWorse(const char *s) {
+    std::size_t rv = 0;
+    using S = swar::SWAR<8, std::size_t>;
+    S bytes;
+    constexpr auto MSBs = S{S::MostSignificantBit};
+    for(auto base = s;; base += 8) {
+        memcpy(&bytes.m_v, base, 8);
+        auto nulls = zoo::swar::equals(bytes, S{0});
+        if(nulls) { // there is a null!
+            auto firstNullIndex = nulls.lsbIndex();
+            return firstNullIndex + (base - s);
+        }
+    }
+}
+
+}

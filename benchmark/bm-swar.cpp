@@ -32,3 +32,7 @@ void runBenchmark(benchmark::State &s) {
 PARSE8BYTES_CORPUS_X_LIST
 #undef X
 
+#define X(TN, FTC) \
+    BENCHMARK(runBenchmark<CorpusStringLength, Invoke##TN>);
+STRLEN_CORPUS_X_LIST
+#undef X

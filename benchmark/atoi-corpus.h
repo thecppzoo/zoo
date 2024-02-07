@@ -1,5 +1,8 @@
+#include "atoi.h"
+
 #include <vector>
 #include <string>
+#include <cstring>
 #include <random>
 
 struct Corpus8DecimalDigits {
@@ -63,8 +66,67 @@ struct Corpus8DecimalDigits {
     X(Zoo, lemire_as_zoo_swar)\
     X(LIBC, atoi)
 
+struct CorpusStringLength {
+    std::vector<int> skips_;
+    std::string characters_;
+
+    CorpusStringLength(std::vector<int> &&skips, std::string &&cs):
+        skips_{std::move(skips)}, characters_{std::move(cs)}
+    {}
+
+    template<typename G>
+    static auto makeCorpus(G &generator) {
+        auto count = 1031; // see Corpus8DecimalDigits for why 1031
+        std::vector<int> sizes;
+        std::string allCharacters;
+        std::uniform_int_distribution<> strSize(0, 101); // again a prime
+        std::uniform_int_distribution<> characters(1, 255); // notice 0 excluded
+
+        for(;;) {
+            auto length = strSize(generator);
+            sizes.push_back(length);
+            for(auto i = length; i--; ) {
+                allCharacters.append(1, characters(generator));
+            }
+            allCharacters.append(1, '\0');
+        }
+        return CorpusStringLength(std::move(sizes), std::move(allCharacters));
+    }
+
+    struct Iterator {
+        int *skips, *sentinel;
+        char *cp;
+
+        Iterator &operator++() {
+            cp += *skips++;
+            return *this;
+        }
+
+        char *operator*() {
+            return cp;
+        }
+
+        auto next() noexcept {
+            ++(*this);
+            return sentinel != skips;
+        }
+    };
+
+    Iterator commence() {
+        return {
+            skips_.data(), skips_.data() + skips_.size(), characters_.data()
+        };
+    }
+};
+
+#define STRLEN_CORPUS_X_LIST \
+    X(LIBC_STRLEN, strlen) \
+    X(ZOO_BEST_STRLEN, zoo::c_strLength) \
+    X(ZOO_NATURAL_STRLEN, zoo::c_strLength_MoreNaturalButSlightlyWorse)
+
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };
 
 PARSE8BYTES_CORPUS_X_LIST
+STRLEN_CORPUS_X_LIST
 #undef X

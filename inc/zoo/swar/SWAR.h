@@ -362,7 +362,15 @@ struct BooleanSWAR: SWAR<NBits, T> {
     template<int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
     greaterEqual_MSB_off(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
+
+    template<int NB, typename TT>
+    friend constexpr BooleanSWAR<NB, TT>
+    asBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+asBooleanSWAR(SWAR<NBits, T> arg) noexcept { return arg; }
 
 template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
