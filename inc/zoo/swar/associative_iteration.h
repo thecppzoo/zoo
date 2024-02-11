@@ -108,9 +108,11 @@ fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
 
 template<int NB, typename B>
 constexpr SWAR<NB, B>
-saturatingUnsignedArithmetic(SWAR<NB, B> s1, SWAR<NB, B> s2) {  // rename
+saturatingUnsignedArithmetic(SWAR<NB, B> s1, SWAR<NB, B> s2) {
   const auto additionResult = fullAddition(s1, s2);
-  // If we carry unsigned, we need to saturate: thus or the carry bit with the lane bits (carry because it happens to be earlier in the struct declartion)
+  // If we carry unsigned, we need to saturate: thus OR the carry bit with the
+  // lane bits (carry because it happens to be earlier in the struct
+  // declaration)
   return additionResult.carry.asMask() | additionResult.result;
 }
 
