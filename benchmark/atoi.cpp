@@ -1,7 +1,9 @@
 #include "zoo/swar/SWAR.h"
 #include "zoo/swar/associative_iteration.h"
 
+#if defined(__AVX2__)
 #include <immintrin.h>
+#endif
 
 #include <stdint.h>
 #include <string.h>
@@ -117,6 +119,7 @@ std::size_t c_strLength_manualComparison(const char *s) {
     }
 }
 
+#if defined(__AVX2__)
 size_t avx2_strlen(const char* str) {
     const __m256i zero = _mm256_setzero_si256(); // Vector of 32 zero bytes
     size_t offset = 0;
@@ -140,6 +143,7 @@ size_t avx2_strlen(const char* str) {
     // Unreachable, but included to avoid compiler warnings
     return offset;
 }
+#endif
 
 }
 
