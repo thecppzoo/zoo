@@ -120,9 +120,9 @@ struct CorpusStringLength {
 };
 
 
-#if defined(__AVX2__)
+#if ZOO_CONFIGURED_TO_USE_AVX
 #define AVX2_STRLEN_CORPUS_X_LIST \
-  X(ZOO_AVX, zoo::avx2_strlen)
+    X(ZOO_AVX, zoo::avx2_strlen)
 #else
 #define AVX2_STRLEN_CORPUS_X_LIST /* nothing */
 #endif

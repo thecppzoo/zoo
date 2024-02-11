@@ -36,7 +36,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     REQUIRE(fromLIBC_STRLEN == fromZOO_NATURAL_STRLEN);
     REQUIRE(fromZOO_NATURAL_STRLEN == fromZOO_MANUAL_STRLEN);
     REQUIRE(fromGENERIC_GLIBC_STRLEN == fromZOO_NATURAL_STRLEN);
-#if defined(__AVX2__)
+#if ZOO_CONFIGURED_TO_USE_AVX
     REQUIRE(fromZOO_AVX == fromZOO_STRLEN);
 #endif
 

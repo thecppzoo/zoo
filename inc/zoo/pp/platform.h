@@ -9,6 +9,8 @@
 
 #define MSVC_EMPTY_BASES
 
+#define ZOO_CONFIGURED_TO_USE_AVX defined(__AVX2__) // TODO bring this in from CMake
+
 #endif
 
 #endif

@@ -1,7 +1,7 @@
 #include "zoo/swar/SWAR.h"
 #include "zoo/swar/associative_iteration.h"
 
-#if defined(__AVX2__)
+#if ZOO_CONFIGURED_TO_USE_AVX
 #include <immintrin.h>
 #endif
 
@@ -119,7 +119,7 @@ std::size_t c_strLength_manualComparison(const char *s) {
     }
 }
 
-#if defined(__AVX2__)
+#if ZOO_CONFIGURED_TO_USE_AVX
 size_t avx2_strlen(const char* str) {
     const __m256i zero = _mm256_setzero_si256(); // Vector of 32 zero bytes
     size_t offset = 0;
