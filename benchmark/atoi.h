@@ -9,7 +9,10 @@ namespace zoo {
 std::size_t c_strLength(const char *s);
 std::size_t c_strLength_natural(const char *s);
 std::size_t c_strLength_manualComparison(const char *s);
+
+#if ZOO_CONFIGURED_TO_USE_AVX
 std::size_t avx2_strlen(const char* str);
+#endif
 
 }
 
