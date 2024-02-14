@@ -5,7 +5,6 @@
 #include <string>
 #include <cstring>
 #include <random>
-#include <zoo/pp/platform.h>
 
 struct Corpus8DecimalDigits {
     std::vector<int> asNumbers_;
