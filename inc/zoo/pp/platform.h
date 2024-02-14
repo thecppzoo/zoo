@@ -2,9 +2,9 @@
 #define ZOO_PLATFORM_MACROS_H
 
 #ifdef __AVX2__
-#define ZOO_CONFIGURED_TO_USE_AVX 1
+#define ZOO_CONFIGURED_TO_USE_AVX() 1
 #else
-#define ZOO_CONFIGURED_TO_USE_AVX 0
+#define ZOO_CONFIGURED_TO_USE_AVX() 0
 #endif
 
 #ifdef _MSC_VER

@@ -1,9 +1,9 @@
 #include "atoi.h"
-
 #include <vector>
 #include <string>
 #include <cstring>
 #include <random>
+#include <zoo/pp/platform.h>
 
 struct Corpus8DecimalDigits {
     std::vector<int> asNumbers_;
@@ -120,7 +120,7 @@ struct CorpusStringLength {
 };
 
 
-#if ZOO_CONFIGURED_TO_USE_AVX
+#if ZOO_CONFIGURED_TO_USE_AVX()
 #define AVX2_STRLEN_CORPUS_X_LIST \
     X(ZOO_AVX, zoo::avx2_strlen)
 #else
