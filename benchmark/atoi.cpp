@@ -1,13 +1,15 @@
-#include "zoo/swar/SWAR.h"
+#include "atoi.h"
+
 #include "zoo/swar/associative_iteration.h"
 
-#if ZOO_CONFIGURED_TO_USE_AVX
+#if ZOO_CONFIGURED_TO_USE_AVX()
 #include <immintrin.h>
 #endif
 
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // Copied from Daniel Lemire's GitHub at
 // https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/
@@ -25,7 +27,7 @@ uint32_t parse_eight_digits_swar(const char *chars) {
 
 // Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
 // of 10^9 is slightly less than 30, thus, only 30 bits are needed.
-auto lemire_as_zoo_swar(const char *chars) {
+uint32_t lemire_as_zoo_swar(const char *chars) {
     uint64_t bytes;
     memcpy(&bytes, chars, 8);
     auto allCharacterZero = zoo::meta::BitmaskMaker<uint64_t, '0', 8>::value;
@@ -54,7 +56,43 @@ auto lemire_as_zoo_swar(const char *chars) {
     return uint32_t(by10001base2to32.value() >> 32);
 }
 
+std::size_t spaces_glibc(const char *ptr) {
+    auto rv = 0;
+    while(isspace(ptr[rv])) { ++rv; }
+    return rv;
+}
+
 namespace zoo {
+
+//constexpr
+std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept {
+    /*
+    space (0x20, ' ')
+    form feed (0x0c, '\f')
+    line feed (0x0a, '\n')
+    carriage return (0x0d, '\r')
+    horizontal tab (0x09, '\t')
+    vertical tab (0x0b, '\v')*
+    constexpr std::array<char, 6> SpaceCharacters = {
+        0b10'0000, //0x20 space
+        0b00'1101, // 0xD \r
+        0b00'1100, // 0xC \f
+        0b00'1011, // 0xB \v
+        0b00'1010, // 0xA \n
+        0b00'1001  //   9 \t
+    },
+    ExpressedAsEscapeCodes = { ' ', '\r', '\f', '\v', '\n', '\t' };
+    static_assert(SpaceCharacters == ExpressedAsEscapeCodes); */
+    using S = swar::SWAR<8, uint64_t>;
+    constexpr S Space{meta::BitmaskMaker<uint64_t, ' ', 8>::value};
+    auto space = swar::equals(bytes, Space);
+    auto otherWhiteSpace =
+        swar::constantIsGreaterEqual<'\r'>(bytes) &
+        ~swar::constantIsGreaterEqual<'\t' - 1>(bytes);
+    auto whiteSpace = space | otherWhiteSpace;
+    auto notWhiteSpace = S{S::MostSignificantBit} ^ whiteSpace;
+    return notWhiteSpace.lsbIndex();
+}
 
 std::size_t c_strLength(const char *s) {
     using S = swar::SWAR<8, std::size_t>;
@@ -119,7 +157,7 @@ std::size_t c_strLength_manualComparison(const char *s) {
     }
 }
 
-#if ZOO_CONFIGURED_TO_USE_AVX
+#if ZOO_CONFIGURED_TO_USE_AVX()
 size_t avx2_strlen(const char* str) {
     const __m256i zero = _mm256_setzero_si256(); // Vector of 32 zero bytes
     size_t offset = 0;
