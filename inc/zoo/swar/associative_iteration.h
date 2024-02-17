@@ -161,7 +161,7 @@ saturatingUnsignedArithmetic(SWAR<NB, B> s1, SWAR<NB, B> s2) {
   // If we carry unsigned, we need to saturate: thus OR the carry bit with the
   // lane bits (carry because it happens to be earlier in the struct
   // declaration)
-  return additionResult.carry.asMask() | additionResult.result;
+  return additionResult.carry.MSBtoLaneMask() | additionResult.result;
 }
 
 /// \brief Negation is useful only for the signed integer interpretation

@@ -345,8 +345,8 @@ struct BooleanSWAR: SWAR<NBits, T> {
         return BooleanSWAR(MaskLaneMSB ^ *this);
     }
 
-     // BooleanSWAR as a mask: BooleanSWAR<4, u16>(0x0800).asMask() => SWAR<4,u16>(0x0F00)
-     constexpr auto asMask() const noexcept {
+     // BooleanSWAR as a mask: BooleanSWAR<4, u16>(0x0800).MSBtoLaneMask() => SWAR<4,u16>(0x0F00)
+     constexpr auto MSBtoLaneMask() const noexcept {
        return SWAR<NBits,T>(this->m_v - (this->m_v >> (NBits-1)) | this->m_v);
      }
 
