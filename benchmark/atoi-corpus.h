@@ -120,7 +120,6 @@ struct CorpusStringLength {
     }
 };
 
-
 #if ZOO_CONFIGURED_TO_USE_AVX()
 #define AVX2_STRLEN_CORPUS_X_LIST \
     X(ZOO_AVX, zoo::avx2_strlen)
@@ -128,14 +127,12 @@ struct CorpusStringLength {
 #define AVX2_STRLEN_CORPUS_X_LIST /* nothing */
 #endif
 
-
 #define STRLEN_CORPUS_X_LIST \
     X(LIBC_STRLEN, strlen) \
     X(ZOO_STRLEN, zoo::c_strLength) \
     X(ZOO_NATURAL_STRLEN, zoo::c_strLength_natural) \
     X(GENERIC_GLIBC_STRLEN, STRLEN_old) \
     AVX2_STRLEN_CORPUS_X_LIST
-
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };

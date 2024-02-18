@@ -5,6 +5,7 @@
 
 uint32_t parse_eight_digits_swar(const char *chars);
 uint32_t lemire_as_zoo_swar(const char *chars);
+
 std::size_t spaces_glibc(const char *ptr);
 
 namespace zoo {

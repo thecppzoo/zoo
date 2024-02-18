@@ -26,10 +26,12 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
         auto zl2 = zoo::c_strLength(skipFst);
         auto strlen2 = strlen(skipFst);
         REQUIRE(zl2 == strlen2);
-        auto avx1 = zoo::avx2_strlen(TwoStrings);
-        REQUIRE(avx1 == strlen1);
-        auto avx2 = zoo::avx2_strlen(skipFst);
-        REQUIRE(avx2 == strlen2);
+        #if ZOO_CONFIGURED_TO_USE_AVX()
+            auto avx1 = zoo::avx2_strlen(TwoStrings);
+            REQUIRE(avx1 == strlen1);
+            auto avx2 = zoo::avx2_strlen(skipFst);
+            REQUIRE(avx2 == strlen2);
+        #endif
     }
     auto corpus8D = Corpus8DecimalDigits::makeCorpus(g);
     auto corpusStrlen = CorpusStringLength::makeCorpus(g);
@@ -49,9 +51,9 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     REQUIRE(fromZOO_STRLEN == fromLIBC_STRLEN);
     REQUIRE(fromLIBC_STRLEN == fromZOO_NATURAL_STRLEN);
     REQUIRE(fromGENERIC_GLIBC_STRLEN == fromZOO_NATURAL_STRLEN);
-#if ZOO_CONFIGURED_TO_USE_AVX()
-    REQUIRE(fromZOO_AVX == fromZOO_STRLEN);
-#endif
+    #if ZOO_CONFIGURED_TO_USE_AVX()
+        REQUIRE(fromZOO_AVX == fromZOO_STRLEN);
+    #endif
 
     auto haveTheRoleOfMemoryBarrier = -1;
     #define X(Type, Fun) \
