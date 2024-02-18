@@ -37,9 +37,12 @@ constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
 /// Index into the bits of the type T that contains the LSB.
 template<typename T>
 constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
-    // ~v & (v - 1) turns on all trailing zeroes, zeroes the rest
-    //return meta::logFloor(1 + (~v & (v - 1)));
-    return ~v ? __builtin_ctzll(v) : sizeof(T) * 8;
+    #ifdef _MSC_VER
+        // ~v & (v - 1) turns on all trailing zeroes, zeroes the rest
+        return meta::logFloor(1 + (~v & (v - 1)));
+    #else
+        return ~v ? __builtin_ctzll(v) : sizeof(T) * 8;
+    #endif
 }
 
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
