@@ -389,21 +389,21 @@ static_assert( S4_32(0x0000'0000).value() == fullAddSumTest.carry.value());
 static_assert( S4_32(0x0000'0000).value() == fullAddSumTest.overflow.value());
 
 // Verify that saturation works (saturates and doesn't saturate as appropriate)
-static_assert( S4_16(0x0000).value() == saturatingUnsignedArithmetic(S4_16(0x0000), S4_16(0x0000)).value());
-static_assert( S4_16(0x0200).value() == saturatingUnsignedArithmetic(S4_16(0x0100), S4_16(0x0100)).value());
-static_assert( S4_16(0x0400).value() == saturatingUnsignedArithmetic(S4_16(0x0300), S4_16(0x0100)).value());
-static_assert( S4_16(0x0A00).value() == saturatingUnsignedArithmetic(S4_16(0x0300), S4_16(0x0700)).value());
-static_assert( S4_16(0x0F00).value() == saturatingUnsignedArithmetic(S4_16(0x0800), S4_16(0x0700)).value());
-static_assert( S4_16(0x0F00).value() == saturatingUnsignedArithmetic(S4_16(0x0800), S4_16(0x0800)).value());
+static_assert( S4_16(0x0000).value() == saturatingUnsignedAddition(S4_16(0x0000), S4_16(0x0000)).value());
+static_assert( S4_16(0x0200).value() == saturatingUnsignedAddition(S4_16(0x0100), S4_16(0x0100)).value());
+static_assert( S4_16(0x0400).value() == saturatingUnsignedAddition(S4_16(0x0300), S4_16(0x0100)).value());
+static_assert( S4_16(0x0A00).value() == saturatingUnsignedAddition(S4_16(0x0300), S4_16(0x0700)).value());
+static_assert( S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0700)).value());
+static_assert( S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0800)).value());
 
 TEST_CASE(
-    "saturatingUnsignedArithmetic",
-    "[swar]"
+    "saturatingUnsignedAddition",
+    "[swar][saturation]"
 ) {
-    CHECK(SWAR<4, u16>(0x0200).value() == saturatingUnsignedArithmetic(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0100)).value());
-    CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedArithmetic(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
-    CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedArithmetic(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedArithmetic(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedArithmetic(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedArithmetic(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(SWAR<4, u16>(0x0200).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0100)).value());
+    CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
+    CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
 }
