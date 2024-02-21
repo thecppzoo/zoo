@@ -18,6 +18,10 @@ std::size_t c_strLength_natural(const char *s);
 std::size_t avx2_strlen(const char* str);
 #endif
 
+#if ZOO_CONFIGURED_TO_USE_NEON()
+std::size_t neon_strlen(const char* str);
+#endif
+
 }
 
 std::size_t

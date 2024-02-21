@@ -325,3 +325,52 @@ STRLEN_old (const char *str)
 	}
     }
 }
+
+
+#if ZOO_CONFIGURED_TO_USE_NEON()
+
+#include <arm_neon.h>
+
+namespace zoo {
+
+/// \note uses the key technique of shifting by 4 and narrowing from 16 to 8 bit lanes in
+/// aarch64/strlen.S at
+/// https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/aarch64/strlen.S;h=ab2a576cdb5665e596b791299af3f4abecb73c0e;hb=HEAD
+std::size_t neon_strlen(const char *str) {
+    const uint8x16_t zero = vdupq_n_u8(0);
+    size_t offset = 0;
+    uint8x16_t data;
+    auto [alignedBase, misalignment] = blockAlignedLoad(str, &data);
+
+    auto compareAndConvertResultsToNibbles = [&]() {
+        auto cmp = vceqq_u8(data, zero);
+        // The result looks like, in hexadecimal digits, like this:
+        // [ AA, BB, CC, DD, EE, FF, GG, HH, ... ] with each
+        // variable A, B, ... either 0xF or 0x0.
+        // instead of 16x8 bit results, we can see that as
+        // 8 16 bit results like this
+        // [ AABB, CCDD, EEFF, GGHH, ... ]
+        // If we shift out a nibble from each element (shift right by 4):
+        // [ ABB0, CDD0, EFF0, GHH0, ... ]
+        // Narrowing from 16 to eight, we would get
+        // [ AB, CD, EF, GH, ... ]
+        auto straddle8bitLanePairAndNarrowToBytes = vshrn_n_u16(cmp, 4);
+        return vget_lane_u64(vreinterpret_u64_u8(straddle8bitLanePairAndNarrowToBytes), 0);
+    };
+    auto nibbles = compareAndConvertResultsToNibbles();
+    auto misalignmentNibbleMask = (~uint64_t(0)) << (misalignment * 4);
+    nibbles &= misalignmentNibbleMask;
+    for(;;) {
+        if(nibbles) {
+            auto trailingZeroBits = __builtin_ctz(nibbles);
+            auto nonNullByteCount = trailingZeroBits / 4;
+            return alignedBase + offset + nonNullByteCount - str;
+        }
+        alignedBase += sizeof(uint8x16_t);
+        memcpy(&data, alignedBase, sizeof(uint8x16_t));
+        nibbles = compareAndConvertResultsToNibbles();
+    }
+}
+
+}
+#endif
