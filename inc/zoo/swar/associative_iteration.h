@@ -80,68 +80,42 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
     return S{result};
 }
 
-template<int NB, typename B>
-constexpr SWAR<NB, B>
-compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
-    // the only bits turned on in the result are the bits set in the input that
-    // are moved down (shifted right)
-
-    // Following Henry S. Warren Jr.'s Hacker's Delight, Section 7-4
-    // The compression moves bits right as many positions as there are zeroes
-    // in the mask "below" it (or to the right).
-    // We can count the zeroes in the mask in a logarithmic way:
-    // First detect an odd count of zeroes, move those bits in the input one
-    // position down (right).
-    // Then an odd count of *pairs* of zeroes, moving them 2 positions right.
-    // Then an odd count of *quartets* (nibbles) of zeroes, shifting them 4
-    // right.
-    // An odd count of octects (bytes) of zeroes, shifting right 8,
-    // Odd count of 16 zeroes, >> 16
-    // ...
-    //
-    // This solution will use the parallel suffix operation as a primary tool:
-    // For every bit postion it indicates an odd number of ones to the right,
-    // including itself.
-    // Because we want to detect the "oddity" of groups of zeroes to the right,
-    // we flip the compression mask.  To not count the bit position itself,
-    // we shift by one.
-    #define ZTE ZOO_TRACEABLE_EXPRESSION
-    ZTE(input);
-    ZTE(compressionMask);
-    using S = SWAR<NB, B>;
-    auto result = input;
-    auto groupSize = 1;
-    auto shiftLeftMask = S{S::LowerBits};
-    auto shiftRightMask = S{S::LowerBits << 1};
-    auto forParallelSuffix = // this is called "mk" in the book
-        (~compressionMask).shiftIntraLaneLeft(groupSize, shiftLeftMask);
-    ZTE(forParallelSuffix);
-        // note: forParallelSuffix denotes positions with a zero
-        // immediately to the right in the 'mask'
-    auto oddCountOfGroupsOfZerosToTheRight =  // called "mp" in the book
-        parallelSuffix(forParallelSuffix);
-    ZTE(oddCountOfGroupsOfZerosToTheRight);
-    // compress the bits just identified in both the result and the mask
-    auto movingFromMask = compressionMask & oddCountOfGroupsOfZerosToTheRight;
-    ZTE(movingFromMask);
-    auto movingFromInput = result & oddCountOfGroupsOfZerosToTheRight;
-    /*compressionMask =
-        (compressionMask ^ movingFromMask) |
-        movingFromMask.shiftIntraLaneRight(groupSize, shiftRightMask);*/
-    result =
-        (result ^ movingFromInput) |
-        movingFromInput.shiftIntraLaneLeft(groupSize, shiftRightMask);
-
-    auto evenCountOfGroupsOfZerosToTheRight =
-        ~oddCountOfGroupsOfZerosToTheRight;
-    
-    //auto moved = toMove.shiftIntraLaneRight(1, ~S{S::LeastSignificantBit});
-    //result = result ^ moved;
-    return result;
-    #undef ZTE
-}
-
 /*
+Binary compress: A fascinating algorithm.
+
+Warren (Hacker's Delight) believes Guy L. Steele is the author of the following
+binary compression operation, equivalent to Intel's BMI2 instruction PEXT of
+"Parallel Extraction"
+
+From a "mask", a selector of bits from an input, we want to put them together in
+the output.
+
+For example's sake, this is the selector:
+Note: this follows the usual 'big endian' convention of denoting the most
+significant bit first:
+0001 0011 0111 0111 0110 1110 1100 1010
+Imagine the input is the 32-bit or 32-boolean variable expression
+abcd efgh ijkl mnop qrst uvxy zABC DEFG
+We want the selection
+   d   gh  jkl  nop  rs  uvx  zA   D F
+To be compressed into the output
+0000 0000 0000 00dg hjkl nopr suvx zADF
+
+This algorithm will virtually calculate the count of positions that the selected
+bits travel to the right, by constructing the binary encoding of that count:
+It will identify the positions that will travel an odd number of positions to
+the right, these are those whose position-travel-count have the units set.
+It will then move those positions by one position to the right, and eliminate
+them from the yet-to-move positions.  Because it eliminates the positions that
+would move an odd count, there remains only positions that move an even number
+of positions.  Now it finds the positions that move an odd count of /pairs/ of
+positions, it moves them 2 positions.  This is equivalent to finding the
+positions that would have the bit for 2 set in the count of positions to move
+right.
+Then an odd count of /quartets/ of positions, and moves them 4;
+8, 16, 32, ...
+
+
 Complete example (32 bits)
 Selection mask:
 0001 0011 0111 0111 0110 1110 1100 1010
@@ -169,50 +143,96 @@ Desired result:
 
 0001 0011 0111 0111 0110 1110 1100 1010 compressionMask
 1110 1100 1000 1000 1001 0001 0011 0101 ~compressionMask
-1101 1001 0001 0001 0010 0010 0110 1010 forParallelSuffix == mk == shiftleft 1 == groupsize of ~compressionMask
-This indicates the positions that have a 0 immediately to the right in compressionMask
-4322 1000 9999 8888 7765 5554 4432 2110 number of 1s at and to the right of the current position in forParallelSuffix, last decimal digit
-0100 1000 1111 0000 1101 1110 0010 0110 mp == parallel suffix of forParallelSuffix
-we have just identified the positions that need to move an odd number of positions
-filter those positions to positions that have a bit set in the compressionMask:
+1101 1001 0001 0001 0010 0010 0110 1010 forParallelSuffix == mk == shiftleft 1
+                                            == groupsize of ~compressionMask
+This indicates the positions that have a 0 immediately to the right in
+                                            compressionMask
+4322 1000 9999 8888 7765 5554 4432 2110 number of 1s at and to the right of the
+                                          current position in forParallelSuffix,
+                                          last decimal digit
+0100 1000 1111 0000 1101 1110 0010 0110 mp == parallel suffix of
+                                            forParallelSuffix
+We have just identified the positions that need to move an odd number of
+positions.  Filter them with positions with a bit set in compressionMask:
 0001 0011 0111 0111 0110 1110 1100 1010 compressionMask
----- ---- -111 ---- -1-- 111- ---- --1- mv == move (compress) these bits of the compressionMask by 1 == groupSize
-0001 0011 0000 0111 0010 0000 1100 1000 mv ^ compressionMask (clear the bits that will move)
+---- ---- -111 ---- -1-- 111- ---- --1- mv == move (compress) these bits of
+                                            compressionMask by 1 == groupSize
+0001 0011 0000 0111 0010 0000 1100 1000 mv ^ compressionMask (clear the bits
+                                            that will move)
 ---- ---- --11 1--- --1- -111 ---- ---1 mv >> 1 == groupSize
 0001 0011 0011 1111 0010 0111 1100 1001 pseudo-compressed compressionMask.
-0100 1000 1111 0000 1101 1110 0010 0110 mp == parallel suffix of forParallelSuffix
+0100 1000 1111 0000 1101 1110 0010 0110 mp == parallel suffix of
+                                            forParallelSuffix
 1011 0111 0000 1111 0010 0001 1101 1001 ~mp == ~parallel suffix (bits not moved)
-1101 1001 0001 0001 0010 0010 0110 1010 forParallelSuffix (remember: had a zero immediately to their right)
-1001 0001 0000 0001 0010 0000 0100 1000 new forParallelSuffix (also not moved => had even zeroes to their right)
-At this point, we have removed from compressionMask the positions that moved an odd number of positions and moved them 1 position,
+1101 1001 0001 0001 0010 0010 0110 1010 forParallelSuffix (remember: had a zero
+                                            immediately to their right)
+1001 0001 0000 0001 0010 0000 0100 1000 new forParallelSuffix (also not moved =>
+                                                had even zeroes to their right)
+At this point, we have removed from compressionMask the positions that moved an
+odd number of positions and moved them 1 position,
 then, we only keep positions that move an even number of positions.
-Now, we will repeat these steps but for groups of two zeroes
-
-
-Binary compress: A fascinating algorithm.
-Warren (Hacker's Delight) believes Guy L. Steele is the author of the following binary compression algorithm:
-From a "mask", a selector of bits from an input, we want to put them together in the output.
-For example's sake, this is the selector:
-Note: this follows the usual 'big endian' convention of denoting the most significant bit first
-0001 0011 0111 0111 0110 1110 1100 1010
-Imagine the input is the 32-bit or 32-boolean variable expression
-abcd efgh ijkl mnop qrst uvxy zABC DEFG
-We want the selection
-   d   gh  jkl  nop  rs  uvx  zA   D F
-To be compressed into the output
-0000 0000 0000 00dg hjkl nopr suvx zADF
-This algorithm will virtually calculate the count of positions that the selected bits travel to the right,
-by constructing the binary encoding of that count:
-It will identify the positions that will travel an odd number of positions to the right, these are those
-whose position-travel-count have the units set.
-It will move those positions by one position to the right, and eliminate them from the yet-to-move positions.
-Because it eliminates the positions that would move an odd count, there remains only positions that move
-an even number of positions.  Now it finds the positions that move an odd count of /pairs/ of positions,
-and moves them 2 positions.
-then an odd count of /quartets/ of positions, and moves them 4;
-8, 16, 32, ...
-
+Now, we will repeat these steps but for groups of two zeroes, then 4 zeroes, ...
 */
+
+template<int NB, typename B>
+constexpr SWAR<NB, B>
+compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
+    // This solution uses the parallel suffix operation as a primary tool:
+    // For every bit postion it indicates an odd number of ones to the right,
+    // including itself.
+    // Because we want to detect the "oddness" of groups of zeroes to the right,
+    // we flip the compression mask.  To not count the bit position itself,
+    // we shift by one.
+    // #define ZTE ZOO_TRACEABLE_EXPRESSION
+    ZTE(input);
+    ZTE(compressionMask);
+    using S = SWAR<NB, B>;
+    auto result = input & compressionMask;
+    auto groupSize = 1;
+    auto
+        shiftLeftMask = S{S::LowerBits},
+        shiftRightMask = S{S::LowerBits << 1};
+    ZTE(~compressionMask);
+    auto forParallelSuffix = // this is called "mk" in the book
+        (~compressionMask).shiftIntraLaneLeft(groupSize, shiftLeftMask);
+    ZTE(forParallelSuffix);
+        // note: forParallelSuffix denotes positions with a zero
+        // immediately to the right in 'compressionMask'
+    do {
+        ZTE(groupSize);
+        ZTE(shiftLeftMask);
+        ZTE(shiftRightMask);
+        ZTE(result);
+        auto oddCountOfGroupsOfZerosToTheRight =  // called "mp" in the book
+            parallelSuffix(forParallelSuffix);
+        ZTE(oddCountOfGroupsOfZerosToTheRight);
+        // compress the bits just identified in both the result and the mask
+        auto moving = compressionMask & oddCountOfGroupsOfZerosToTheRight;
+        ZTE(moving);
+        compressionMask =
+            (compressionMask ^ moving) | // clear the moving
+            moving.shiftIntraLaneRight(groupSize, shiftRightMask);
+        ZTE(compressionMask);
+        auto movingFromInput = result & moving;
+        result =
+            (result ^ movingFromInput) | // clear the moving from the result
+            movingFromInput.shiftIntraLaneRight(groupSize, shiftRightMask);
+
+        auto evenCountOfGroupsOfZerosToTheRight =
+            ~oddCountOfGroupsOfZerosToTheRight;
+        forParallelSuffix =
+            forParallelSuffix & evenCountOfGroupsOfZerosToTheRight;
+        auto newShiftLeftMask =
+            shiftLeftMask.shiftIntraLaneRight(groupSize, shiftRightMask);
+        shiftRightMask =
+            shiftRightMask.shiftIntraLaneLeft(groupSize, shiftLeftMask);
+        shiftLeftMask = newShiftLeftMask;
+        groupSize <<= 1;
+    } while(groupSize < NB);
+    ZTE(result);
+    #undef ZTE
+    return result;
+}
 
 
 /// \todo because of the desirability of "accumuating" the XORs at the MSB,

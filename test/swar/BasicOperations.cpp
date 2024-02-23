@@ -102,15 +102,14 @@ TEST_CASE(
 }
 
 TEST_CASE("Compress/Expand", "[swar]") {
-    unsigned Mask =   0b0001'0011'0111'0111'0110'1110'1100'1010;
-    unsigned ToMove = 0x55555555;
+    unsigned
+        Mask =   0b0001'0011'0111'0111'0110'1110'1100'1010,
+        ToMove = 0b0101'0101'0101'0101'0101'0101'0101'0101,
+        // Selection: 1   01  101  101  10  010  01   0 0
+        result = 0b0001'0'1'1'0'1'1'0'1'10'0'10'0'1'0'0;
     using S1_32 = SWAR<32, uint32_t>;
     auto q = compress(S1_32{ToMove}, S1_32{Mask});
-    CHECK(0 != q.value());
-    using S2_8 = SWAR<2, uint8_t>;
-    auto r = compress(S2_8{0b10'10'10'10}, S2_8{0b11'10'00'00});
-    S2_8 expected{0b10'01'00'00};
-    CHECK(expected.value() == r.value());
+    CHECK(result == q.value());
 }
 
 static_assert(1 == popcount<5>(0x100ull));
