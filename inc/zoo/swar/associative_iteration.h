@@ -3,6 +3,43 @@
 
 #include "zoo/swar/SWAR.h"
 
+#define ZOO_DEVELOPMENT_DEBUGGING
+#ifdef ZOO_DEVELOPMENT_DEBUGGING
+#include <iostream>
+
+inline std::ostream &binary(std::ostream &out, uint64_t input, int count) {
+    while(count--) {
+        out << (1 & input);
+        input >>= 1;
+    }
+    return out;
+}
+
+template<int NB, typename B>
+std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
+    using S = zoo::swar::SWAR<NB, B>;
+    auto shiftCounter = sizeof(B) * 8 / NB;
+    out << "<|";
+    auto v = s.value();
+    do {
+        binary(out, v, NB) << '|';
+
+    } while(--shiftCounter);
+    return out << ">";
+}
+
+#define ZOO_TO_STRING(a) #a
+// std::endl is needed within the context of debugging: flush the line
+#define ZOO_TRACEABLE_EXP_IMPL(F, L, ...) std::cout << '"' << (__VA_ARGS__) << "\", \"" <<  F << ':' << L << "\", \"" << ZOO_TO_STRING(__VA_ARGS__) << "\"" << std::endl;
+#define ZOO_TRACEABLE_EXPRESSION(...) ZOO_TRACEABLE_EXP_IMPL(__FILE__, __LINE__, __VA_ARGS__)
+
+#else
+
+#define ZOO_TRACEABLE_EXPRESSION(...) __VA_ARGS__
+
+#endif
+
+
 namespace zoo::swar {
 
 /// \note This code should be substituted by an application of "progressive" algebraic iteration
@@ -11,31 +48,172 @@ template<int NB, typename B>
 constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto
-        shiftClearingMask = S{~S::MostSignificantBit},
+        shiftClearingMask = S{static_cast<B>(~S::MostSignificantBit)},
         doubling = input,
         result = S{0};
     auto
         bitsToXOR = NB,
         power = 1;
+    #define ZTE(...) __VA_ARGS__
     for(;;) {
+        ZTE(doubling);
         if(1 & bitsToXOR) {
-            result = result ^ doubling;
-            doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
+            ZTE(result = result ^ doubling);
+            ZTE(doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask));
         }
-        bitsToXOR >>= 1;
+        ZTE(bitsToXOR >>= 1);
         if(!bitsToXOR) { break; }
         auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
-        doubling = doubling ^ shifted;
+        ZTE(shifted);
+        ZTE(doubling = doubling ^ shifted);
         // 01...1
         // 001...1
         // 00001...1
         // 000000001...1
         shiftClearingMask =
-            shiftClearingMask & S{shiftClearingMask.value() >> power};
-        power <<= 1;
+            shiftClearingMask &
+                S{static_cast<B>(shiftClearingMask.value() >> power)};
+        ZTE(power <<= 1);
     }
+    ZTE(input);
+    #undef ZTE
     return S{result};
 }
+
+template<int NB, typename B>
+constexpr SWAR<NB, B>
+compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
+    // the only bits turned on in the result are the bits set in the input that
+    // are moved down (shifted right)
+
+    // Following Henry S. Warren Jr.'s Hacker's Delight, Section 7-4
+    // The compression moves bits right as many positions as there are zeroes
+    // in the mask "below" it (or to the right).
+    // We can count the zeroes in the mask in a logarithmic way:
+    // First detect an odd count of zeroes, move those bits in the input one
+    // position down (right).
+    // Then an odd count of *pairs* of zeroes, moving them 2 positions right.
+    // Then an odd count of *quartets* (nibbles) of zeroes, shifting them 4
+    // right.
+    // An odd count of octects (bytes) of zeroes, shifting right 8,
+    // Odd count of 16 zeroes, >> 16
+    // ...
+    //
+    // This solution will use the parallel suffix operation as a primary tool:
+    // For every bit postion it indicates an odd number of ones to the right,
+    // including itself.
+    // Because we want to detect the "oddity" of groups of zeroes to the right,
+    // we flip the compression mask.  To not count the bit position itself,
+    // we shift by one.
+    #define ZTE ZOO_TRACEABLE_EXPRESSION
+    ZTE(input);
+    ZTE(compressionMask);
+    using S = SWAR<NB, B>;
+    auto result = input;
+    auto groupSize = 1;
+    auto shiftLeftMask = S{S::LowerBits};
+    auto shiftRightMask = S{S::LowerBits << 1};
+    auto forParallelSuffix = // this is called "mk" in the book
+        (~compressionMask).shiftIntraLaneLeft(groupSize, shiftLeftMask);
+    ZTE(forParallelSuffix);
+        // note: forParallelSuffix denotes positions with a zero
+        // immediately to the right in the 'mask'
+    auto oddCountOfGroupsOfZerosToTheRight =  // called "mp" in the book
+        parallelSuffix(forParallelSuffix);
+    ZTE(oddCountOfGroupsOfZerosToTheRight);
+    // compress the bits just identified in both the result and the mask
+    auto movingFromMask = compressionMask & oddCountOfGroupsOfZerosToTheRight;
+    ZTE(movingFromMask);
+    auto movingFromInput = result & oddCountOfGroupsOfZerosToTheRight;
+    /*compressionMask =
+        (compressionMask ^ movingFromMask) |
+        movingFromMask.shiftIntraLaneRight(groupSize, shiftRightMask);*/
+    result =
+        (result ^ movingFromInput) |
+        movingFromInput.shiftIntraLaneLeft(groupSize, shiftRightMask);
+
+    auto evenCountOfGroupsOfZerosToTheRight =
+        ~oddCountOfGroupsOfZerosToTheRight;
+    
+    //auto moved = toMove.shiftIntraLaneRight(1, ~S{S::LeastSignificantBit});
+    //result = result ^ moved;
+    return result;
+    #undef ZTE
+}
+
+/*
+Complete example (32 bits)
+Selection mask:
+0001 0011 0111 0111 0110 1110 1100 1010
+Input (each letter or variable is a boolean, that can have 0 or 1)
+abcd efgh ijkl mnop qrst uvxy zABC DEFG
+Selection (using spaces)
+   d   gh  jkl  nop  rs  uvx  zA   D F
+Desired result:
+                     dghjklnoprsuvxzADF
+
+0000 1001 1011 1011 1011 0111 0110 0101 shiftLeft 1
+1111 0110 0100 0100 0100 1000 1001 1010 forParallelSuffix
+
+                           10 1101 1101
+/*
+Complete example (32 bits)
+Selection mask:
+0001 0011 0111 0111 0110 1110 1100 1010
+Input (each letter or variable is a boolean, that can have 0 or 1)
+abcd efgh ijkl mnop qrst uvxy zABC DEFG
+Selection (using spaces)
+   d   gh  jkl  nop  rs  uvx  zA   D F
+Desired result:
+                     dghjklnoprsuvxzADF
+
+0001 0011 0111 0111 0110 1110 1100 1010 compressionMask
+1110 1100 1000 1000 1001 0001 0011 0101 ~compressionMask
+1101 1001 0001 0001 0010 0010 0110 1010 forParallelSuffix == mk == shiftleft 1 == groupsize of ~compressionMask
+This indicates the positions that have a 0 immediately to the right in compressionMask
+4322 1000 9999 8888 7765 5554 4432 2110 number of 1s at and to the right of the current position in forParallelSuffix, last decimal digit
+0100 1000 1111 0000 1101 1110 0010 0110 mp == parallel suffix of forParallelSuffix
+we have just identified the positions that need to move an odd number of positions
+filter those positions to positions that have a bit set in the compressionMask:
+0001 0011 0111 0111 0110 1110 1100 1010 compressionMask
+---- ---- -111 ---- -1-- 111- ---- --1- mv == move (compress) these bits of the compressionMask by 1 == groupSize
+0001 0011 0000 0111 0010 0000 1100 1000 mv ^ compressionMask (clear the bits that will move)
+---- ---- --11 1--- --1- -111 ---- ---1 mv >> 1 == groupSize
+0001 0011 0011 1111 0010 0111 1100 1001 pseudo-compressed compressionMask.
+0100 1000 1111 0000 1101 1110 0010 0110 mp == parallel suffix of forParallelSuffix
+1011 0111 0000 1111 0010 0001 1101 1001 ~mp == ~parallel suffix (bits not moved)
+1101 1001 0001 0001 0010 0010 0110 1010 forParallelSuffix (remember: had a zero immediately to their right)
+1001 0001 0000 0001 0010 0000 0100 1000 new forParallelSuffix (also not moved => had even zeroes to their right)
+At this point, we have removed from compressionMask the positions that moved an odd number of positions and moved them 1 position,
+then, we only keep positions that move an even number of positions.
+Now, we will repeat these steps but for groups of two zeroes
+
+
+Binary compress: A fascinating algorithm.
+Warren (Hacker's Delight) believes Guy L. Steele is the author of the following binary compression algorithm:
+From a "mask", a selector of bits from an input, we want to put them together in the output.
+For example's sake, this is the selector:
+Note: this follows the usual 'big endian' convention of denoting the most significant bit first
+0001 0011 0111 0111 0110 1110 1100 1010
+Imagine the input is the 32-bit or 32-boolean variable expression
+abcd efgh ijkl mnop qrst uvxy zABC DEFG
+We want the selection
+   d   gh  jkl  nop  rs  uvx  zA   D F
+To be compressed into the output
+0000 0000 0000 00dg hjkl nopr suvx zADF
+This algorithm will virtually calculate the count of positions that the selected bits travel to the right,
+by constructing the binary encoding of that count:
+It will identify the positions that will travel an odd number of positions to the right, these are those
+whose position-travel-count have the units set.
+It will move those positions by one position to the right, and eliminate them from the yet-to-move positions.
+Because it eliminates the positions that would move an odd count, there remains only positions that move
+an even number of positions.  Now it finds the positions that move an odd count of /pairs/ of positions,
+and moves them 2 positions.
+then an odd count of /quartets/ of positions, and moves them 4;
+8, 16, 32, ...
+
+*/
+
 
 /// \todo because of the desirability of "accumuating" the XORs at the MSB,
 /// the parallel suffix operation is more suitable.
@@ -252,6 +430,27 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
         oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};
     return evenHalf | oddHalf;
 }
+
+/*
+template<int NB, typename T>
+constexpr auto compress(SWAR<NB, T> input, SWAR<NB, T> mask) {
+    using S = SWAR<NB, T>;
+    // Follows Henry S. Warren's "Hacker's Delight" 7-4
+    auto movers = input & mask;
+    // The mechanism detects positions with an odd number of zeroes to the
+    // right.
+    // To count odd zeroes, invert the mask
+    // The "parallel suffix" gives this, but including the position, to exclude
+    // the position, shift left by one
+    auto preOddZeroesToTheRight = ~S{~mask.value() << 1};
+    auto oddZeroesToTheRight = parallelSuffix(preOddZeroesToTheRight);
+    auto moveSelector1 = oddZeroesToTheRight & mask;
+    auto shiftRightMask = ~S::LeastSignificantBit;
+    auto move1 = moveSelector1 & movers;
+    auto result = (moveSelector1 ^ move1) | movers.shiftIntraLaneRight(1, shiftRightMask);
+    return result;
+}
+*/
 
 }
 

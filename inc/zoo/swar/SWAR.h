@@ -15,7 +15,7 @@ namespace zoo { namespace swar {
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = uint8_t;
+using u8 = std::uint8_t;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
@@ -58,7 +58,10 @@ struct SWAR {
         SignificantBitsCount = BitWidth - PaddingBitsCount,
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
-        MostSignificantBit = LeastSignificantBit << (NBits - 1);
+        MostSignificantBit = LeastSignificantBit << (NBits - 1),
+        // Use LowerBits in favor of ~MostSignificantBit to not pollute
+        // "don't care" bits when non-power-of-two bit lane sizes are supported
+        LowerBits = MostSignificantBit - LeastSignificantBit;
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -134,14 +137,16 @@ struct SWAR {
     /// We are not sure the optimizer would maintain this mask somewhere, if it was to recalculate it it would be disastrous for performance.
     constexpr SWAR
     shiftIntraLaneLeft(int bitCount, SWAR protectiveMask) const noexcept {
-        return SWAR{(*this & protectiveMask).value() << bitCount};
+        T shiftC = static_cast<T>(bitCount); // could be a narrowing conversion
+        auto V = (*this & protectiveMask).value();
+        return SWAR{static_cast<T>(V << shiftC)};
     }
 
     /// \param protectiveMask should clear the bits that would cross the lane
     /// \sa shiftIntraLaneLeft
     constexpr SWAR
     shiftIntraLaneRight(int bitCount, SWAR protectiveMask) const noexcept {
-        return SWAR{(*this & protectiveMask).value() >> bitCount};
+        return SWAR{(*this & protectiveMask).value() >> T{bitCount}};
     }
 
     T m_v;
