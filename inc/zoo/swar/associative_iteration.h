@@ -3,7 +3,7 @@
 
 #include "zoo/swar/SWAR.h"
 
-#define ZOO_DEVELOPMENT_DEBUGGING
+//#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
 #include <iostream>
 
@@ -54,7 +54,7 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
     auto
         bitsToXOR = NB,
         power = 1;
-    #define ZTE(...) __VA_ARGS__
+    #define ZTE(...) ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
     for(;;) {
         ZTE(doubling);
         if(1 & bitsToXOR) {
@@ -183,7 +183,7 @@ compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
     // Because we want to detect the "oddness" of groups of zeroes to the right,
     // we flip the compression mask.  To not count the bit position itself,
     // we shift by one.
-    // #define ZTE ZOO_TRACEABLE_EXPRESSION
+    #define ZTE(...) ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
     ZTE(input);
     ZTE(compressionMask);
     using S = SWAR<NB, B>;
@@ -450,27 +450,6 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
         oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};
     return evenHalf | oddHalf;
 }
-
-/*
-template<int NB, typename T>
-constexpr auto compress(SWAR<NB, T> input, SWAR<NB, T> mask) {
-    using S = SWAR<NB, T>;
-    // Follows Henry S. Warren's "Hacker's Delight" 7-4
-    auto movers = input & mask;
-    // The mechanism detects positions with an odd number of zeroes to the
-    // right.
-    // To count odd zeroes, invert the mask
-    // The "parallel suffix" gives this, but including the position, to exclude
-    // the position, shift left by one
-    auto preOddZeroesToTheRight = ~S{~mask.value() << 1};
-    auto oddZeroesToTheRight = parallelSuffix(preOddZeroesToTheRight);
-    auto moveSelector1 = oddZeroesToTheRight & mask;
-    auto shiftRightMask = ~S::LeastSignificantBit;
-    auto move1 = moveSelector1 & movers;
-    auto result = (moveSelector1 ^ move1) | movers.shiftIntraLaneRight(1, shiftRightMask);
-    return result;
-}
-*/
 
 }
 
