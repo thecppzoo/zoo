@@ -198,7 +198,7 @@ compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
     ZTE(forParallelSuffix);
         // note: forParallelSuffix denotes positions with a zero
         // immediately to the right in 'compressionMask'
-    do {
+    for(;;) {
         ZTE(groupSize);
         ZTE(shiftLeftMask);
         ZTE(shiftRightMask);
@@ -217,7 +217,10 @@ compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
         result =
             (result ^ movingFromInput) | // clear the moving from the result
             movingFromInput.shiftIntraLaneRight(groupSize, shiftRightMask);
-
+        auto nextGroupSize = groupSize << 1;
+        if(NB <= nextGroupSize) {
+            break;
+        }
         auto evenCountOfGroupsOfZerosToTheRight =
             ~oddCountOfGroupsOfZerosToTheRight;
         forParallelSuffix =
@@ -227,8 +230,8 @@ compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
         shiftRightMask =
             shiftRightMask.shiftIntraLaneLeft(groupSize, shiftLeftMask);
         shiftLeftMask = newShiftLeftMask;
-        groupSize <<= 1;
-    } while(groupSize < NB);
+        groupSize = nextGroupSize;
+    }
     ZTE(result);
     #undef ZTE
     return result;
