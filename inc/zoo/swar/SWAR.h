@@ -151,6 +151,8 @@ struct SWAR {
     #undef X
     #undef SHIFT_INTRALANE_OP_X_LIST
 
+    constexpr SWAR
+    multiply(T multiplier) const noexcept { return SWAR{m_v * multiplier}; }
     T m_v;
 };
 
@@ -367,7 +369,17 @@ struct BooleanSWAR: SWAR<NBits, T> {
     template<int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
     greaterEqual_MSB_off(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
+
+    template<int NB, typename TT>
+    friend constexpr BooleanSWAR<NB, TT>
+    convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+convertToBooleanSWAR(SWAR<NBits, T> arg) noexcept {
+    return SWAR<NBits, T>{SWAR<NBits, T>::MostSignificantBit} & arg;
+}
 
 template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>

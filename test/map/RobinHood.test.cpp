@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <regex>
 #include <map>
-#include <sstream>
 #include <fstream>
 #include <unordered_map>
 
@@ -54,22 +53,24 @@ struct V {
 
 std::ostream &operator<<(std::ostream &out, V v) {
     char buffer[30];
+    const auto bufferSize = sizeof(buffer);
     char *ptr = buffer;
     auto val = v.v;
     auto printHalf = [&](auto low, auto high) {
         for(auto ndx = low; ndx < high; ++ndx) {
             if(v.intraIndex == ndx) {
-                ptr += sprintf(ptr, "<");
+                ptr += snprintf(ptr, bufferSize, "<");
             }
-            ptr += sprintf(ptr, "%02lx", val & 0xFF);
+            const std::size_t va = val & 0xFF;
+            ptr += snprintf(ptr, bufferSize, "%02lx", va);
             if(v.intraIndex == ndx) {
-                ptr += sprintf(ptr, ">");
+                ptr += snprintf(ptr, bufferSize, ">");
             }
             val >>= 8;
         }
     };
     printHalf(0, 4);
-    ptr += sprintf(ptr, "'");
+    ptr += snprintf(ptr, bufferSize, "'");
     printHalf(4, 8);
     out << buffer;
     return out;
@@ -143,7 +144,7 @@ TEST_CASE("Robin Hood", "[api][mapping][swar][robin-hood]") {
         }
         return true;
     };
-    
+
     std::regex words("\\w+");
     std::sregex_iterator
         wordsEnd{},
@@ -227,7 +228,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata basic",
     CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 0));
     CHECK(std::tuple{0,0} == zoo::rh::impl::peek(table.md_, 2));
 
-    // If we ask for a skarupke tail 
+    // If we ask for a skarupke tail
     FrontendSmall32::Backend be{table.md_.data()};
     auto [index, deadline, metadata] =
         be.findMisaligned_assumesSkarupkeTail(0x7, 1, [](int i) {return true;});
@@ -331,7 +332,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata psl one",
         CHECK(i+1 == missIndex);
         CHECK((missIndex)%4 ==
             FrontendSmall32::MD{missDeadline}.lsbIndex());
-        CHECK(0x02 == 
+        CHECK(0x02 ==
             missMetadata.at(FrontendSmall32::MD{missDeadline}.lsbIndex()));
     }
     {
@@ -375,7 +376,7 @@ TEST_CASE("Robin Hood Metadata peek/poke u32 synthetic metadata psl not one",
         CHECK(i-p+4 == missIndex);
         CHECK((missIndex)%4 ==
             FrontendSmall32::MD{missDeadline}.lsbIndex());
-        CHECK(0x04 == 
+        CHECK(0x04 ==
             missMetadata.at(FrontendSmall32::MD{missDeadline}.lsbIndex()));
     }
 }
@@ -449,7 +450,7 @@ TEST_CASE(
     m.data_ = MD35u32Ops::SSL{0x0401'8201};
     CHECK(0x0000'8001u == m.attemptMatch(SM{hash1}, SM{psl1}).value());
     CHECK(0x0000'8001u == SO35u32Ops::attemptMatch(m.data_, SM{hash1}, SM{psl1}).value());
-    } 
+    }
 }
 
 template<typename Container>
@@ -485,7 +486,7 @@ TEST_CASE("RH Validation") {
 
         while(corpus) {
             getline(corpus, line);
-            
+
             std::sregex_iterator
                 wordsEnd{},
                 wordIterator{line.begin(), line.end(), words};
