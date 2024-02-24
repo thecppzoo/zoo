@@ -1,4 +1,5 @@
 #include "atoi.h"
+#include "zoo/pp/platform.h"
 
 #include <vector>
 #include <string>
@@ -119,17 +120,33 @@ struct CorpusStringLength {
     }
 };
 
+#if ZOO_CONFIGURED_TO_USE_AVX()
+#define AVX2_STRLEN_CORPUS_X_LIST \
+    X(ZOO_AVX, zoo::avx2_strlen)
+#else
+#define AVX2_STRLEN_CORPUS_X_LIST /* nothing */
+#endif
+
+#if ZOO_CONFIGURED_TO_USE_NEON()
+#define NEON_STRLEN_CORPUS_X_LIST \
+    X(ZOO_NEON, zoo::neon_strlen)
+#else
+#define NEON_STRLEN_CORPUS_X_LIST /* nothing */
+#endif
+
+
 #define STRLEN_CORPUS_X_LIST \
     X(LIBC_STRLEN, strlen) \
     X(ZOO_STRLEN, zoo::c_strLength) \
     X(ZOO_NATURAL_STRLEN, zoo::c_strLength_natural) \
-    X(ZOO_MANUAL_STRLEN, zoo::c_strLength_manualComparison) \
-    X(ZOO_AVX, zoo::avx2_strlen) \
-    X(GENERIC_GLIBC_STRLEN, STRLEN_old)
+    X(GENERIC_GLIBC_STRLEN, STRLEN_old) \
+    AVX2_STRLEN_CORPUS_X_LIST \
+    NEON_STRLEN_CORPUS_X_LIST
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };
 
 PARSE8BYTES_CORPUS_X_LIST
 STRLEN_CORPUS_X_LIST
+
 #undef X

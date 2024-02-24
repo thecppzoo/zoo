@@ -1,11 +1,17 @@
-#include "zoo/swar/SWAR.h"
+#include "atoi.h"
+
 #include "zoo/swar/associative_iteration.h"
 
+#if ZOO_CONFIGURED_TO_USE_AVX()
 #include <immintrin.h>
+#endif
 
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
+
+#include <tuple>
 
 // Copied from Daniel Lemire's GitHub at
 // https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/
@@ -23,7 +29,7 @@ uint32_t parse_eight_digits_swar(const char *chars) {
 
 // Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
 // of 10^9 is slightly less than 30, thus, only 30 bits are needed.
-auto lemire_as_zoo_swar(const char *chars) {
+uint32_t lemire_as_zoo_swar(const char *chars) {
     uint64_t bytes;
     memcpy(&bytes, chars, 8);
     auto allCharacterZero = zoo::meta::BitmaskMaker<uint64_t, '0', 8>::value;
@@ -52,16 +58,96 @@ auto lemire_as_zoo_swar(const char *chars) {
     return uint32_t(by10001base2to32.value() >> 32);
 }
 
+std::size_t spaces_glibc(const char *ptr) {
+    auto rv = 0;
+    while(isspace(ptr[rv])) { ++rv; }
+    return rv;
+}
+
 namespace zoo {
 
+//constexpr
+std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept {
+    /*
+    space (0x20, ' ')
+    form feed (0x0c, '\f')
+    line feed (0x0a, '\n')
+    carriage return (0x0d, '\r')
+    horizontal tab (0x09, '\t')
+    vertical tab (0x0b, '\v')*
+    constexpr std::array<char, 6> SpaceCharacters = {
+        0b10'0000, //0x20 space
+        0b00'1101, // 0xD \r
+        0b00'1100, // 0xC \f
+        0b00'1011, // 0xB \v
+        0b00'1010, // 0xA \n
+        0b00'1001  //   9 \t
+    },
+    ExpressedAsEscapeCodes = { ' ', '\r', '\f', '\v', '\n', '\t' };
+    static_assert(SpaceCharacters == ExpressedAsEscapeCodes); */
+    using S = swar::SWAR<8, uint64_t>;
+    constexpr S Space{meta::BitmaskMaker<uint64_t, ' ', 8>::value};
+    auto space = swar::equals(bytes, Space);
+    auto otherWhiteSpace =
+        swar::constantIsGreaterEqual<'\r'>(bytes) &
+        ~swar::constantIsGreaterEqual<'\t' - 1>(bytes);
+    auto whiteSpace = space | otherWhiteSpace;
+    auto notWhiteSpace = S{S::MostSignificantBit} ^ whiteSpace;
+    return notWhiteSpace.lsbIndex();
+}
+
+/// @brief Loads the "block" containing the pointer, by proper alignment
+/// @tparam PtrT Pointer type for loading
+/// @tparam Block as the name indicates
+/// @param pointerInsideBlock the potentially misaligned pointer
+/// @param b where the loaded bytes will be put
+/// @return a pair to indicate the aligned pointer to the base of the block
+/// and the misalignment, in bytes, of the source pointer
+template<typename PtrT, typename Block>
+std::tuple<PtrT *, int>
+blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
+    uintptr_t asUint = reinterpret_cast<uintptr_t>(pointerInsideBlock);
+    constexpr auto Alignment = alignof(Block), Size = sizeof(Block);
+    static_assert(Alignment == Size);
+    auto misalignment = asUint % Alignment;
+    auto *base = reinterpret_cast<PtrT *>(asUint - misalignment);
+    memcpy(b, base, Size);
+    return { base, misalignment };
+}
+
+/// \brief Helper function to fix the non-string part of block
+template<typename S>
+S adjustMisalignmentFor_strlen(S data, int misalignment) {
+    // The speculative load has the valid data in the higher lanes.
+    // To use the same algorithm as the rest of the implementation, simply
+    // populate with ones the lower part, in that way there won't be nulls.
+    constexpr typename S::type Zero{0};
+    auto
+        zeroesInMisalignedOnesInValid =
+            (~Zero) // all ones
+            <<  (misalignment * 8), // assumes 8 bits per char
+        onesInMisalignedZeroesInValid = ~zeroesInMisalignedOnesInValid;
+    return data | S{onesInMisalignedZeroesInValid};
+}
+
 std::size_t c_strLength(const char *s) {
-    using S = swar::SWAR<8, std::size_t>;
+    using S = swar::SWAR<8, uint64_t>;
     constexpr auto
         MSBs = S{S::MostSignificantBit},
         Ones = S{S::LeastSignificantBit};
-    S bytes;
-    for(auto base = s;; base += 8) {
-        memcpy(&bytes.m_v, base, 8);
+    constexpr auto BytesPerIteration = sizeof(S::type);
+    S initialBytes;
+
+    auto indexOfFirstTrue = [](auto bs) { return bs.lsbIndex(); };
+
+     // Misalignment must be taken into account because a SWAR read is
+    // speculative, it might read bytes outside of the actual string.
+    // It is safe to read within the page where the string occurs, and to
+    // guarantee that, simply make aligned reads because the size of the SWAR
+    // base size will always divide the memory page size
+    auto [alignedBase, misalignment] = blockAlignedLoad(s, &initialBytes);
+    auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
+    for(;;) {
         auto firstNullTurnsOnMSB = bytes - Ones;
         // The first lane with a null will borrow and set its MSB on when
         // subtracted one.
@@ -74,24 +160,28 @@ std::size_t c_strLength(const char *s) {
         auto cheapestInversionOfMSBs = ~bytes;
         auto firstMSBsOnIsFirstNull =
             firstNullTurnsOnMSB & cheapestInversionOfMSBs;
-        auto onlyMSBs = zoo::swar::convertToBooleanSWAR(firstMSBsOnIsFirstNull);
-        if(onlyMSBs) { // there is a null!
-            auto firstNullIndex = onlyMSBs.lsbIndex();
-            return firstNullIndex + (base - s);
+        auto onlyMSBs = swar::convertToBooleanSWAR(firstMSBsOnIsFirstNull);
+        if(onlyMSBs) {
+            return alignedBase + indexOfFirstTrue(onlyMSBs) - s;
         }
+        alignedBase += BytesPerIteration;
+        memcpy(&bytes, alignedBase, BytesPerIteration);
     }
 }
 
 std::size_t c_strLength_natural(const char *s) {
-    using S = swar::SWAR<8, std::size_t>;
-    S bytes;
-    for(auto base = s;; base += 8) {
-        memcpy(&bytes.m_v, base, 8);
+    using S = swar::SWAR<8, std::uint64_t>;
+    S initialBytes;
+    auto [base, misalignment] = blockAlignedLoad(s, &initialBytes);
+    auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
+    for(;;) {
         auto nulls = zoo::swar::equals(bytes, S{0});
         if(nulls) { // there is a null!
             auto firstNullIndex = nulls.lsbIndex();
-            return firstNullIndex + (base - s);
+            return firstNullIndex + base - s;
         }
+        base += sizeof(S);
+        memcpy(&bytes.m_v, base, 8);
     }
 }
 
@@ -117,29 +207,47 @@ std::size_t c_strLength_manualComparison(const char *s) {
     }
 }
 
+#if ZOO_CONFIGURED_TO_USE_AVX()
+
+/// \note Partially generated by Chat GPT 4
 size_t avx2_strlen(const char* str) {
     const __m256i zero = _mm256_setzero_si256(); // Vector of 32 zero bytes
     size_t offset = 0;
+    __m256i data;
+    auto [alignedBase, misalignment] = blockAlignedLoad(str, &data);
+
+    // AVX does not offer a practical way to generate a mask of all ones in
+    // the least significant positions, thus we cant invoke adjustFor_strlen.
+    // We will do the first iteration as a special case to explicitly take into
+    // account misalignment
+    auto maskOfMask = (~uint64_t(0)) << misalignment;
+
+    auto compareAndMask =
+        [&]() {
+            // Compare each byte with '\0'
+            __m256i cmp = _mm256_cmpeq_epi8(data, zero);
+            // Create a mask indicating which bytes are '\0'
+            return _mm256_movemask_epi8(cmp);
+        };
+    auto mask = compareAndMask();
+    mask &= maskOfMask;
 
     // Loop over the string in blocks of 32 bytes
-    for (;; offset += 32) {
-        // Load 32 bytes of the string into a __m256i vector
-        __m256i data;// = _mm256_load_si256((const __m256i*)(str + offset));
-        memcpy(&data, str + offset, 32);
-        // Compare each byte with '\0'
-        __m256i cmp = _mm256_cmpeq_epi8(data, zero);
-        // Create a mask indicating which bytes are '\0'
-        int mask = _mm256_movemask_epi8(cmp);
-
+    for (;;) {
         // If mask is not zero, we found a '\0' byte
         if (mask) {
-            // Calculate the index of the first '\0' byte using ctz (Count Trailing Zeros)
-            return offset + __builtin_ctz(mask);
+            // Calculate the index of the first '\0' byte counting trailing 0s
+            auto nunNullByteCount = __builtin_ctz(mask);
+            return alignedBase + offset + nunNullByteCount - str;
         }
+        offset += 32;
+        memcpy(&data, alignedBase + offset, 32);
+        mask = compareAndMask();
     }
     // Unreachable, but included to avoid compiler warnings
     return offset;
 }
+#endif
 
 }
 
@@ -217,3 +325,52 @@ STRLEN_old (const char *str)
 	}
     }
 }
+
+
+#if ZOO_CONFIGURED_TO_USE_NEON()
+
+#include <arm_neon.h>
+
+namespace zoo {
+
+/// \note uses the key technique of shifting by 4 and narrowing from 16 to 8 bit lanes in
+/// aarch64/strlen.S at
+/// https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/aarch64/strlen.S;h=ab2a576cdb5665e596b791299af3f4abecb73c0e;hb=HEAD
+std::size_t neon_strlen(const char *str) {
+    const uint8x16_t zero = vdupq_n_u8(0);
+    size_t offset = 0;
+    uint8x16_t data;
+    auto [alignedBase, misalignment] = blockAlignedLoad(str, &data);
+
+    auto compareAndConvertResultsToNibbles = [&]() {
+        auto cmp = vceqq_u8(data, zero);
+        // The result looks like, in hexadecimal digits, like this:
+        // [ AA, BB, CC, DD, EE, FF, GG, HH, ... ] with each
+        // variable A, B, ... either 0xF or 0x0.
+        // instead of 16x8 bit results, we can see that as
+        // 8 16 bit results like this
+        // [ AABB, CCDD, EEFF, GGHH, ... ]
+        // If we shift out a nibble from each element (shift right by 4):
+        // [ ABB0, CDD0, EFF0, GHH0, ... ]
+        // Narrowing from 16 to eight, we would get
+        // [ AB, CD, EF, GH, ... ]
+        auto straddle8bitLanePairAndNarrowToBytes = vshrn_n_u16(cmp, 4);
+        return vget_lane_u64(vreinterpret_u64_u8(straddle8bitLanePairAndNarrowToBytes), 0);
+    };
+    auto nibbles = compareAndConvertResultsToNibbles();
+    auto misalignmentNibbleMask = (~uint64_t(0)) << (misalignment * 4);
+    nibbles &= misalignmentNibbleMask;
+    for(;;) {
+        if(nibbles) {
+            auto trailingZeroBits = __builtin_ctz(nibbles);
+            auto nonNullByteCount = trailingZeroBits / 4;
+            return alignedBase + offset + nonNullByteCount - str;
+        }
+        alignedBase += sizeof(uint8x16_t);
+        memcpy(&data, alignedBase, sizeof(uint8x16_t));
+        nibbles = compareAndConvertResultsToNibbles();
+    }
+}
+
+}
+#endif
