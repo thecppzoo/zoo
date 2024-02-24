@@ -15,7 +15,7 @@ namespace zoo { namespace swar {
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = uint8_t;
+using u8 = std::uint8_t;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
@@ -58,7 +58,10 @@ struct SWAR {
         SignificantBitsCount = BitWidth - PaddingBitsCount,
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
-        MostSignificantBit = LeastSignificantBit << (NBits - 1);
+        MostSignificantBit = LeastSignificantBit << (NBits - 1),
+        // Use LowerBits in favor of ~MostSignificantBit to not pollute
+        // "don't care" bits when non-power-of-two bit lane sizes are supported
+        LowerBits = MostSignificantBit - LeastSignificantBit;
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -129,20 +132,24 @@ struct SWAR {
 
     /// \brief as the name suggests
     /// \param protectiveMask should clear the bits that would cross the lane.
-    /// The bits that will be cleared are directly related to the count of shifts, it is natural to maintain
-    /// the protective mask by the caller, otherwise, the mask will be computed on all invocations.
-    /// We are not sure the optimizer would maintain this mask somewhere, if it was to recalculate it it would be disastrous for performance.
-    constexpr SWAR
-    shiftIntraLaneLeft(int bitCount, SWAR protectiveMask) const noexcept {
-        return SWAR{(*this & protectiveMask).value() << bitCount};
-    }
-
-    /// \param protectiveMask should clear the bits that would cross the lane
-    /// \sa shiftIntraLaneLeft
-    constexpr SWAR
-    shiftIntraLaneRight(int bitCount, SWAR protectiveMask) const noexcept {
-        return SWAR{(*this & protectiveMask).value() >> bitCount};
-    }
+    /// The bits that will be cleared are directly related to the count of
+    /// shifts, it is natural to maintain the protective mask by the caller,
+    /// otherwise, the mask would have to be computed in all invocations.
+    /// We are not sure the optimizer would maintain this mask somewhere, if it
+    /// were to recalculate it, it would be disastrous for performance
+    /// \note the \c static_cast are necessary because of narrowing conversions
+    #define SHIFT_INTRALANE_OP_X_LIST X(Left, <<) X(Right, >>)
+    #define X(name, op) \
+        constexpr SWAR \
+        shiftIntraLane##name(int bitCount, SWAR protectiveMask) const noexcept { \
+            T shiftC = static_cast<T>(bitCount); \
+            auto V = (*this & protectiveMask).value(); \
+            auto rv = static_cast<T>(V op shiftC); \
+            return SWAR{rv}; \
+        }
+    SHIFT_INTRALANE_OP_X_LIST
+    #undef X
+    #undef SHIFT_INTRALANE_OP_X_LIST
 
     constexpr SWAR
     multiply(T multiplier) const noexcept { return SWAR{m_v * multiplier}; }
