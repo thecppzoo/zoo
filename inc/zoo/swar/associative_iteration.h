@@ -223,7 +223,11 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
     multiplier = S{static_cast<T>(multiplier.value() << (NB - ActualBits))};
     return associativeOperatorIterated_regressive(
-        multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
+        multiplicand,
+        S{0},
+        multiplier,
+        S{S::MostSignificantBit},
+        operation,
         ActualBits, halver
     );
 }
@@ -276,8 +280,13 @@ constexpr auto expo_OverflowUnsafe_SpecificBitCount(
 
     exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
     return associativeOperatorIterated_regressive(
-        x, S{1}, exponent, S{S::MostSignificantBit}, operation,
-        ActualBits, halver
+        x,
+        S{meta::BitmaskMaker<T, 1, NB>().value}, // neutral is lane wise..
+        exponent,
+        S{S::MostSignificantBit},
+        operation,
+        ActualBits,
+        halver
     );
 }
 
