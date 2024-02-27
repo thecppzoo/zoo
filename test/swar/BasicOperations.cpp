@@ -41,18 +41,20 @@ static_assert(
     multiplication_OverflowUnsafe_SpecificBitCount<3>(Micand, Mplier).value()
 );
 
-TEST_CASE("Jamie's expo") {
-    constexpr auto base     = SWAR<4>{0b0010'0011}; // 2 | 3
-    constexpr auto exponent = SWAR<4>{0b0011'0010}; // 3 | 2
-    constexpr auto expected = SWAR<4>{0b1000'1001}; // 8 | 9
+TEST_CASE("Jamie's wip expo") {
+    // the LSB lanes seem to be correct, but the MSB lanes are not...
+    constexpr auto base     = SWAR<8, u32>{0b0001'0011}; // 2 | 3
+    constexpr auto exponent = SWAR<8, u32>{0b0001'0010}; // 3 | 2
+    constexpr auto expected = SWAR<8, u32>{0b0001'1001}; // 8 | 9
     // static_assert(
     //     expected.value() == expo_OverflowUnsafe(base, exponent).value()
     // );
     auto actual = expo_OverflowUnsafe(base, exponent);
     CHECK(expected.value() == actual.value());
-    auto as_bits = std::bitset<8>(expected.value());
-    printf("Expected: %s\n", as_bits.to_string().c_str());
-    printf("Actual:   %s\n", std::bitset<8>(actual.value()).to_string().c_str());
+    auto expected_as_bits = std::bitset<32>(expected.value());
+    auto actual_as_bits = std::bitset<32>(actual.value());
+    printf("expected: %s\n", expected_as_bits.to_string().c_str());
+    printf("actual:   %s\n", actual_as_bits.to_string().c_str());
 }
 
 } // namespace Multiplication

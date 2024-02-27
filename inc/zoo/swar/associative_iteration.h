@@ -69,7 +69,7 @@ template<int NB, typename B>
 constexpr auto makeLaneMaskFromMSB(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto msb = input & S{S::MostSignificantBit};
-    auto msbCopiedToLSB = S{msb.value() >> (NB - 1)};
+    auto msbCopiedToLSB = S{static_cast<B>(msb.value() >> (NB - 1))};
     return impl::makeLaneMaskFromMSB_and_LSB(msb, msbCopiedToLSB);
 }
 
@@ -239,10 +239,10 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        return S{static_cast<T>(msbCleared.value() << 1)};
     };
 
-    multiplier = S{multiplier.value() << (NB - ActualBits)};
+    multiplier = S{static_cast<T>(multiplier.value() << (NB - ActualBits))};
     return associativeOperatorIterated_regressive(
         multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
         ActualBits, halver
@@ -278,24 +278,24 @@ constexpr auto expo_OverflowUnsafe_SpecificBitCount(
     auto operation = [](auto left, auto right, auto counts) {
       const auto mask = makeLaneMaskFromMSB(counts);
       const auto antiMask = ~mask;
-
-      const auto product = multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
+      const auto product =
+        multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
       /*
        * if (count)
        *    return product;
-       *  else
+       * else
        *    return left;
-       * */
+       */
       return (product & mask) | (left & antiMask);
     };
 
     // halver should work same as multiplication... i think...
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        return S{static_cast<T>(msbCleared.value() << 1)};
     };
 
-    exponent = S{exponent.value() << (NB - ActualBits)};
+    exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
     return associativeOperatorIterated_regressive(
         x, S{1}, exponent, S{S::MostSignificantBit}, operation,
         ActualBits, halver
