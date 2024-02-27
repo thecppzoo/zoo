@@ -34,6 +34,19 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
         #endif
     }
     auto corpus8D = Corpus8DecimalDigits::makeCorpus(g);
+    auto corpusLeadingSpaces = CorpusLeadingSpaces::makeCorpus(g);
+    SECTION("Leading Spaces Comparison") {
+        auto iterator = corpusLeadingSpaces.commence();
+        do {
+            auto glibc = spaces_glibc(*iterator);
+            auto zspc = zoo::leadingSpacesCount(*iterator);
+            if(glibc != zspc) {
+                auto v = zoo::leadingSpacesCount(*iterator);
+                WARN("<<" << *iterator << ">> " << v );
+            }
+            REQUIRE(glibc == zspc);
+        } while(iterator.next());
+    }
     auto corpusStrlen = CorpusStringLength::makeCorpus(g);
     #define X(Type, Fun) \
         auto from##Type = traverse(CORPUS, Invoke##Type{}, 0);
@@ -42,10 +55,16 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
             PARSE8BYTES_CORPUS_X_LIST
         #undef CORPUS
 
+        #define CORPUS corpusLeadingSpaces
+            LEADING_SPACES_CORPUS_X_LIST
+        #undef CORPUS
+
         #define CORPUS corpusStrlen
             STRLEN_CORPUS_X_LIST
         #undef CORPUS
+
     #undef X
+    REQUIRE(fromGLIB_Spaces == fromZooSpaces);
     REQUIRE(fromLemire == fromZoo);
     REQUIRE(fromLIBC == fromZoo);
     REQUIRE(fromZOO_STRLEN == fromLIBC_STRLEN);

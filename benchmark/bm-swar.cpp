@@ -23,9 +23,9 @@ void runBenchmark(benchmark::State &s) {
     Callable function;
     for(auto _: s) {
         goOverCorpus(corpus, function);
+        benchmark::ClobberMemory();
     }
 }
-
 
 #define X(Typename, _) \
     BENCHMARK(runBenchmark<Corpus8DecimalDigits, Invoke##Typename>);

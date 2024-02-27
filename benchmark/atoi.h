@@ -10,7 +10,8 @@ std::size_t spaces_glibc(const char *ptr);
 
 namespace zoo {
 
-std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept;
+std::size_t leadingSpacesCount(const char *) noexcept;
+
 std::size_t c_strLength(const char *s);
 std::size_t c_strLength_natural(const char *s);
 

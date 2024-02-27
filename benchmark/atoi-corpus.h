@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <array>
 #include <random>
 
 struct Corpus8DecimalDigits {
@@ -143,10 +144,71 @@ struct CorpusStringLength {
     AVX2_STRLEN_CORPUS_X_LIST \
     NEON_STRLEN_CORPUS_X_LIST
 
+struct CorpusLeadingSpaces {
+    constexpr static auto CountOfSpaceCharactersAvailable = 6;
+    constexpr static inline std::array<char, CountOfSpaceCharactersAvailable> Spaces =
+        { ' ', '\n', '\t', '\r', '\f', '\v' };
+    std::vector<int> skips_;
+    std::string characters_;
+
+    CorpusLeadingSpaces(std::vector<int> &&skips, std::string &&cs):
+        skips_{std::move(skips)}, characters_{std::move(cs)}
+    {}
+
+    template<typename G>
+    static auto makeCorpus(G &generator) {
+        auto count = 1031; // see Corpus8DecimalDigits for why 1031
+        std::vector<int> sizes;
+        std::string allCharacters;
+        std::geometric_distribution<> spacesCount(1.0/29);
+            // unrepresentatively very large, but will cross the 32 boundary
+            // to test 32-byte techniques
+        std::uniform_int_distribution<> spacer(0, CountOfSpaceCharactersAvailable - 1);
+
+        while(count--) {
+            auto count = spacesCount(generator);
+            sizes.push_back(count);
+            for(auto i = count; i--; ) {
+                allCharacters.append(1, Spaces[spacer(generator)]);
+            }
+            allCharacters.append(1, '\0');
+        }
+        return CorpusStringLength(std::move(sizes), std::move(allCharacters));
+    }
+
+    struct Iterator {
+        int *skips, *sentinel;
+        char *cp;
+
+        Iterator &operator++() {
+            cp += *skips++;
+            return *this;
+        }
+
+        char *operator*() {
+            return cp;
+        }
+
+        auto next() noexcept {
+            ++(*this);
+            return sentinel != skips;
+        }
+    };
+
+    Iterator commence() {
+        return {
+            skips_.data(), skips_.data() + skips_.size(), characters_.data()
+        };
+    }
+};
+
+#define LEADING_SPACES_CORPUS_X_LIST X(GLIB_Spaces, spaces_glibc) X(ZooSpaces, zoo::leadingSpacesCount)
+
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };
 
 PARSE8BYTES_CORPUS_X_LIST
 STRLEN_CORPUS_X_LIST
+LEADING_SPACES_CORPUS_X_LIST
 
 #undef X

@@ -13,6 +13,8 @@
 
 #include <tuple>
 
+static_assert(~uint32_t(0) == zoo::swar::SWAR<32, uint32_t>::LeastSignificantLaneMask);
+
 // Copied from Daniel Lemire's GitHub at
 // https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/
 // https://github.com/lemire/Code-used-on-Daniel-Lemire-s-blog/blob/ddb082981228f7256e9a4dbbf56fd4a335d78e30/2018/10/03/eightchartoi.c#L26C1-L34C2
@@ -66,8 +68,8 @@ std::size_t spaces_glibc(const char *ptr) {
 
 namespace zoo {
 
-//constexpr
-std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept {
+template<typename S>
+std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     /*
     space (0x20, ' ')
     form feed (0x0c, '\f')
@@ -85,16 +87,19 @@ std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept {
     },
     ExpressedAsEscapeCodes = { ' ', '\r', '\f', '\v', '\n', '\t' };
     static_assert(SpaceCharacters == ExpressedAsEscapeCodes); */
-    using S = swar::SWAR<8, uint64_t>;
+    static_assert(sizeof(S) == alignof(S));
     constexpr S Space{meta::BitmaskMaker<uint64_t, ' ', 8>::value};
     auto space = swar::equals(bytes, Space);
-    auto otherWhiteSpace =
-        swar::constantIsGreaterEqual<'\r'>(bytes) &
-        ~swar::constantIsGreaterEqual<'\t' - 1>(bytes);
+    auto belowEqualCarriageReturn = swar::constantIsGreaterEqual<'\r'>(bytes);
+    auto belowTab = swar::constantIsGreaterEqual<'\t' - 1>(bytes);
+    auto otherWhiteSpace = belowEqualCarriageReturn & ~belowTab;
     auto whiteSpace = space | otherWhiteSpace;
-    auto notWhiteSpace = S{S::MostSignificantBit} ^ whiteSpace;
-    return notWhiteSpace.lsbIndex();
+    auto notWhiteSpace = ~whiteSpace;
+    auto rv = notWhiteSpace ? notWhiteSpace.lsbIndex() : S::Lanes;
+    return rv;
 }
+
+auto trick = &leadingSpacesCountAligned<swar::SWAR<8, uint64_t>>;
 
 /// @brief Loads the "block" containing the pointer, by proper alignment
 /// @tparam PtrT Pointer type for loading
@@ -113,6 +118,29 @@ blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
     auto *base = reinterpret_cast<PtrT *>(asUint - misalignment);
     memcpy(b, base, Size);
     return { base, misalignment };
+}
+
+std::size_t leadingSpacesCount(const char *p) noexcept {
+    using S = swar::SWAR<8, uint64_t>;
+    S bytes;
+    auto [base, misalignment] = blockAlignedLoad(p, &bytes.m_v);
+    auto bitDisplacement = 8 * misalignment;
+
+    // deal with misalignment setting the low part to spaces
+    constexpr static S
+        AllSpaces{meta::BitmaskMaker<uint64_t, ' ', 8>::value},
+        AllOn = ~S{0};
+    // blit the spaces in
+    auto mask = S{AllOn.value() << bitDisplacement};
+    auto misalignedEliminated = bytes & mask;
+    auto spacesIntroduced = AllSpaces & ~mask;
+    bytes = spacesIntroduced | misalignedEliminated;
+    for(;;) {
+        auto spacesThisBlock = leadingSpacesCountAligned(bytes);
+        base += spacesThisBlock;
+        if(8 != spacesThisBlock) { return base - p; }
+        memcpy(&bytes.m_v, base, 8);
+    }
 }
 
 /// \brief Helper function to fix the non-string part of block
@@ -145,7 +173,7 @@ std::size_t c_strLength(const char *s) {
     // It is safe to read within the page where the string occurs, and to
     // guarantee that, simply make aligned reads because the size of the SWAR
     // base size will always divide the memory page size
-    auto [alignedBase, misalignment] = blockAlignedLoad(s, &initialBytes);
+    auto [alignedBase, misalignment] = blockAlignedLoad(s, &initialBytes.m_v);
     auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
     for(;;) {
         auto firstNullTurnsOnMSB = bytes - Ones;
@@ -172,7 +200,7 @@ std::size_t c_strLength(const char *s) {
 std::size_t c_strLength_natural(const char *s) {
     using S = swar::SWAR<8, std::uint64_t>;
     S initialBytes;
-    auto [base, misalignment] = blockAlignedLoad(s, &initialBytes);
+    auto [base, misalignment] = blockAlignedLoad(s, &initialBytes.m_v);
     auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
     for(;;) {
         auto nulls = zoo::swar::equals(bytes, S{0});

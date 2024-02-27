@@ -54,14 +54,15 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
         bitsToXOR = NB,
         power = 1;
 
-    #define ZTE(...) ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
+    #define ZTE(...)
     for(;;) {
         ZTE(doubling);
         if(1 & bitsToXOR) {
             ZTE(result = result ^ doubling);
             ZTE(doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask));
         }
-        ZTE(bitsToXOR >>= 1);
+        ZTE(bitsToXOR >> 1);
+        bitsToXOR >>= 1;
         if(!bitsToXOR) { break; }
         auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
         ZTE(shifted);
@@ -130,7 +131,7 @@ Desired result:
 1111 0110 0100 0100 0100 1000 1001 1010 forParallelSuffix
 
                            10 1101 1101
-/*
+
 Complete example (32 bits)
 Selection mask:
 0001 0011 0111 0111 0110 1110 1100 1010
@@ -183,7 +184,7 @@ compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
     // Because we want to detect the "oddness" of groups of zeroes to the right,
     // we flip the compression mask.  To not count the bit position itself,
     // we shift by one.
-    #define ZTE(...) ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
+    #define ZTE(...)
     ZTE(input);
     ZTE(compressionMask);
     using S = SWAR<NB, B>;

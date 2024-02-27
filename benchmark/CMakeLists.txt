@@ -56,9 +56,19 @@ add_executable(
 set_xcode_properties(zoo-google-benchmark)
 
 add_executable(
-    zoo-atoi-benchmark benchmark_main.cpp bm-swar.cpp atoi.cpp
+    zoo-atoi-benchmark benchmark_main.cpp bm-swar.cpp atoi.cpp swar/compress.cpp
 )
 set_xcode_properties(zoo-atoi-benchmark)
 
 target_link_libraries(zoo-google-benchmark benchmark::benchmark)
 target_link_libraries(zoo-atoi-benchmark benchmark::benchmark)
+
+add_library(zoo-atoi-implementations SHARED atoi.cpp)
+add_executable(
+    zoo-atoi-benchmark-from-dynamic-library benchmark_main.cpp bm-swar.cpp
+)
+target_link_libraries(
+    zoo-atoi-benchmark-from-dynamic-library
+    zoo-atoi-implementations
+    benchmark::benchmark
+)
