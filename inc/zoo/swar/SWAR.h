@@ -52,8 +52,8 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
-    using type = T;
-    constexpr static inline std::make_unsigned_t<T>
+    using type = std::make_unsigned_t<T>;
+    constexpr static inline type
         NBits = NBits_,
         BitWidth = sizeof(T) * 8,
         Lanes = BitWidth / NBits,
@@ -63,6 +63,8 @@ struct SWAR {
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
+        LeastSignificantLaneMask =
+            ~(~T(0) << T(sizeof(T) * 8 == NBits ? 0 : NBits)),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit;
@@ -89,14 +91,12 @@ struct SWAR {
 
     // Returns lane at position with other lanes cleared.
     constexpr T isolateLane(int position) const noexcept {
-        constexpr auto filter = (T(1) << NBits) - 1;
-        return m_v & (filter << (NBits * position));
+        return m_v & (LeastSignificantLaneMask << (NBits * position));
     }
 
     // Returns lane value at position, in lane 0, rest of SWAR cleared.
     constexpr T at(int position) const noexcept {
-        constexpr auto filter = (T(1) << NBits) - 1;
-        return filter & (m_v >> (NBits * position));
+        return LeastSignificantLaneMask & (m_v >> (NBits * position));
     }
 
     constexpr SWAR clear(int position) const noexcept {
@@ -331,10 +331,9 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
 /// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
 template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
-    // Booleanness is stored in the MSBs
-    static constexpr auto MaskLaneMSB =
-        broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1)));
-    constexpr explicit BooleanSWAR(T v): SWAR<NBits, T>(v) {}
+    using Base = SWAR<NBits, T>;
+
+    constexpr explicit BooleanSWAR(T v): Base(v) {}
 
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
@@ -347,14 +346,20 @@ struct BooleanSWAR: SWAR<NBits, T> {
     /// BooleanSWAR treats the MSB of each lane as the boolean associated with that lane.
     /// A logical NOT in this circumstance _only_ flips the MSB of each lane.  This operation is
     /// not ones or twos complement.
-    constexpr auto operator not() const noexcept {
-        return BooleanSWAR(MaskLaneMSB ^ *this);
+    constexpr auto operator ~() const noexcept {
+        return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
+
+    #define BOOLEANSWAR_BINARY_LOGIC_OPERATOR X(^) X(&) X(|)
+    #define X(op) \
+        constexpr BooleanSWAR operator op(BooleanSWAR other) const noexcept { return this->Base::operator op(other); }
+    BOOLEANSWAR_BINARY_LOGIC_OPERATOR
+    #undef X
 
     explicit
     constexpr operator bool() const noexcept { return this->m_v; }
  private:
-    constexpr BooleanSWAR(SWAR<NBits, T> initializer) noexcept:
+    constexpr BooleanSWAR(Base initializer) noexcept:
         SWAR<NBits, T>(initializer)
     {}
 
@@ -442,7 +447,7 @@ constantIsGreaterEqual_MSB_off(SWAR<NBits, T> subtrahend) noexcept {
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
 greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
-    constexpr auto MLMSB = BooleanSWAR<NBits, T>::MaskLaneMSB;
+    constexpr auto MLMSB = SWAR<NBits, T>{SWAR<NBits, T>::MostSignificantBit};
     auto minuend = MLMSB | left;
     return MLMSB & (minuend - right);
 }
@@ -450,7 +455,7 @@ greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
 template<int NB, typename T>
 constexpr auto
 booleans(SWAR<NB, T> arg) noexcept {
-    return not constantIsGreaterEqual<0>(arg);
+    return ~constantIsGreaterEqual<0>(arg);
 }
 
 template<int NBits, typename T>
@@ -462,7 +467,7 @@ differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
 template<int NBits, typename T>
 constexpr auto
 equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    return not differents(a1, a2);
+    return ~differents(a1, a2);
 }
 
 /*
@@ -476,7 +481,7 @@ constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
     constexpr auto LogNBits = meta::logFloor(NBits);
     static_assert(NBits == (1 << LogNBits), "Logarithms of element width not power of two is un-implemented");
     auto whole = v.value();
-    auto isolationMask = BooleanSWAR<NBits, T>::MaskLaneMSB.value();
+    auto isolationMask = SWAR<NBits, T>::MostSignificantBit;
     for(auto groupSize = 1; groupSize < NBits; groupSize <<= 1) {
         auto shifted = whole >> groupSize;
 
