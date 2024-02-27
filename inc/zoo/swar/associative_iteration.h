@@ -257,9 +257,18 @@ constexpr auto expo_OverflowUnsafe_SpecificBitCount(
     using S = SWAR<NB, T>;
 
     auto operation = [](auto left, auto right, auto counts) {
-      const auto product = multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
       const auto mask = makeLaneMaskFromMSB(counts);
-      return (mask & product) | (left & ~mask);
+      const auto antiMask = ~mask;
+
+      const auto product = multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
+      /*
+       * if (count)
+       *    return product;
+       *  else
+       *    return left;
+       * */
+      return (product & mask) | (left & antiMask);
+
     };
 
     auto halver = [](auto counts) {
