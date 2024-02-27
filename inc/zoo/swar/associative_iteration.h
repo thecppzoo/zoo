@@ -249,6 +249,24 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     );
 }
 
+
+/*
+     // extended from mathematics to generic programming
+
+      template <typename T> constexpr T exp_acc(T r, T a, T n) {
+        for (;;) {
+          if (is_odd(n)) {
+            r = multiply(r, a);
+            if (n == 1) {
+              return r;
+            }
+          }
+          n = half(n);
+          a = multiply(a, a);
+        }
+      }
+*/
+
 template<int ActualBits, int NB, typename T>
 constexpr auto expo_OverflowUnsafe_SpecificBitCount(
     SWAR<NB, T> x,
@@ -268,9 +286,9 @@ constexpr auto expo_OverflowUnsafe_SpecificBitCount(
        *    return left;
        * */
       return (product & mask) | (left & antiMask);
-
     };
 
+    // halver should work same as multiplication... i think...
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
         return S{msbCleared.value() << 1};
