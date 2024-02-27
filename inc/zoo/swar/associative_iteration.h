@@ -252,6 +252,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
 /*
      // extended from mathematics to generic programming
+     // see https://github.com/jamierpond/fmtgp/blob/main/2_first_algo/main.cpp
 
       template <typename T> constexpr T exp_acc(T r, T a, T n) {
         for (;;) {
