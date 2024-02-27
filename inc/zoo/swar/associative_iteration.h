@@ -205,6 +205,27 @@ constexpr auto associativeOperatorIterated_regressive(
     return result;
 }
 
+template<int ActualBits, typename T>
+constexpr auto multiplication_scalar(
+    T multiplicand, T multiplier
+) {
+    auto operation = [](auto left, auto right, auto counts) {
+        return counts ? left + right : left;
+    };
+
+    auto halver = [](auto counts) {
+       return counts >> 1;
+    };
+
+    multiplier = multiplier + 1;
+
+    return associativeOperatorIterated_regressive(
+        multiplicand, 1, multiplier, 0, operation,
+        ActualBits, halver
+    );
+}
+
+
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier
@@ -224,6 +245,31 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     multiplier = S{multiplier.value() << (NB - ActualBits)};
     return associativeOperatorIterated_regressive(
         multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
+        ActualBits, halver
+    );
+}
+
+template<int ActualBits, int NB, typename T>
+constexpr auto expo_OverflowUnsafe_SpecificBitCount(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto left, auto right, auto counts) {
+      const auto product = multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
+      const auto mask = makeLaneMaskFromMSB(counts);
+      return (mask & product) | (left & ~mask);
+    };
+
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        return S{msbCleared.value() << 1};
+    };
+
+    exponent = S{exponent.value() << (NB - ActualBits)};
+    return associativeOperatorIterated_regressive(
+        x, S{1}, exponent, S{S::MostSignificantBit}, operation,
         ActualBits, halver
     );
 }
@@ -258,6 +304,17 @@ constexpr auto multiplication_OverflowUnsafe(
     return
         multiplication_OverflowUnsafe_SpecificBitCount<NB>(
             multiplicand, multiplier
+        );
+}
+
+template<int NB, typename T>
+constexpr auto expo_OverflowUnsafe(
+    SWAR<NB, T> base,
+    SWAR<NB, T> exponent
+) {
+    return
+       expo_OverflowUnsafe_SpecificBitCount<NB>(
+            base, exponent
         );
 }
 
