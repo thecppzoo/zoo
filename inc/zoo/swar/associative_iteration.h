@@ -205,27 +205,6 @@ constexpr auto associativeOperatorIterated_regressive(
     return result;
 }
 
-template<int ActualBits, typename T>
-constexpr auto multiplication_scalar(
-    T multiplicand, T multiplier
-) {
-    auto operation = [](auto left, auto right, auto counts) {
-        return counts ? left + right : left;
-    };
-
-    auto halver = [](auto counts) {
-       return counts >> 1;
-    };
-
-    multiplier = multiplier + 1;
-
-    return associativeOperatorIterated_regressive(
-        multiplicand, 1, multiplier, 0, operation,
-        ActualBits, halver
-    );
-}
-
-
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier
