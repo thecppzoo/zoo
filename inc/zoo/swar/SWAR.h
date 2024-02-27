@@ -64,7 +64,9 @@ struct SWAR {
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask =
-            ~(~T(0) << T(sizeof(T) * 8 == NBits ? 0 : NBits)),
+            sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
+                ~T(0) :
+                ~(~T(0) << NBits),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit;
