@@ -43,9 +43,9 @@ static_assert(
 
 TEST_CASE("Jamie's wip expo") {
     // the LSB lanes seem to be correct, but the MSB lanes are not...
-    constexpr auto base     = SWAR<8, u32>{0b0001'0011}; // 1 | 3
-    constexpr auto exponent = SWAR<8, u32>{0b0001'0010}; // 1 | 2
-    constexpr auto expected = SWAR<8, u32>{0b0001'1001}; // 1 | 9
+    constexpr auto base     = SWAR<16, u32>{0b0000'0001'0011}; // 1 | 3
+    constexpr auto exponent = SWAR<16, u32>{0b0000'0001'0010}; // 1 | 2
+    constexpr auto expected = SWAR<16, u32>{0b0000'0001'1001}; // 1 | 9
     auto actual = expo_OverflowUnsafe(base, exponent);
     CHECK(expected.value() == actual.value());
     auto expected_as_bits = std::bitset<32>(expected.value());
