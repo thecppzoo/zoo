@@ -7,20 +7,29 @@
 #include <random>
 #include <vector>
 
+#include <iostream>
+#include <bitset>
+
 uint64_t sideEffect = 0;
 
 template<int NB>
 using S = zoo::swar::SWAR<NB, uint64_t>;
 
-template<int NB, bool UseBuiltin>
+enum ExtractionPrimitive {
+    UseBuiltin,
+    UseSWAR,
+    CompareBuiltinAndSWAR
+};
+
+template<int NB, ExtractionPrimitive P>
 S<NB> parallelExtraction(S<NB> i, S<NB> m) {
-    if constexpr(!UseBuiltin) {
+    if constexpr(UseSWAR == P) {
         return compress(i, m);
     } else {
         constexpr auto LaneCount = 64 / NB;
         uint64_t
             input = i.value(),
-            mask = i.value(),
+            mask = m.value(),
             result = 0;
         for(auto lane = 0;;) {
             auto lowV = input & S<NB>::LeastSignificantLaneMask;
@@ -39,11 +48,23 @@ S<NB> parallelExtraction(S<NB> i, S<NB> m) {
                 mask >>= NB;
             }
         }
+        if constexpr(CompareBuiltinAndSWAR == P) {
+            auto fromSWAR = compress(i, m);
+            using B = std::bitset<64>;
+            auto toBinary = [](S<NB> what) { return B(what.value()); };
+            if(fromSWAR.value() != result) {
+                std::cout << NB << '\n' <<
+                    toBinary(i) << '\n' <<
+                    toBinary(m) << "\n---------\n" <<
+                    toBinary(S<NB>(result)) << '\n' <<
+                    toBinary(fromSWAR) << '\n' << std::endl;
+            }
+        }
         return S<NB>{result};
     }
 }
 
-template<int NB, bool UseBuiltin>
+template<int NB, ExtractionPrimitive EP>
 void runCompressions(benchmark::State &s) {
     using S = zoo::swar::SWAR<NB, uint64_t>;
     std::random_device rd;
@@ -57,7 +78,7 @@ void runCompressions(benchmark::State &s) {
         auto result = 0;
         for(auto c = 1000; c--; ) {
             S input{inputs[c]}, mask{masks[c]};
-            result ^= parallelExtraction<NB, UseBuiltin>(input, mask).value();
+            result ^= parallelExtraction<NB, EP>(input, mask).value();
         }
         sideEffect = result;
         benchmark::ClobberMemory();
@@ -67,7 +88,8 @@ void runCompressions(benchmark::State &s) {
 #define BIT_SIZE_X_LIST X(4) X(8) X(16) X(32) X(64)
 
 #define X(nb) \
-    BENCHMARK(runCompressions<nb, false>); \
-    BENCHMARK(runCompressions<nb, true>);
+    BENCHMARK(runCompressions<nb, UseBuiltin>); \
+    BENCHMARK(runCompressions<nb, UseSWAR>); \
+    BENCHMARK(runCompressions<nb, CompareBuiltinAndSWAR>);
 
 BIT_SIZE_X_LIST
