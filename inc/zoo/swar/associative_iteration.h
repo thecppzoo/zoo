@@ -1,15 +1,7 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
-#include <iostream>
 #include "zoo/swar/SWAR.h"
-
-// include std::cout etc
-
-template<typename ...Args>
-void print(Args... args) {
-    (std::cout << ... << args);
-}
 
 namespace zoo::swar {
 
@@ -199,26 +191,20 @@ template<
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    const Base base, // 4
-    const Base neutral,  // 1
-    IterationCount count,  // 2
-    const IterationCount forSquaring, // ??
-    const Operator op, // plus
-    unsigned log2Count, // big number
-    const CountHalver ch // halver
+    const Base base,
+    const Base neutral,
+    IterationCount count,
+    const IterationCount forSquaring,
+    const Operator op,
+    unsigned log2Count,
+    const CountHalver ch
 ) {
-    auto result = neutral; // result = 1
-    if (!log2Count) { return result; } // still going
+    auto result = neutral;
+    if (!log2Count) { return result; }
     for (;;) {
-        result = op(result, base, count); // result = 1 + 4
-        if constexpr (std::is_same_v<IterationCount, int>) {
-           print("result1: ", result, "\n");
-        }
+        result = op(result, base, count);
         if(!--log2Count) { break; }
         result = op(result, result, forSquaring);
-        if constexpr (std::is_same_v<IterationCount, int>) {
-           print("result2: ", result, "\n");
-        }
         count = ch(count);
     }
     return result;
@@ -279,27 +265,6 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
         halver
     );
 }
-
-
-/*
-     // extended from mathematics to generic programming
-     // see https://github.com/jamierpond/fmtgp/blob/main/2_first_algo/main.cpp
-
-      template <typename T> constexpr T exp_acc(T r, T a, T n) {
-        for (;;) {
-          if (is_odd(n)) {
-            r = multiply(r, a);
-            if (n == 1) {
-              return r;
-            }
-          }
-          n = half(n);
-          a = multiply(a, a);
-        }
-      }
-*/
-
-
 
 template<int ActualBits, int NB, typename T>
 constexpr auto expo_OverflowUnsafe_SpecificBitCount(

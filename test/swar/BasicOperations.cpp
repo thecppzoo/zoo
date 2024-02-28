@@ -50,7 +50,7 @@ TEST_CASE("Jamie's totally working exponentiation :D") {
     CHECK(expected.value() == actual.value());
 }
 
-} // namespace Multiplication
+}
 
 #define HE(nbits, t, v0, v1) \
     static_assert(horizontalEquality<nbits, t>(\
