@@ -225,6 +225,7 @@ constexpr auto associativeOperatorIterated_regressive(
 }
 
 
+// What I don't understand is why this doesn't work?
 template <typename T>
 constexpr auto multiply(T a , T b) {
     auto operation = [](auto left, auto right, auto count) {
@@ -250,37 +251,6 @@ constexpr auto multiply(T a , T b) {
         halver     // halver
     );
 }
-
-// static_assert(multiply(2, 3) == 6);
-
-template <typename T>
-constexpr auto expo(T base, T exponent) {
-
-    auto operation = [](auto left, auto right, auto counts) {
-      if (counts) {
-        return left * right;
-      } else {
-        return left;
-      }
-    };
-
-    auto halver = [](auto counts) {
-      return counts >> 1;
-    };
-
-    constexpr auto numBits = sizeof(T) * 8;
-    return associativeOperatorIterated_regressive(
-        base,
-        1,
-        exponent,
-        meta::BitmaskMaker<T, 1, numBits>().value << 1,
-        operation,
-        numBits,
-        halver
-    );
-}
-
-// static_assert(expo(2, 3) == 8, "expo(2, 3) == 8");
 
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
