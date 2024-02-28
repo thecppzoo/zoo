@@ -30,7 +30,7 @@ constexpr SWAR<8, u32> Mplier{0xA050301};
 // 5*0xA = 5*10 = 50 = 0x32,
 // 3*5 = 15 = 0xF,
 // 3*2 = 6,
-// 1*1 = 1,
+// 1*1 = 1
 constexpr auto Expected = 0x320F0601;
 
 static_assert(
