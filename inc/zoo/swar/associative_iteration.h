@@ -1,7 +1,15 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
+#include <iostream>
 #include "zoo/swar/SWAR.h"
+
+// include std::cout etc
+
+template<typename ...Args>
+void print(Args... args) {
+    (std::cout << ... << args);
+}
 
 namespace zoo::swar {
 
@@ -191,19 +199,88 @@ template<
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    const Base base, // 4
+    const Base neutral,  // 1
+    IterationCount count,  // 2
+    const IterationCount forSquaring, // ??
+    const Operator op, // plus
+    unsigned log2Count, // big number
+    const CountHalver ch // halver
 ) {
-    auto result = neutral;
-    if(!log2Count) { return result; }
-    for(;;) {
-        result = op(result, base, count);
+    auto result = neutral; // result = 1
+    if (!log2Count) { return result; } // still going
+    for (;;) {
+        result = op(result, base, count); // result = 1 + 4
+        if constexpr (std::is_same_v<IterationCount, int>) {
+           print("result1: ", result, "\n");
+        }
         if(!--log2Count) { break; }
         result = op(result, result, forSquaring);
+        if constexpr (std::is_same_v<IterationCount, int>) {
+           print("result2: ", result, "\n");
+        }
         count = ch(count);
     }
     return result;
 }
+
+
+template <typename T>
+constexpr auto multiply(T a , T b) {
+    auto operation = [](auto left, auto right, auto count) {
+      if (count) {
+        return left + right;
+      } else {
+        return left;
+      }
+    };
+
+    auto halver = [](auto count) {
+      return count >> 1;
+    };
+
+    constexpr auto numBits = sizeof(T) * 8;
+    return associativeOperatorIterated_regressive(
+        a,         // base
+        0,         // neutral
+        b,         // count
+        1,         // forSquaring, pretty sure this is where i am not understanding
+        operation, // operation
+        numBits,   // log2Count
+        halver     // halver
+    );
+}
+
+// static_assert(multiply(2, 3) == 6);
+
+template <typename T>
+constexpr auto expo(T base, T exponent) {
+
+    auto operation = [](auto left, auto right, auto counts) {
+      if (counts) {
+        return left * right;
+      } else {
+        return left;
+      }
+    };
+
+    auto halver = [](auto counts) {
+      return counts >> 1;
+    };
+
+    constexpr auto numBits = sizeof(T) * 8;
+    return associativeOperatorIterated_regressive(
+        base,
+        1,
+        exponent,
+        meta::BitmaskMaker<T, 1, numBits>().value << 1,
+        operation,
+        numBits,
+        halver
+    );
+}
+
+// static_assert(expo(2, 3) == 8, "expo(2, 3) == 8");
 
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
@@ -228,7 +305,8 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
         multiplier,
         S{S::MostSignificantBit},
         operation,
-        ActualBits, halver
+        ActualBits,
+        halver
     );
 }
 
@@ -250,6 +328,8 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
         }
       }
 */
+
+
 
 template<int ActualBits, int NB, typename T>
 constexpr auto expo_OverflowUnsafe_SpecificBitCount(

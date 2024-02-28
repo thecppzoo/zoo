@@ -30,7 +30,7 @@ constexpr SWAR<8, u32> Mplier{0xA050301};
 // 5*0xA = 5*10 = 50 = 0x32,
 // 3*5 = 15 = 0xF,
 // 3*2 = 6,
-// 1*1 = 1
+// 1*1 = 1,
 constexpr auto Expected = 0x320F0601;
 
 static_assert(
@@ -41,17 +41,13 @@ static_assert(
     multiplication_OverflowUnsafe_SpecificBitCount<3>(Micand, Mplier).value()
 );
 
-TEST_CASE("Jamie's wip expo") {
-    // the LSB lanes seem to be correct, but the MSB lanes are not...
-    constexpr auto base     = SWAR<16, u32>{0b0000'0001'0011}; // 1 | 3
-    constexpr auto exponent = SWAR<16, u32>{0b0000'0001'0010}; // 1 | 2
-    constexpr auto expected = SWAR<16, u32>{0b0000'0001'1001}; // 1 | 9
-    auto actual = expo_OverflowUnsafe(base, exponent);
+TEST_CASE("Jamie's totally working exponentiation :D") {
+    constexpr auto base     = SWAR<8, u32>{0x02'01'05'06}; //   2 | 1 |  5 |   6
+    constexpr auto exponent = SWAR<8, u32>{0x07'00'02'03}; //   7 | 0 |  2 |   3
+    constexpr auto expected = SWAR<8, u32>{0x80'01'19'D8}; // 128 | 1 | 19 | 216
+    constexpr auto actual = expo_OverflowUnsafe(base, exponent);
+    static_assert(expected.value() == actual.value());
     CHECK(expected.value() == actual.value());
-    auto expected_as_bits = std::bitset<32>(expected.value());
-    auto actual_as_bits = std::bitset<32>(actual.value());
-    printf("expected: %s\n", expected_as_bits.to_string().c_str());
-    printf("actual:   %s\n", actual_as_bits.to_string().c_str());
 }
 
 } // namespace Multiplication
