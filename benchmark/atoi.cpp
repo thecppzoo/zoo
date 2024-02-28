@@ -29,14 +29,7 @@ uint32_t parse_eight_digits_swar(const char *chars) {
   return short100plus >> 32;
 }
 
-// Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
-// of 10^9 is slightly less than 30, thus, only 30 bits are needed.
-uint32_t lemire_as_zoo_swar(const char *chars) {
-    uint64_t bytes;
-    memcpy(&bytes, chars, 8);
-    auto allCharacterZero = zoo::meta::BitmaskMaker<uint64_t, '0', 8>::value;
-    using S8_64 = zoo::swar::SWAR<8, uint64_t>;
-    S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
+uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexcept {
     /* the idea is to perform the following multiplication:
      * NOTE: THE BASE OF THE NUMBERS is 256 (2^8), then 65536 (2^16), 2^32
      * convertedToIntegers is IN BASE 256 the number ABCDEFGH
@@ -58,6 +51,18 @@ uint32_t lemire_as_zoo_swar(const char *chars) {
     auto byteQuads = zoo::swar::doublePrecision(by101base2to16).odd;
     auto by10001base2to32 = byteQuads.multiply(1 + (10000ull << 32));
     return uint32_t(by10001base2to32.value() >> 32);
+}
+
+// Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
+// of 10^9 is slightly less than 30, thus, only 30 bits are needed.
+uint32_t lemire_as_zoo_swar(const char *chars) noexcept {
+    uint64_t bytes;
+    memcpy(&bytes, chars, 8);
+    auto allCharacterZero = zoo::meta::BitmaskMaker<uint64_t, '0', 8>::value;
+    using S8_64 = zoo::swar::SWAR<8, uint64_t>;
+    S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
+    auto rv = calculateBase10(convertedToIntegers);
+    return rv;    
 }
 
 std::size_t spaces_glibc(const char *ptr) {
@@ -99,8 +104,6 @@ std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     return rv;
 }
 
-auto trick = &leadingSpacesCountAligned<swar::SWAR<8, uint64_t>>;
-
 /// @brief Loads the "block" containing the pointer, by proper alignment
 /// @tparam PtrT Pointer type for loading
 /// @tparam Block as the name indicates
@@ -139,6 +142,87 @@ std::size_t leadingSpacesCount(const char *p) noexcept {
         auto spacesThisBlock = leadingSpacesCountAligned(bytes);
         base += spacesThisBlock;
         if(8 != spacesThisBlock) { return base - p; }
+        memcpy(&bytes.m_v, base, 8);
+    }
+}
+
+auto leadingDigitsCount(const char *p) noexcept {
+    using S = swar::SWAR<8, uint64_t>;
+    S bytes;
+    auto [base, misalignment] = blockAlignedLoad(p, &bytes.m_v);
+    auto bitDisplacement = 8 * misalignment;
+    constexpr static S
+        AllZeroCharacter{meta::BitmaskMaker<uint64_t, '0', 8>::value},
+        AllOn = ~S{0};
+    // blit the zero-characters to the misaligned part
+    auto mask = S{AllOn.value() << bitDisplacement};
+    auto misalignedEliminated = bytes & mask;
+    auto zeroCharactersIntroduced = AllZeroCharacter & ~mask;
+    bytes = zeroCharactersIntroduced | misalignedEliminated;
+    for(;;) {
+        auto belowOrEqualTo9 = swar::constantIsGreaterEqual<'9'>(bytes);
+        auto belowCharacter0 = swar::constantIsGreaterEqual<'0' - 1>(bytes);
+        auto digits = belowOrEqualTo9 & ~belowCharacter0;
+        auto nonDigits = ~digits;
+        if(nonDigits) {
+            auto nonDigitIndex = nonDigits.lsbIndex();
+            return base + nonDigitIndex - p;
+        }
+        base += 8;
+        memcpy(&bytes.m_v, base, 8);
+    }
+}
+
+int c_strToI(const char *str) noexcept {
+    constexpr static std::array<int, 8> LastFactor = {
+        1, 10, 100, 1000,
+        10'000, 100'000, 1000'000, 10'000'000
+    };
+    auto leadingSpaces = leadingSpacesCount(str);
+    auto s = str + leadingSpaces;
+    auto sign = 1;
+    switch(*s) {
+        case '-': sign = -1;
+            [[fallthrough]];
+        case '+': ++s; break;
+        default: ;
+    }
+    using S = swar::SWAR<8, uint64_t>;
+    S bytes;
+    auto [base, misalignment] = blockAlignedLoad(s, &bytes.m_v);
+    auto bitDisplacement = 8 * misalignment;
+    constexpr static S
+        AllZeroCharacter{meta::BitmaskMaker<uint64_t, '0', 8>::value},
+        AllOn = ~S{0};
+    // blit the zero-characters to the misaligned part
+    auto mask = S{AllOn.value() << bitDisplacement};
+    auto misalignedEliminated = bytes & mask;
+    auto zeroCharactersIntroduced = AllZeroCharacter & ~mask;
+    bytes = zeroCharactersIntroduced | misalignedEliminated;
+    long accumulator = 0;
+
+    for(;;) {
+        auto belowOrEqualTo9 = swar::constantIsGreaterEqual<'9'>(bytes);
+        auto belowCharacter0 = swar::constantIsGreaterEqual<'0' - 1>(bytes);
+        auto digits = belowOrEqualTo9 & ~belowCharacter0;
+        auto nonDigits = ~digits;
+        if(nonDigits) {
+            auto nonDigitIndex = nonDigits.lsbIndex();
+            auto asIntegers = bytes - AllZeroCharacter; // upper lanes garbage
+            auto integersInHighLanes =
+                // allow complete clearing of the 8 bytes by doing 2 shifts,
+                // since it is UB to shift 64 bits.
+                asIntegers.shiftLanesLeft(7 - nonDigitIndex).shiftLanesLeft(1);
+            auto inBase10 = calculateBase10(integersInHighLanes);
+            auto scaledAccumulator = accumulator * LastFactor[nonDigitIndex];
+            return int((scaledAccumulator + inBase10) * sign);
+        }
+        // all 8 bytes are digits
+        auto asIntegers = bytes - AllZeroCharacter;
+        accumulator *= 100'000'000;
+        auto inBase10 = calculateBase10(asIntegers);
+        accumulator += inBase10;
+        base += 8;
         memcpy(&bytes.m_v, base, 8);
     }
 }
