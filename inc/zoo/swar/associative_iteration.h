@@ -55,18 +55,22 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
         power = 1;
 
     #define ZTE(...)
+        // ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
     for(;;) {
         ZTE(doubling);
         if(1 & bitsToXOR) {
-            ZTE(result = result ^ doubling);
-            ZTE(doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask));
+            ZTE(result ^ doubling);
+            result = result ^ doubling;
+            ZTE(doubling.shiftIntraLaneLeft(power, shiftClearingMask));
+            doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
         }
         ZTE(bitsToXOR >> 1);
         bitsToXOR >>= 1;
         if(!bitsToXOR) { break; }
         auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
         ZTE(shifted);
-        ZTE(doubling = doubling ^ shifted);
+        ZTE(doubling ^ shifted);
+        doubling = doubling ^ shifted;
         // 01...1
         // 001...1
         // 00001...1
@@ -74,7 +78,8 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
         shiftClearingMask =
             shiftClearingMask &
                 S{static_cast<B>(shiftClearingMask.value() >> power)};
-        ZTE(power <<= 1);
+        ZTE(power << 1);
+        power <<= 1;
     }
     ZTE(input);
     #undef ZTE
@@ -126,11 +131,6 @@ Selection (using spaces)
    d   gh  jkl  nop  rs  uvx  zA   D F
 Desired result:
                      dghjklnoprsuvxzADF
-
-0000 1001 1011 1011 1011 0111 0110 0101 shiftLeft 1
-1111 0110 0100 0100 0100 1000 1001 1010 forParallelSuffix
-
-                           10 1101 1101
 
 Complete example (32 bits)
 Selection mask:
@@ -185,6 +185,7 @@ compress(SWAR<NB, B> input, SWAR<NB, B> compressionMask) {
     // we flip the compression mask.  To not count the bit position itself,
     // we shift by one.
     #define ZTE(...)
+        // ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
     ZTE(input);
     ZTE(compressionMask);
     using S = SWAR<NB, B>;

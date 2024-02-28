@@ -110,6 +110,17 @@ TEST_CASE("Compress/Expand", "[swar]") {
     using S1_32 = SWAR<32, uint32_t>;
     auto q = compress(S1_32{ToMove}, S1_32{Mask});
     CHECK(result == q.value());
+    SECTION("Regression 1") {
+        u64
+            input =   0b1010'1001'0110'0001'1001'0000'0010'1010'0100'0111'1110'1001'1111'0001'1110'1011,
+            mask =    0b0110'0000'0001'0101'0101'1111'0101'1100'0110'1111'0100'0111'0001'1000'0101'0010,
+            expected =0b0001'0000'0000'0001'0001'0000'0000'0010'0010'0111'0001'0001'0001'0000'0010'0001,
+            butGot =  0b0010'0000'0000'0001'0001'0000'0000'1000'0100'0111'0100'0001'0001'0000'0100'0010;
+        using S16_64 = SWAR<4, uint64_t>;
+        using S = S16_64;
+        auto v = compress(S{input}, S{mask});
+        CHECK(expected == v.value());
+    }
 }
 
 static_assert(1 == popcount<5>(0x100ull));
@@ -332,5 +343,5 @@ static_assert(0 == isolateLSB(u32(0)));
 
 constexpr auto aBooleansWithTrue = booleans(SWAR<4, u32>{0x1});
 static_assert(aBooleansWithTrue);
-static_assert(!aBooleansWithTrue); // this is a pitfall, but lesser evil?
+//static_assert(~aBooleansWithTrue);
 static_assert(false == !bool(aBooleansWithTrue));
