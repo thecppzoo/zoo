@@ -223,20 +223,23 @@ constexpr auto multiply(T a , T b) {
     };
 
     auto halver = [](auto count) {
-      return count >> 1;
+      return count << 1;
     };
 
     constexpr auto numBits = sizeof(T) * 8;
+    constexpr auto msb = 1 << (numBits - 1);
     return associativeOperatorIterated_regressive(
         a,         // base
         0,         // neutral
         b,         // count
-        1,         // forSquaring, pretty sure this is where i am not understanding
+        0,       // forSquaring, pretty sure this is where i am not understanding
         operation, // operation
         numBits,   // log2Count
         halver     // halver
     );
 }
+
+// static_assert(multiply(3, 4) == 12, "multiply failed");
 
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
@@ -267,7 +270,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 }
 
 template<int ActualBits, int NB, typename T>
-constexpr auto expo_OverflowUnsafe_SpecificBitCount(
+constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     SWAR<NB, T> x,
     SWAR<NB, T> exponent
 ) {
@@ -339,12 +342,12 @@ constexpr auto multiplication_OverflowUnsafe(
 }
 
 template<int NB, typename T>
-constexpr auto expo_OverflowUnsafe(
+constexpr auto exponentiation_OverflowUnsafe(
     SWAR<NB, T> base,
     SWAR<NB, T> exponent
 ) {
     return
-       expo_OverflowUnsafe_SpecificBitCount<NB>(
+       exponentiation_OverflowUnsafe_SpecificBitCount<NB>(
             base, exponent
         );
 }
