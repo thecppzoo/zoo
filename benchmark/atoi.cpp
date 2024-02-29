@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-
+#include <array>
 #include <tuple>
 
 static_assert(~uint32_t(0) == zoo::swar::SWAR<32, uint32_t>::LeastSignificantLaneMask);
