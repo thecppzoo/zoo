@@ -42,7 +42,7 @@ static_assert(
 );
 
 TEST_CASE("Jamie's totally working exponentiation :D") {
-    constexpr auto base     = SWAR<8, u32>{0x02'01'05'06}; //   2 | 0 |  5 |   6
+    constexpr auto base     = SWAR<8, u32>{0x02'01'05'06}; //   2 | 1 |  5 |   6
     constexpr auto exponent = SWAR<8, u32>{0x07'00'02'03}; //   7 | 0 |  2 |   3
     constexpr auto expected = SWAR<8, u32>{0x80'01'19'D8}; // 128 | 1 | 25 | 216
     constexpr auto actual = exponentiation_OverflowUnsafe(base, exponent);
