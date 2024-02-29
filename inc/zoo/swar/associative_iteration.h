@@ -200,8 +200,8 @@ constexpr auto associativeOperatorIterated_regressive(
     const CountHalver ch
 ) {
     auto result = neutral;
-    if (!log2Count) { return result; }
-    for (;;) {
+    if(!log2Count) { return result; }
+    for(;;) {
         result = op(result, base, count);
         if(!--log2Count) { break; }
         result = op(result, result, forSquaring);
