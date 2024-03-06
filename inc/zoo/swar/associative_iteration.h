@@ -35,7 +35,7 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 #else
 
-#define ZOO_TRACEABLE_EXPRESSION(...) __VA_ARGS__
+#define ZOO_TRACEABLE_EXPRESSION(...) (void)(__VA_ARGS__)
 
 #endif
 
@@ -130,7 +130,7 @@ Desired result:
 1111 0110 0100 0100 0100 1000 1001 1010 forParallelSuffix
 
                            10 1101 1101
-/*
+
 Complete example (32 bits)
 Selection mask:
 0001 0011 0111 0111 0110 1110 1100 1010
