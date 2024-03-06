@@ -35,7 +35,7 @@ if(MSVC)
         catch_main.cpp
         any.cpp AlignedStorage.cpp AnyCallable.cpp AnyCallSignature.cpp
         AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp
-        swar/BasicOperations.cpp swar/simd.cpp
+        swar/BasicOperations.cpp
         # map/BasicMap.cpp
         # map/RobinHood.test.cpp
         # map/RobinHood.hybrid.test.cpp
