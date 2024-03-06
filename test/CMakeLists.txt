@@ -35,7 +35,7 @@ if(MSVC)
         catch_main.cpp
         any.cpp AlignedStorage.cpp AnyCallable.cpp AnyCallSignature.cpp
         AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp
-        swar/BasicOperations.cpp
+        swar/BasicOperations.cpp swar/simd.cpp
         # map/BasicMap.cpp
         # map/RobinHood.test.cpp
         # map/RobinHood.hybrid.test.cpp
@@ -111,7 +111,7 @@ else()
     )
     set(
         SWAR_SOURCES
-        swar/BasicOperations.cpp
+        swar/BasicOperations.cpp swar/sublanes.cpp
     )
     set(
         MAP_SOURCES
