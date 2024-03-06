@@ -1,4 +1,4 @@
-#include "zoo/swar/SWARWithSublanes.h"
+#include "zoo/swar/SWARWithSubLanes.h"
 
 using namespace zoo;
 using namespace zoo::swar;
