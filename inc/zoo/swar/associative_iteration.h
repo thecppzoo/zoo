@@ -35,7 +35,7 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 #else
 
-#define ZOO_TRACEABLE_EXPRESSION(...) __VA_ARGS__
+#define ZOO_TRACEABLE_EXPRESSION(...) (void)(__VA_ARGS__)
 
 #endif
 
@@ -120,17 +120,6 @@ positions that would have the bit for 2 set in the count of positions to move
 right.
 Then an odd count of /quartets/ of positions, and moves them 4;
 8, 16, 32, ...
-
-
-Complete example (32 bits)
-Selection mask:
-0001 0011 0111 0111 0110 1110 1100 1010
-Input (each letter or variable is a boolean, that can have 0 or 1)
-abcd efgh ijkl mnop qrst uvxy zABC DEFG
-Selection (using spaces)
-   d   gh  jkl  nop  rs  uvx  zA   D F
-Desired result:
-                     dghjklnoprsuvxzADF
 
 Complete example (32 bits)
 Selection mask:

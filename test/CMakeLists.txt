@@ -111,7 +111,7 @@ else()
     )
     set(
         SWAR_SOURCES
-        swar/BasicOperations.cpp
+        swar/BasicOperations.cpp swar/sublanes.cpp
     )
     set(
         MAP_SOURCES
