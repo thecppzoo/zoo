@@ -222,20 +222,19 @@ constexpr auto multiply(T a , T b) {
       }
     };
 
-    auto halver = [](auto count) {
+    auto updateCount = [](auto count) {
       return count << 1;
     };
 
     constexpr auto numBits = sizeof(T) * 8;
-    constexpr auto msb = 1 << (numBits - 1);
     return associativeOperatorIterated_regressive(
-        a,         // base
-        0,         // neutral
-        b,         // count
-        0,       // forSquaring, pretty sure this is where i am not understanding
-        operation, // operation
-        numBits,   // log2Count
-        halver     // halver
+        a,          // base
+        0,          // neutral
+        b,          // count
+        1,          // forSquaring, pretty sure this is where i am not understanding
+        operation,  // operation
+        numBits,    // log2Count
+        updateCount // halver
     );
 }
 
@@ -278,16 +277,9 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
 
     auto operation = [](auto left, auto right, auto counts) {
       const auto mask = makeLaneMaskFromMSB(counts);
-      const auto antiMask = ~mask;
       const auto product =
         multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
-      /*
-       * if (count)
-       *    return product;
-       * else
-       *    return left;
-       */
-      return (product & mask) | (left & antiMask);
+      return (product & mask) | (left & ~mask);
     };
 
     // halver should work same as multiplication... i think...
@@ -308,7 +300,7 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     );
 }
 
-/// \note Not removed yet because it is an example of "progressive" associative exponentiation
+// \note Not removed yet because it is an example of "progressive" associative exponentiation
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     SWAR<NB, T> multiplicand,
