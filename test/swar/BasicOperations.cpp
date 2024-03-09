@@ -22,6 +22,34 @@ using S16_64 = SWAR<16, uint64_t>;
 using S16_32 = SWAR<16, uint32_t>;
 using S16_16 = SWAR<16, uint16_t>;
 
+/* Creating boolean by comparing template parameters does not work.
+template<int LaneBitCount, int TotalBitCount, bool = true>
+struct SWARIFY {
+    using type = void;
+};
+
+template<int LaneBitCount, int TotalBitCount>
+struct SWARIFY<LaneBitCount, TotalBitCount, LaneBitCount <= TotalBitCount> {
+    using type = SWAR<LaneBitCount, meta::UInteger<TotalBitCount>>;
+};
+template<int LaneBitCount, int TotalBitsCounted>
+using SWARIFY_t = typename SWARIFY<LaneBitCount, TotalBitsCounted>::type;
+static_assert(std::is_same_v<void, SWARIFY_t<16, 8>>);
+static_assert(std::is_same_v<swar::SWAR<8, uint32_t>, typename SWARIFY<8, 32>::type>);
+
+}
+
+#define LANE_BIT_COUNTS_Y_LIST(Base) Y(4, Base)Y(8, Base)Y(16, Base)Y(32, Base)Y(64, Base)
+#define BASE_TYPE_X_LIST X(8)X(16)X(32)X(64)
+
+#define Y(BitCount, Base) using S##BitCount##_##Base = zoo::swar::SWARIFY_t<BitCount, Base>;
+#define X(BaseTypeBitCount) LANE_BIT_COUNTS_Y_LIST(BaseTypeBitCount)
+
+BASE_TYPE_X_LIST
+#undef Y
+#undef X
+*/
+
 namespace Multiplication {
 
 using S4_64 = SWAR<4, uint64_t>;
