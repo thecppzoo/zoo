@@ -60,7 +60,7 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount,
+        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
@@ -229,8 +229,13 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
 template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     // Booleanness is stored in the MSBs
-    static constexpr auto MaskLaneMSB =
+    static constexpr auto MaskMSB =
         broadcast<NBits, T>(SWAR<NBits, T>(T(1) << (NBits -1)));
+    static constexpr auto MaskLSB =
+         broadcast<NBits, T>(SWAR<NBits, T>(T(1)));
+     // Turns off LSB of each lane
+     static constexpr auto MaskNonLSB = ~MaskLSB;
+     static constexpr auto MaskNonMSB = ~MaskMSB;
     constexpr explicit BooleanSWAR(T v): SWAR<NBits, T>(v) {}
 
     constexpr BooleanSWAR clear(int bit) const noexcept {
@@ -245,8 +250,14 @@ struct BooleanSWAR: SWAR<NBits, T> {
     /// A logical NOT in this circumstance _only_ flips the MSB of each lane.  This operation is
     /// not ones or twos complement.
     constexpr auto operator not() const noexcept {
-        return BooleanSWAR(MaskLaneMSB ^ *this);
+        return BooleanSWAR(MaskMSB ^ *this);
     }
+
+     // BooleanSWAR as a mask: BooleanSWAR<4, u16>(0x0800).MSBtoLaneMask() => SWAR<4,u16>(0x0F00)
+     constexpr auto MSBtoLaneMask() const noexcept {
+       const auto MSBMinusOne = this->m_v - (this->m_v >> (NBits-1)); // Convert pattern 10* to 01*
+       return SWAR<NBits,T>(MSBMinusOne | this->m_v); // Blit 01* and 10* together for 1* when MSB was on.
+     }
 
     explicit
     constexpr operator bool() const noexcept { return this->m_v; }
@@ -339,7 +350,7 @@ constantIsGreaterEqual_MSB_off(SWAR<NBits, T> subtrahend) noexcept {
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
 greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
-    constexpr auto MLMSB = BooleanSWAR<NBits, T>::MaskLaneMSB;
+    constexpr auto MLMSB = BooleanSWAR<NBits, T>::MaskMSB;
     auto minuend = MLMSB | left;
     return MLMSB & (minuend - right);
 }
@@ -373,7 +384,7 @@ constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
     constexpr auto LogNBits = meta::logFloor(NBits);
     static_assert(NBits == (1 << LogNBits), "Logarithms of element width not power of two is un-implemented");
     auto whole = v.value();
-    auto isolationMask = BooleanSWAR<NBits, T>::MaskLaneMSB.value();
+    auto isolationMask = BooleanSWAR<NBits, T>::MaskMSB.value();
     for(auto groupSize = 1; groupSize < NBits; groupSize <<= 1) {
         auto shifted = whole >> groupSize;
 
