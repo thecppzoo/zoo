@@ -249,10 +249,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
         return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
 
-    #define BOOLEANSWAR_BINARY_LOGIC_OPERATOR X(^) X(&) X(|)
+    #define BOOLEANSWAR_BINARY_LOGIC_OPERATOR_X_LIST  X(^) X(&) X(|)
     #define X(op) \
         constexpr BooleanSWAR operator op(BooleanSWAR other) const noexcept { return this->Base::operator op(other); }
-    BOOLEANSWAR_BINARY_LOGIC_OPERATOR
+    BOOLEANSWAR_BINARY_LOGIC_OPERATOR_X_LIST
     #undef X
 
     explicit
