@@ -13,6 +13,12 @@
 #define ZOO_CONFIGURED_TO_USE_NEON() 0
 #endif
 
+#ifdef __BMI2__
+#define ZOO_CONFIGURED_TO_USE_BMI() 1
+#else
+#define ZOO_CONFIGURED_TO_USE_BMI() 0
+#endif
+
 #ifdef _MSC_VER
 #define MSVC_EMPTY_BASES __declspec(empty_bases)
 #else

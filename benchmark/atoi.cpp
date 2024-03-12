@@ -10,8 +10,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-
+#include <array>
 #include <tuple>
+
+static_assert(~uint32_t(0) == zoo::swar::SWAR<32, uint32_t>::LeastSignificantLaneMask);
 
 // Copied from Daniel Lemire's GitHub at
 // https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/
@@ -27,14 +29,7 @@ uint32_t parse_eight_digits_swar(const char *chars) {
   return short100plus >> 32;
 }
 
-// Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
-// of 10^9 is slightly less than 30, thus, only 30 bits are needed.
-uint32_t lemire_as_zoo_swar(const char *chars) {
-    uint64_t bytes;
-    memcpy(&bytes, chars, 8);
-    auto allCharacterZero = zoo::meta::BitmaskMaker<uint64_t, '0', 8>::value;
-    using S8_64 = zoo::swar::SWAR<8, uint64_t>;
-    S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
+uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexcept {
     /* the idea is to perform the following multiplication:
      * NOTE: THE BASE OF THE NUMBERS is 256 (2^8), then 65536 (2^16), 2^32
      * convertedToIntegers is IN BASE 256 the number ABCDEFGH
@@ -58,6 +53,18 @@ uint32_t lemire_as_zoo_swar(const char *chars) {
     return uint32_t(by10001base2to32.value() >> 32);
 }
 
+// Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
+// of 10^9 is slightly less than 30, thus, only 30 bits are needed.
+uint32_t lemire_as_zoo_swar(const char *chars) noexcept {
+    uint64_t bytes;
+    memcpy(&bytes, chars, 8);
+    auto allCharacterZero = zoo::meta::BitmaskMaker<uint64_t, '0', 8>::value;
+    using S8_64 = zoo::swar::SWAR<8, uint64_t>;
+    S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
+    auto rv = calculateBase10(convertedToIntegers);
+    return rv;    
+}
+
 std::size_t spaces_glibc(const char *ptr) {
     auto rv = 0;
     while(isspace(ptr[rv])) { ++rv; }
@@ -66,8 +73,8 @@ std::size_t spaces_glibc(const char *ptr) {
 
 namespace zoo {
 
-//constexpr
-std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept {
+template<typename S>
+std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     /*
     space (0x20, ' ')
     form feed (0x0c, '\f')
@@ -85,15 +92,16 @@ std::size_t leadingSpacesCount(swar::SWAR<8, uint64_t> bytes) noexcept {
     },
     ExpressedAsEscapeCodes = { ' ', '\r', '\f', '\v', '\n', '\t' };
     static_assert(SpaceCharacters == ExpressedAsEscapeCodes); */
-    using S = swar::SWAR<8, uint64_t>;
+    static_assert(sizeof(S) == alignof(S));
     constexpr S Space{meta::BitmaskMaker<uint64_t, ' ', 8>::value};
     auto space = swar::equals(bytes, Space);
-    auto otherWhiteSpace =
-        swar::constantIsGreaterEqual<'\r'>(bytes) &
-        ~swar::constantIsGreaterEqual<'\t' - 1>(bytes);
+    auto belowEqualCarriageReturn = swar::constantIsGreaterEqual<'\r'>(bytes);
+    auto belowTab = swar::constantIsGreaterEqual<'\t' - 1>(bytes);
+    auto otherWhiteSpace = belowEqualCarriageReturn & ~belowTab;
     auto whiteSpace = space | otherWhiteSpace;
-    auto notWhiteSpace = S{S::MostSignificantBit} ^ whiteSpace;
-    return notWhiteSpace.lsbIndex();
+    auto notWhiteSpace = ~whiteSpace;
+    auto rv = notWhiteSpace ? notWhiteSpace.lsbIndex() : S::Lanes;
+    return rv;
 }
 
 /// @brief Loads the "block" containing the pointer, by proper alignment
@@ -113,6 +121,110 @@ blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
     auto *base = reinterpret_cast<PtrT *>(asUint - misalignment);
     memcpy(b, base, Size);
     return { base, misalignment };
+}
+
+std::size_t leadingSpacesCount(const char *p) noexcept {
+    using S = swar::SWAR<8, uint64_t>;
+    S bytes;
+    auto [base, misalignment] = blockAlignedLoad(p, &bytes.m_v);
+    auto bitDisplacement = 8 * misalignment;
+
+    // deal with misalignment setting the low part to spaces
+    constexpr static S
+        AllSpaces{meta::BitmaskMaker<uint64_t, ' ', 8>::value},
+        AllOn = ~S{0};
+    // blit the spaces in
+    auto mask = S{AllOn.value() << bitDisplacement};
+    auto misalignedEliminated = bytes & mask;
+    auto spacesIntroduced = AllSpaces & ~mask;
+    bytes = spacesIntroduced | misalignedEliminated;
+    for(;;) {
+        auto spacesThisBlock = leadingSpacesCountAligned(bytes);
+        base += spacesThisBlock;
+        if(8 != spacesThisBlock) { return base - p; }
+        memcpy(&bytes.m_v, base, 8);
+    }
+}
+
+auto leadingDigitsCount(const char *p) noexcept {
+    using S = swar::SWAR<8, uint64_t>;
+    S bytes;
+    auto [base, misalignment] = blockAlignedLoad(p, &bytes.m_v);
+    auto bitDisplacement = 8 * misalignment;
+    constexpr static S
+        AllZeroCharacter{meta::BitmaskMaker<uint64_t, '0', 8>::value},
+        AllOn = ~S{0};
+    // blit the zero-characters to the misaligned part
+    auto mask = S{AllOn.value() << bitDisplacement};
+    auto misalignedEliminated = bytes & mask;
+    auto zeroCharactersIntroduced = AllZeroCharacter & ~mask;
+    bytes = zeroCharactersIntroduced | misalignedEliminated;
+    for(;;) {
+        auto belowOrEqualTo9 = swar::constantIsGreaterEqual<'9'>(bytes);
+        auto belowCharacter0 = swar::constantIsGreaterEqual<'0' - 1>(bytes);
+        auto digits = belowOrEqualTo9 & ~belowCharacter0;
+        auto nonDigits = ~digits;
+        if(nonDigits) {
+            auto nonDigitIndex = nonDigits.lsbIndex();
+            return base + nonDigitIndex - p;
+        }
+        base += 8;
+        memcpy(&bytes.m_v, base, 8);
+    }
+}
+
+int c_strToI(const char *str) noexcept {
+    constexpr static std::array<int, 8> LastFactor = {
+        1, 10, 100, 1000,
+        10'000, 100'000, 1000'000, 10'000'000
+    };
+    auto leadingSpaces = leadingSpacesCount(str);
+    auto s = str + leadingSpaces;
+    auto sign = 1;
+    switch(*s) {
+        case '-': sign = -1;
+            [[fallthrough]];
+        case '+': ++s; break;
+        default: ;
+    }
+    using S = swar::SWAR<8, uint64_t>;
+    S bytes;
+    auto [base, misalignment] = blockAlignedLoad(s, &bytes.m_v);
+    auto bitDisplacement = 8 * misalignment;
+    constexpr static S
+        AllZeroCharacter{meta::BitmaskMaker<uint64_t, '0', 8>::value},
+        AllOn = ~S{0};
+    // blit the zero-characters to the misaligned part
+    auto mask = S{AllOn.value() << bitDisplacement};
+    auto misalignedEliminated = bytes & mask;
+    auto zeroCharactersIntroduced = AllZeroCharacter & ~mask;
+    bytes = zeroCharactersIntroduced | misalignedEliminated;
+    long accumulator = 0;
+
+    for(;;) {
+        auto belowOrEqualTo9 = swar::constantIsGreaterEqual<'9'>(bytes);
+        auto belowCharacter0 = swar::constantIsGreaterEqual<'0' - 1>(bytes);
+        auto digits = belowOrEqualTo9 & ~belowCharacter0;
+        auto nonDigits = ~digits;
+        if(nonDigits) {
+            auto nonDigitIndex = nonDigits.lsbIndex();
+            auto asIntegers = bytes - AllZeroCharacter; // upper lanes garbage
+            auto integersInHighLanes =
+                // allow complete clearing of the 8 bytes by doing 2 shifts,
+                // since it is UB to shift 64 bits.
+                asIntegers.shiftLanesLeft(7 - nonDigitIndex).shiftLanesLeft(1);
+            auto inBase10 = calculateBase10(integersInHighLanes);
+            auto scaledAccumulator = accumulator * LastFactor[nonDigitIndex];
+            return int((scaledAccumulator + inBase10) * sign);
+        }
+        // all 8 bytes are digits
+        auto asIntegers = bytes - AllZeroCharacter;
+        accumulator *= 100'000'000;
+        auto inBase10 = calculateBase10(asIntegers);
+        accumulator += inBase10;
+        base += 8;
+        memcpy(&bytes.m_v, base, 8);
+    }
 }
 
 /// \brief Helper function to fix the non-string part of block
@@ -145,7 +257,7 @@ std::size_t c_strLength(const char *s) {
     // It is safe to read within the page where the string occurs, and to
     // guarantee that, simply make aligned reads because the size of the SWAR
     // base size will always divide the memory page size
-    auto [alignedBase, misalignment] = blockAlignedLoad(s, &initialBytes);
+    auto [alignedBase, misalignment] = blockAlignedLoad(s, &initialBytes.m_v);
     auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
     for(;;) {
         auto firstNullTurnsOnMSB = bytes - Ones;
@@ -172,7 +284,7 @@ std::size_t c_strLength(const char *s) {
 std::size_t c_strLength_natural(const char *s) {
     using S = swar::SWAR<8, std::uint64_t>;
     S initialBytes;
-    auto [base, misalignment] = blockAlignedLoad(s, &initialBytes);
+    auto [base, misalignment] = blockAlignedLoad(s, &initialBytes.m_v);
     auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
     for(;;) {
         auto nulls = zoo::swar::equals(bytes, S{0});

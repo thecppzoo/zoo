@@ -88,7 +88,7 @@ struct RH_Backend {
             // significant bits is to be able to call the cheaper version
             // _MSB_off here
 
-        auto theyBreakInvariant = not theyKeepInvariant;
+        auto theyBreakInvariant = ~theyKeepInvariant;
         // because we make the assumption of LITTLE ENDIAN byte ordering,
         // we're interested in the elements up to the first haystack-richer
         auto firstBreakage = swar::isolateLSB(theyBreakInvariant.value());
@@ -565,7 +565,7 @@ struct RH_Frontend_WithSkarupkeTail {
             auto haystackPSLs = md.PSLs();
             // haystack < needle => !(haystack >= needle)
             auto breaksRobinHood =
-                not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
+                ~greaterEqual_MSB_off(haystackPSLs, needlePSLs);
             if(!bool(breaksRobinHood)) {
                 // no place for the evicted element found in this swar.
                 // increment the PSLs in the needle to check the next haystack
@@ -600,7 +600,7 @@ struct RH_Frontend_WithSkarupkeTail {
                     ++mdp;
                     haystackPSLs = mdp->PSLs();
                     breaksRobinHood =
-                        not greaterEqual_MSB_off(haystackPSLs, needlePSLs);
+                        ~greaterEqual_MSB_off(haystackPSLs, needlePSLs);
                     if(breaksRobinHood) { break; }
                     evictedPSL += MD::NSlots;
                     if(HighestSafePSL < evictedPSL) {

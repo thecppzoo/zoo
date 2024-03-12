@@ -38,7 +38,7 @@ template<int NBitsHash, int NBitsPSL, typename T = u64> struct SlotOperations {
         // PSLs in a swar with sublanes in the least bits, this guarantee
         // holds.
         auto satisfied = greaterEqual_MSB_off(pslHaystack, pslNeedle);
-        auto broken = not satisfied;
+        auto broken = ~satisfied;
         return swar::isolateLSB(broken.value());
     }
 
