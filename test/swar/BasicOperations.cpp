@@ -22,9 +22,11 @@ using S16_64 = SWAR<16, uint64_t>;
 using S16_32 = SWAR<16, uint32_t>;
 using S16_16 = SWAR<16, uint16_t>;
 
-namespace Multiplication {
+using S32_32 = SWAR<32, uint32_t>;
 
-using S4_64 = SWAR<4, uint64_t>;
+using S64_64 = SWAR<64, uint64_t>;
+
+namespace Multiplication {
 
 static_assert(~int64_t(0) == negate(S4_64{S4_64::LeastSignificantBit}).value());
 static_assert(0x0F0F0F0F == doublingMask<4, uint32_t>().value());
@@ -121,16 +123,14 @@ TEST_CASE("Compress/Expand", "[swar]") {
         ToMove = 0b0101'0101'0101'0101'0101'0101'0101'0101,
         // Selection: 1   01  101  101  10  010  01   0 0
         result = 0b0001'0'1'1'0'1'1'0'1'10'0'10'0'1'0'0;
-    using S1_32 = SWAR<32, uint32_t>;
-    auto q = compress(S1_32{ToMove}, S1_32{Mask});
+    auto q = compress(S32_32{ToMove}, S32_32{Mask});
     CHECK(result == q.value());
     SECTION("Regression 1") {
         u64
             input =   0b1010'1001'0110'0001'1001'0000'0010'1010'0100'0111'1110'1001'1111'0001'1110'1011,
             mask =    0b0110'0000'0001'0101'0101'1111'0101'1100'0110'1111'0100'0111'0001'1000'0101'0010,
-            expected =0b0001'0000'0000'0001'0001'0000'0000'0010'0010'0111'0001'0001'0001'0000'0010'0001,
-        using S16_64 = SWAR<4, uint64_t>;
-        using S = S16_64;
+            expected =0b0001'0000'0000'0001'0001'0000'0000'0010'0010'0111'0001'0001'0001'0000'0010'0001;
+        using S = S4_64;
         auto v = compress(S{input}, S{mask});
         CHECK(expected == v.value());
     }
