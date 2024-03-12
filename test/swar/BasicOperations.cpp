@@ -8,6 +8,20 @@
 using namespace zoo;
 using namespace zoo::swar;
 
+using S4_64 = SWAR<4, uint64_t>;
+using S4_32 = SWAR<4, uint32_t>;
+using S4_16 = SWAR<4, uint16_t>;
+using S4_8 = SWAR<4, uint8_t>;
+
+using S8_64 = SWAR<8, uint64_t>;
+using S8_32 = SWAR<8, uint32_t>;
+using S8_16 = SWAR<8, uint16_t>;
+using S8_8 = SWAR<8, uint8_t>;
+
+using S16_64 = SWAR<16, uint64_t>;
+using S16_32 = SWAR<16, uint32_t>;
+using S16_16 = SWAR<16, uint16_t>;
+
 namespace Multiplication {
 
 using S4_64 = SWAR<4, uint64_t>;
@@ -85,19 +99,19 @@ TEST_CASE(
     "[swar]"
 ) {
     for (auto i = 0; i < 63; ++i) {
-      CHECK(i == isolate<8>(i));
-      CHECK(i == isolate<8>(0xFF00+i));
-      CHECK(i == isolate<8>(0xFFFF00+i));
+        CHECK(i == isolate<8>(i));
+        CHECK(i == isolate<8>(0xFF00+i));
+        CHECK(i == isolate<8>(0xFFFF00+i));
     }
     for (auto i = 0; i < 31; ++i) {
-      CHECK(i == isolate<7>(i));
-      CHECK(i == isolate<7>(0xFF00+i));
-      CHECK(i == isolate<7>(0xFFFF00+i));
+        CHECK(i == isolate<7>(i));
+        CHECK(i == isolate<7>(0xFF00+i));
+        CHECK(i == isolate<7>(0xFFFF00+i));
     }
     for (auto i = 0; i < 31; ++i) {
-      CHECK(i == isolate<11>(i));
-      CHECK(i == isolate<11>(0xF800+i));
-      CHECK(i == isolate<11>(0xFFF800+i));
+        CHECK(i == isolate<11>(i));
+        CHECK(i == isolate<11>(0xF800+i));
+        CHECK(i == isolate<11>(0xFFF800+i));
     }
 }
 
@@ -292,3 +306,73 @@ constexpr auto aBooleansWithTrue = booleans(SWAR<4, u32>{0x1});
 static_assert(aBooleansWithTrue);
 //static_assert(~aBooleansWithTrue);
 static_assert(false == !bool(aBooleansWithTrue));
+
+TEST_CASE(
+    "fullAddition",
+    "[swar][signed-swar][unsigned-swar]"
+) {
+    SECTION("fullAddition overflow") {
+        const auto sum = fullAddition(SWAR<4, u32>(0x0000'1000), SWAR<4, u32>(0x0000'7000));
+        CHECK(SWAR<4, u32>(0x0000'0000).value() == sum.carry.value());
+        CHECK(SWAR<4, u32>(0x0000'8000).value() == sum.overflow.value());
+        CHECK(SWAR<4, u32>(0x0000'8000).value() == sum.result.value());
+    }
+    SECTION("no carry or overflow for safe values") {
+        const auto sum = fullAddition(SWAR<4, u32>(0x0000'8000), SWAR<4, u32>(0x0000'7000));
+        CHECK(SWAR<4, u32>(0x0000'0000).value() == sum.carry.value());
+        CHECK(SWAR<4, u32>(0x0000'0000).value() == sum.overflow.value());
+        CHECK(SWAR<4, u32>(0x0000'F000).value() == sum.result.value());
+    }
+    SECTION("fullAddition signed overflow") {
+        const auto sum = fullAddition(SWAR<4, u32>(0x0000'5000), SWAR<4, u32>(0x0000'5000));
+        CHECK(SWAR<4, u32>(0x0000'0000).value() == sum.carry.value());
+        CHECK(SWAR<4, u32>(0x0000'8000).value() == sum.overflow.value());
+        CHECK(SWAR<4, u32>(0x0000'A000).value() == sum.result.value());
+    }
+    SECTION("0x0111 (7) + 0x0111 (7) is 0x1110 (0x1110->0x1101->0x0010) (0xe unsigned, 0x2 signed) (signed and unsigned check)") {
+        const auto sum = fullAddition(SWAR<4, u32>(0x0000'7000), SWAR<4, u32>(0x0000'7000));
+        CHECK(SWAR<4, u32>(0x0000'0000).value() == sum.carry.value());
+        CHECK(SWAR<4, u32>(0x0000'8000).value() == sum.overflow.value());
+        CHECK(SWAR<4, u32>(0x0000'e000).value() == sum.result.value());
+    }
+    SECTION("both carry and overflow") {
+        const auto sum = fullAddition(SWAR<4, u32>(0x0000'a000), SWAR<4, u32>(0x0000'a000));
+        CHECK(SWAR<4, u32>(0x0000'8000).value() == sum.carry.value());
+        CHECK(SWAR<4, u32>(0x0000'8000).value() == sum.overflow.value());
+    }
+}
+
+TEST_CASE(
+    "BooleanSWAR MSBtoLaneMask",
+    "[swar]"
+) {
+    // BooleanSWAR as a mask: 
+    auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
+    auto mask = S4_32(0x0F0F'0000);
+    CHECK(bswar.MSBtoLaneMask().value() == mask.value());
+}
+
+constexpr auto fullAddSumTest = fullAddition(S4_32(0x0111'1101), S4_32(0x1000'0010));
+static_assert( S4_32(0x1111'1111).value() == fullAddSumTest.result.value());
+static_assert( S4_32(0x0000'0000).value() == fullAddSumTest.carry.value());
+static_assert( S4_32(0x0000'0000).value() == fullAddSumTest.overflow.value());
+
+// Verify that saturation works (saturates and doesn't saturate as appropriate)
+static_assert( S4_16(0x0000).value() == saturatingUnsignedAddition(S4_16(0x0000), S4_16(0x0000)).value());
+static_assert( S4_16(0x0200).value() == saturatingUnsignedAddition(S4_16(0x0100), S4_16(0x0100)).value());
+static_assert( S4_16(0x0400).value() == saturatingUnsignedAddition(S4_16(0x0300), S4_16(0x0100)).value());
+static_assert( S4_16(0x0A00).value() == saturatingUnsignedAddition(S4_16(0x0300), S4_16(0x0700)).value());
+static_assert( S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0700)).value());
+static_assert( S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0800)).value());
+
+TEST_CASE(
+    "saturatingUnsignedAddition",
+    "[swar][saturation]"
+) {
+    CHECK(SWAR<4, u16>(0x0200).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0100)).value());
+    CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
+    CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+}

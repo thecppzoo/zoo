@@ -345,6 +345,16 @@ fullAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
     return { result, BS{carry.value()}, BS{overflow.value()} };
 };
 
+template<int NB, typename B>
+constexpr SWAR<NB, B>
+saturatingUnsignedAddition(SWAR<NB, B> s1, SWAR<NB, B> s2) {
+    const auto additionResult = fullAddition(s1, s2);
+    // If we carry unsigned, we need to saturate: thus OR the carry bit with the
+    // lane bits (carry because it happens to be earlier in the struct
+    // declaration)
+    return additionResult.carry.MSBtoLaneMask() | additionResult.result;
+}
+
 /// \brief Negation is useful only for the signed integer interpretation
 template<int NB, typename B>
 constexpr auto negate(SWAR<NB, B> input) {
