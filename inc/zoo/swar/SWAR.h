@@ -27,7 +27,6 @@ constexpr uint64_t popcount(uint64_t a) noexcept {
         >::execute(a);
 }
 
-
 /// Index into the bits of the type T that contains the MSB.
 template<typename T>
 constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
@@ -298,6 +297,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
     greaterEqual_MSB_off(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
 
     template<int NB, typename TT>
+    constexpr T
+    fastFirstLeftOn(SWAR<NBits, T> test) noexcept;
+
+    template<int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
     convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
@@ -360,6 +363,39 @@ constantIsGreaterEqual_MSB_off(SWAR<NBits, T> subtrahend) noexcept {
             minuendWithMSBs_turnedOn - subtrahendMSBs_turnedOff;
         return MSB_Mask & leastSignificantComparison;
     }
+}
+
+template<typename T, typename U, typename V>
+constexpr T median(T x, U y, V z) {
+  return (x | y) & (y | z) & (x | z);
+}
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
+    // Adapted from TAOCP V4 P152
+    // h is msbselector, x is right, l is lower/left.  Sets MSB to 1 in lanes
+    // in test variable t for when xi < yi for lane i . Invert for greaterEqual.
+    // t = h & ~<x~yz>
+    // z = (x|h) - (y&~h)
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
+    const auto z = (x|h) - (y&~h);
+    // bitwise ternary median! 
+    const auto t = h & ~median(x, ~y, z);
+    return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
+}
+
+// In the condition where only MSBs will be on, we can fast lookup with 1 multiply the index of the leftmost byte.
+// This appears to be a mapping from the (say) 256 unique values of a 64 bit int where only MSBs of each 8 bits can be on, but I don't fully understand it.
+// Adapted from TAOCP Vol 4A Page 153 Eq 94.
+template<int NBits, typename T>
+constexpr T
+fastFirstLeftOn(SWAR<NBits, T> test) noexcept {
+    const auto width = sizeof(T) * 8;
+    const auto tval = (1ull<<(width-NBits))-1, bval = (1ull<<(NBits-1))-1;
+    const u64 cval = tval / bval; 
+    return (test.value() * cval) >> (width - NBits);
 }
 
 template<int NBits, typename T>
