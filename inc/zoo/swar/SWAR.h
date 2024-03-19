@@ -5,6 +5,7 @@
 #include "zoo/meta/log.h"
 
 #include <type_traits>
+#include <initializer_list>
 
 #ifdef _MSC_VER
 #include <iso646.h>
@@ -69,6 +70,19 @@ struct SWAR {
     constexpr explicit operator T() const noexcept { return m_v; }
 
     constexpr T value() const noexcept { return m_v; }
+
+   constexpr static T baseFromLaneLiterals(std::initializer_list<T> args) noexcept {
+       T result = 0;
+       for (auto arg: args) {
+           result = (result << NBits) | arg;
+       }
+       return result;
+   }
+
+   constexpr static SWAR fromLaneLiterals(std::initializer_list<T> args) noexcept {
+       return SWAR(baseFromLaneLiterals(args));
+   }
+
 
     #define SWAR_UNARY_OPERATORS_X_LIST \
         X(SWAR, ~)
