@@ -411,36 +411,6 @@ constexpr auto associativeOperatorIterated_regressive(
     return result;
 }
 
-
-// What I don't understand is why this doesn't work?
-template <typename T>
-constexpr auto multiply(T a , T b) {
-    auto operation = [](auto left, auto right, auto count) {
-      if (count) {
-        return left + right;
-      } else {
-        return left;
-      }
-    };
-
-    auto updateCount = [](auto count) {
-      return count << 1;
-    };
-
-    constexpr auto numBits = sizeof(T) * 8;
-    return associativeOperatorIterated_regressive(
-        a,          // base
-        0,          // neutral
-        b,          // count
-        1,          // forSquaring, pretty sure this is where i am not understanding
-        operation,  // operation
-        numBits,    // log2Count
-        updateCount // halver
-    );
-}
-
-// static_assert(multiply(3, 4) == 12, "multiply failed");
-
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier
