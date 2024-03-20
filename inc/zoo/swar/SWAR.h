@@ -510,9 +510,4 @@ static_assert(
     0x0706050403020100ull
 );
 
-
-
 }}
-
-
-static_assert(zoo::swar::SWAR<8, zoo::swar::u32>::baseFromLaneLiterals({0, 0, 0, 0}) == 0);

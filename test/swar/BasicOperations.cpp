@@ -4,6 +4,7 @@
 
 #include <type_traits>
 
+
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -20,8 +21,7 @@ constexpr auto Doubled =
 
 static_assert(0x090B0D0F == Doubled.even.value());
 static_assert(0x080A0C0E == Doubled.odd.value());
-static_assert(PrecisionFixtureTest ==
-              halvePrecision(Doubled.even, Doubled.odd).value());
+static_assert(PrecisionFixtureTest == halvePrecision(Doubled.even, Doubled.odd).value());
 
 constexpr SWAR<8, u32> Micand{0x5030201};
 constexpr SWAR<8, u32> Mplier{0xA050301};
@@ -33,11 +33,15 @@ constexpr SWAR<8, u32> Mplier{0xA050301};
 // 1*1 = 1
 constexpr auto Expected = 0x320F0601;
 
-static_assert(Expected ==
-              multiplication_OverflowUnsafe(Micand, Mplier).value());
+static_assert(
+    Expected == multiplication_OverflowUnsafe(Micand, Mplier).value()
+);
 static_assert(
     0x320F0601 != // intentionally use a too-small bit count
-    multiplication_OverflowUnsafe_SpecificBitCount<3>(Micand, Mplier).value());
+    multiplication_OverflowUnsafe_SpecificBitCount<3>(Micand, Mplier).value()
+);
+
+static_assert(0b00000010000000110000010100000110 == 0x02'03'05'06);
 
 TEST_CASE("Jamie's totally working exponentiation :D") {
   using S = SWAR<8, u32>;
@@ -49,12 +53,13 @@ TEST_CASE("Jamie's totally working exponentiation :D") {
   CHECK(expected.value() == actual.value());
 }
 
-} // namespace Multiplication
+}
 
-#define HE(nbits, t, v0, v1)                                                   \
-  static_assert(horizontalEquality<nbits, t>(                                  \
-      SWAR<nbits, t>(v0),                                                      \
-      SWAR<nbits, t>(meta::BitmaskMaker<t, v1, nbits>::value)));
+#define HE(nbits, t, v0, v1) \
+    static_assert(horizontalEquality<nbits, t>(\
+        SWAR<nbits, t>(v0),\
+        SWAR<nbits, t>(meta::BitmaskMaker<t, v1, nbits>::value)\
+    ));
 HE(8, u64, 0x0808'0808'0808'0808, 0x8);
 HE(4, u64, 0x1111'1111'1111'1111, 0x1);
 HE(3, u64, 0xFFFF'FFFF'FFFF'FFFF, 0x7);
@@ -65,42 +70,47 @@ HE(2, u8, 0xAA, 0x2);
 #undef HE
 
 TEST_CASE("Old version", "[deprecated][swar]") {
-  SWAR<8, u32> Micand{0x5030201};
-  SWAR<8, u32> Mplier{0xA050301};
-  auto Expected = 0x320F0601;
-  auto result = multiplication_OverflowUnsafe_SpecificBitCount_deprecated<4>(
-      Micand, Mplier);
-  CHECK(Expected == result.value());
+    SWAR<8, u32> Micand{0x5030201};
+    SWAR<8, u32> Mplier{0xA050301};
+    auto Expected = 0x320F0601;
+    auto result =
+        multiplication_OverflowUnsafe_SpecificBitCount_deprecated<4>(
+            Micand, Mplier
+        );
+    CHECK(Expected == result.value());
 }
 
 TEST_CASE("Parity", "[swar]") {
-  // For each nibble, E indicates (E)ven and O (O)dd parities
-  //                EEOEEOOO
-  auto Examples = 0xFF13A7E4;
-  SWAR<4, u32> casesBy4{Examples};
-  SWAR<8, u32> casesBy8{Examples};
-  auto by4 = parity(casesBy4);
-  auto by8 = parity(casesBy8);
-  CHECK(by4.value() == 0x00800888);
-  CHECK(by8.value() == 0x00808000);
+    // For each nibble, E indicates (E)ven and O (O)dd parities
+    //                EEOEEOOO
+    auto Examples = 0xFF13A7E4;
+    SWAR<4, u32> casesBy4{Examples};
+    SWAR<8, u32> casesBy8{Examples};
+    auto by4 = parity(casesBy4);
+    auto by8 = parity(casesBy8);
+    CHECK(by4.value() == 0x00800888);
+    CHECK(by8.value() == 0x00808000);
 }
 
-TEST_CASE("Isolate", "[swar]") {
-  for (auto i = 0; i < 63; ++i) {
-    CHECK(i == isolate<8>(i));
-    CHECK(i == isolate<8>(0xFF00 + i));
-    CHECK(i == isolate<8>(0xFFFF00 + i));
-  }
-  for (auto i = 0; i < 31; ++i) {
-    CHECK(i == isolate<7>(i));
-    CHECK(i == isolate<7>(0xFF00 + i));
-    CHECK(i == isolate<7>(0xFFFF00 + i));
-  }
-  for (auto i = 0; i < 31; ++i) {
-    CHECK(i == isolate<11>(i));
-    CHECK(i == isolate<11>(0xF800 + i));
-    CHECK(i == isolate<11>(0xFFF800 + i));
-  }
+TEST_CASE(
+    "Isolate",
+    "[swar]"
+) {
+    for (auto i = 0; i < 63; ++i) {
+      CHECK(i == isolate<8>(i));
+      CHECK(i == isolate<8>(0xFF00+i));
+      CHECK(i == isolate<8>(0xFFFF00+i));
+    }
+    for (auto i = 0; i < 31; ++i) {
+      CHECK(i == isolate<7>(i));
+      CHECK(i == isolate<7>(0xFF00+i));
+      CHECK(i == isolate<7>(0xFFFF00+i));
+    }
+    for (auto i = 0; i < 31; ++i) {
+      CHECK(i == isolate<11>(i));
+      CHECK(i == isolate<11>(0xF800+i));
+      CHECK(i == isolate<11>(0xFFF800+i));
+    }
 }
 
 static_assert(1 == popcount<5>(0x100ull));
@@ -113,13 +123,13 @@ static_assert(0x210 == popcount<1>(0x320));
 static_assert(0x4321 == popcount<2>(0xF754));
 static_assert(0x50004 == popcount<4>(0x3E001122));
 
-static_assert(1 == msbIndex<u64>(1ull << 1));
-static_assert(3 == msbIndex<u64>(1ull << 3));
-static_assert(5 == msbIndex<u64>(1ull << 5));
-static_assert(8 == msbIndex<u64>(1ull << 8));
-static_assert(17 == msbIndex<u64>(1ull << 17));
-static_assert(30 == msbIndex<u64>(1ull << 30));
-static_assert(31 == msbIndex<u64>(1ull << 31));
+static_assert(1 == msbIndex<u64>(1ull<<1));
+static_assert(3 == msbIndex<u64>(1ull<<3));
+static_assert(5 == msbIndex<u64>(1ull<<5));
+static_assert(8 == msbIndex<u64>(1ull<<8));
+static_assert(17 == msbIndex<u64>(1ull<<17));
+static_assert(30 == msbIndex<u64>(1ull<<30));
+static_assert(31 == msbIndex<u64>(1ull<<31));
 
 namespace {
 using namespace zoo::meta;
@@ -130,7 +140,7 @@ static_assert(0x0808'0808'0808'0808ull == BitmaskMaker<u64, 0x08ull, 8>::value);
 static_assert(0x0101'0101'0101'0101ull == BitmaskMaker<u64, 0x01ull, 8>::value);
 static_assert(0x0E0E'0E0E'0E0E'0E0Eull == BitmaskMaker<u64, 0x0Eull, 8>::value);
 static_assert(0x0303'0303'0303'0303ull == BitmaskMaker<u64, 0x03ull, 8>::value);
-} // namespace
+}
 
 static_assert(0x00 == clearLSB<u8>(0x80));
 static_assert(0x80 == clearLSB<u8>(0xC0));
@@ -218,44 +228,53 @@ static_assert(0x0808'0808 == u32(broadcast<8>(SWAR<8, u32>(0x0000'0008))));
 static_assert(0x0B0B'0B0B == u32(broadcast<8>(SWAR<8, u32>(0x0000'000B))));
 static_assert(0x0E0E'0E0E == u32(broadcast<8>(SWAR<8, u32>(0x0000'000E))));
 static_assert(0x6B6B'6B6B == u32(broadcast<8>(SWAR<8, u32>(0x0000'006B))));
-static_assert(0x0808'0808'0808'0808ull ==
-              u64(broadcast<8>(SWAR<8, u64>(0x0000'0000'0000'0008ull))));
+static_assert(0x0808'0808'0808'0808ull == u64(broadcast<8>(SWAR<8, u64>(0x0000'0000'0000'0008ull))));
 
-static_assert(1 == lsbIndex(1 << 1));
-static_assert(3 == lsbIndex(1 << 3));
-static_assert(5 == lsbIndex(1 << 5));
-static_assert(8 == lsbIndex(1 << 8));
-static_assert(17 == lsbIndex(1 << 17));
-static_assert(30 == lsbIndex(1 << 30));
+static_assert(1 == lsbIndex(1<<1));
+static_assert(3 == lsbIndex(1<<3));
+static_assert(5 == lsbIndex(1<<5));
+static_assert(8 == lsbIndex(1<<8));
+static_assert(17 == lsbIndex(1<<17));
+static_assert(30 == lsbIndex(1<<30));
 
 /*
 These tests were not catching errors known to have been present
-static_assert(0x80880008 == greaterEqual<3>(SWAR<4,
-uint32_t>(0x3245'1027)).value()); static_assert(0x88888888 ==
-greaterEqual<0>(SWAR<4, uint32_t>(0x0123'4567)).value());
-static_assert(0x88888888 == greaterEqual<0>(SWAR<4,
-uint32_t>(0x7654'3210)).value()); static_assert(0x00000008 ==
-greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).value());
-static_assert(0x80000000 == greaterEqual<7>(SWAR<4,
-uint32_t>(0x7654'3210)).value());
+static_assert(0x80880008 == greaterEqual<3>(SWAR<4, uint32_t>(0x3245'1027)).value());
+static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x0123'4567)).value());
+static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x7654'3210)).value());
+static_assert(0x00000008 == greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).value());
+static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).value());
 */
 
 // Unusual formatting for easy visual verification.
-#define GE_MSB_TEST(left, right, result)                                       \
-  static_assert(result == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left),     \
-                                                       SWAR<4, u32>(right))    \
-                              .value());
+#define GE_MSB_TEST(left, right, result) static_assert(result== greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
-GE_MSB_TEST(0x1000'0010, 0x0111'1101, 0x8000'0080)
-GE_MSB_TEST(0x4333'3343, 0x4444'4444, 0x8000'0080)
-GE_MSB_TEST(0x0550'0110, 0x0110'0550, 0x8888'8008)
-GE_MSB_TEST(0x4771'1414, 0x4641'1774, 0x8888'8008)
+GE_MSB_TEST(0x1000'0010,
+            0x0111'1101,
+            0x8000'0080)
+GE_MSB_TEST(0x4333'3343,
+            0x4444'4444,
+            0x8000'0080)
+GE_MSB_TEST(0x0550'0110,
+            0x0110'0550,
+            0x8888'8008)
+GE_MSB_TEST(0x4771'1414,
+            0x4641'1774,
+            0x8888'8008)
 
-GE_MSB_TEST(0x0123'4567, 0x0000'0000, 0x8888'8888)
-GE_MSB_TEST(0x0123'4567, 0x7777'7777, 0x0000'0008)
+GE_MSB_TEST(0x0123'4567,
+            0x0000'0000,
+            0x8888'8888)
+GE_MSB_TEST(0x0123'4567,
+            0x7777'7777,
+            0x0000'0008)
 
-GE_MSB_TEST(0x0000'0000, 0x0123'4567, 0x8000'0000)
-GE_MSB_TEST(0x7777'7777, 0x0123'4567, 0x8888'8888)
+GE_MSB_TEST(0x0000'0000,
+            0x0123'4567,
+            0x8000'0000)
+GE_MSB_TEST(0x7777'7777,
+            0x0123'4567,
+            0x8888'8888)
 
 // 3 bits on msb side, 5 bits on lsb side.
 using Lanes = SWARWithSubLanes<5, 3, u32>;
@@ -266,25 +285,25 @@ static constexpr inline u32 allF = broadcast<8>(S8u32(0x0000'00FFul)).value();
 static_assert(allF == Lanes(allF).value());
 static_assert(0xFFFF'FFFF == Lanes(allF).value());
 
-static_assert(0xFFFF'FFE0 == Lanes(allF).least(0, 0).value());
-static_assert(0xFFFF'FFE1 == Lanes(allF).least(1, 0).value());
-static_assert(0xFFFF'E0FF == Lanes(allF).least(0, 1).value());
-static_assert(0xFFFF'E1FF == Lanes(allF).least(1, 1).value());
+static_assert(0xFFFF'FFE0 == Lanes(allF).least(0,0).value());
+static_assert(0xFFFF'FFE1 == Lanes(allF).least(1,0).value());
+static_assert(0xFFFF'E0FF == Lanes(allF).least(0,1).value());
+static_assert(0xFFFF'E1FF == Lanes(allF).least(1,1).value());
 
-static_assert(0xFFE0'FFFF == Lanes(allF).least(0, 2).value());
-static_assert(0xFFE1'FFFF == Lanes(allF).least(1, 2).value());
-static_assert(0xE0FF'FFFF == Lanes(allF).least(0, 3).value());
-static_assert(0xE1FF'FFFF == Lanes(allF).least(1, 3).value());
+static_assert(0xFFE0'FFFF == Lanes(allF).least(0,2).value());
+static_assert(0xFFE1'FFFF == Lanes(allF).least(1,2).value());
+static_assert(0xE0FF'FFFF == Lanes(allF).least(0,3).value());
+static_assert(0xE1FF'FFFF == Lanes(allF).least(1,3).value());
 
-static_assert(0xFFFF'FF1F == Lanes(allF).most(0, 0).value());
-static_assert(0xFFFF'FF3F == Lanes(allF).most(1, 0).value());
-static_assert(0xFFFF'1FFF == Lanes(allF).most(0, 1).value());
-static_assert(0xFFFF'3FFF == Lanes(allF).most(1, 1).value());
+static_assert(0xFFFF'FF1F == Lanes(allF).most(0,0).value());
+static_assert(0xFFFF'FF3F == Lanes(allF).most(1,0).value());
+static_assert(0xFFFF'1FFF == Lanes(allF).most(0,1).value());
+static_assert(0xFFFF'3FFF == Lanes(allF).most(1,1).value());
 
-static_assert(0xFF1F'FFFF == Lanes(allF).most(0, 2).value());
-static_assert(0xFF3F'FFFF == Lanes(allF).most(1, 2).value());
-static_assert(0x1FFF'FFFF == Lanes(allF).most(0, 3).value());
-static_assert(0x3FFF'FFFF == Lanes(allF).most(1, 3).value());
+static_assert(0xFF1F'FFFF == Lanes(allF).most(0,2).value());
+static_assert(0xFF3F'FFFF == Lanes(allF).most(1,2).value());
+static_assert(0x1FFF'FFFF == Lanes(allF).most(0,3).value());
+static_assert(0x3FFF'FFFF == Lanes(allF).most(1,3).value());
 
 static_assert(0x0000'001f == Lanes(all0).least(31, 0).most(0, 0).value());
 static_assert(0x0000'1f00 == Lanes(all0).least(31, 1).most(0, 1).value());
