@@ -260,7 +260,7 @@ template<int NB, typename B>
 constexpr auto makeLaneMaskFromMSB(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto msb = input & S{S::MostSignificantBit};
-    auto msbCopiedToLSB = S{msb.value() >> (NB - 1)};
+    auto msbCopiedToLSB = S{static_cast<B>(msb.value() >> (NB - 1))};
     return impl::makeLaneMaskFromMSB_and_LSB(msb, msbCopiedToLSB);
 }
 
@@ -392,8 +392,13 @@ template<
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    const Base base,
+    const Base neutral,
+    IterationCount count,
+    const IterationCount forSquaring,
+    const Operator op,
+    unsigned log2Count,
+    const CountHalver ch
 ) {
     auto result = neutral;
     if(!log2Count) { return result; }
@@ -419,17 +424,54 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        return S{static_cast<T>(msbCleared.value() << 1)};
     };
 
-    multiplier = S{multiplier.value() << (NB - ActualBits)};
+    multiplier = S{static_cast<T>(multiplier.value() << (NB - ActualBits))};
     return associativeOperatorIterated_regressive(
-        multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
-        ActualBits, halver
+        multiplicand,
+        S{0},
+        multiplier,
+        S{S::MostSignificantBit},
+        operation,
+        ActualBits,
+        halver
     );
 }
 
-/// \note Not removed yet because it is an example of "progressive" associative exponentiation
+template<int ActualBits, int NB, typename T>
+constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto left, auto right, auto counts) {
+      const auto mask = makeLaneMaskFromMSB(counts);
+      const auto product =
+        multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
+      return (product & mask) | (left & ~mask);
+    };
+
+    // halver should work same as multiplication... i think...
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        return S{static_cast<T>(msbCleared.value() << 1)};
+    };
+
+    exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
+    return associativeOperatorIterated_regressive(
+        x,
+        S{meta::BitmaskMaker<T, 1, NB>().value}, // neutral is lane wise..
+        exponent,
+        S{S::MostSignificantBit},
+        operation,
+        ActualBits,
+        halver
+    );
+}
+
+// \note Not removed yet because it is an example of "progressive" associative exponentiation
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     SWAR<NB, T> multiplicand,
@@ -459,6 +501,17 @@ constexpr auto multiplication_OverflowUnsafe(
     return
         multiplication_OverflowUnsafe_SpecificBitCount<NB>(
             multiplicand, multiplier
+        );
+}
+
+template<int NB, typename T>
+constexpr auto exponentiation_OverflowUnsafe(
+    SWAR<NB, T> base,
+    SWAR<NB, T> exponent
+) {
+    return
+       exponentiation_OverflowUnsafe_SpecificBitCount<NB>(
+            base, exponent
         );
 }
 
