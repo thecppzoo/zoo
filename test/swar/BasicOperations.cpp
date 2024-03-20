@@ -41,9 +41,9 @@ static_assert(
 
 TEST_CASE("Jamie's totally working exponentiation :D") {
   using S = SWAR<8, u32>;
-  constexpr auto base     = S::fromLaneLiterals({2,   3, 5,  6});
-  constexpr auto exponent = S::fromLaneLiterals({7,   0, 2,  3});
-  constexpr auto expected = S::fromLaneLiterals({128, 1, 25, 216});
+  constexpr auto base     = S::fromLaneLiterals({2,   3,  5,  6});
+  constexpr auto exponent = S::fromLaneLiterals({7,   4,  2,  3});
+  constexpr auto expected = S::fromLaneLiterals({128, 81, 25, 216});
   constexpr auto actual = exponentiation_OverflowUnsafe(base, exponent);
   static_assert(expected.value() == actual.value());
   CHECK(expected.value() == actual.value());
