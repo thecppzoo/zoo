@@ -2,10 +2,6 @@
 
 #include "catch2/catch.hpp"
 
-#include <initializer_list>
-#include <type_traits>
-
-
 using namespace zoo;
 using namespace zoo::swar;
 
