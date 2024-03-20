@@ -71,7 +71,9 @@ struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
 
-   constexpr static T baseFromLaneLiterals(std::initializer_list<T> args) noexcept {
+   template<std::size_t N>
+   constexpr static T baseFromLaneLiterals(const T(&args)[N]) {
+       static_assert(N == Lanes, "Wrong number of lanes");
        T result = 0;
        for (auto arg: args) {
            result = (result << NBits) | arg;
@@ -79,9 +81,12 @@ struct SWAR {
        return result;
    }
 
-   constexpr static SWAR fromLaneLiterals(std::initializer_list<T> args) noexcept {
-       return SWAR(baseFromLaneLiterals(args));
+   template<std::size_t N>
+   constexpr static SWAR fromLaneLiterals(const T(&args)[N]) {
+        return SWAR{baseFromLaneLiterals(args)};
    }
+
+
 
 
     #define SWAR_UNARY_OPERATORS_X_LIST \
@@ -508,4 +513,9 @@ static_assert(
     0x0706050403020100ull
 );
 
+
+
 }}
+
+
+static_assert(zoo::swar::SWAR<8, zoo::swar::u32>::baseFromLaneLiterals({0, 0, 0, 0}) == 0);
