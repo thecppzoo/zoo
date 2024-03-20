@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zoo/swar/SWAR.h"
+#include "zoo/swar/SWARWithSubLanes.h"
 
 #include <array>
 #include <cstddef>

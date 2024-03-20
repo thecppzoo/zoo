@@ -23,9 +23,14 @@ void runBenchmark(benchmark::State &s) {
     Callable function;
     for(auto _: s) {
         goOverCorpus(corpus, function);
+        benchmark::ClobberMemory();
     }
 }
 
+#define X(Typename, _) \
+    BENCHMARK(runBenchmark<CorpusLeadingSpaces, Invoke##Typename>);
+    LEADING_SPACES_CORPUS_X_LIST
+#undef X
 
 #define X(Typename, _) \
     BENCHMARK(runBenchmark<Corpus8DecimalDigits, Invoke##Typename>);
@@ -35,6 +40,12 @@ void runBenchmark(benchmark::State &s) {
 #define X(Typename, _) \
     BENCHMARK(runBenchmark<CorpusStringLength, Invoke##Typename>);
     STRLEN_CORPUS_X_LIST
+#undef X
+
+
+#define X(Typename, _) \
+    BENCHMARK(runBenchmark<CorpusAtoi, Invoke##Typename>);
+    ATOI_CORPUS_X_LIST
 #undef X
 
 using RepeatZooStrlen = InvokeZOO_STRLEN;
