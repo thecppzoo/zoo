@@ -71,23 +71,20 @@ struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
 
-   template<std::size_t N>
-   constexpr static T baseFromLaneLiterals(const T(&args)[N]) {
-       static_assert(N == Lanes, "Wrong number of lanes");
-       T result = 0;
-       for (auto arg: args) {
-           result = (result << NBits) | arg;
-       }
-       return result;
-   }
+    template<std::size_t N>
+    constexpr static T baseFromLaneLiterals(const T(&args)[N]) {
+        static_assert(N == Lanes, "Wrong number of lanes");
+        T result = 0;
+        for (auto arg: args) {
+            result = (result << NBits) | arg;
+        }
+        return result;
+    }
 
-   template<std::size_t N>
-   constexpr static SWAR fromLaneLiterals(const T(&args)[N]) {
+    template<std::size_t N>
+    constexpr static SWAR fromLaneLiterals(const T(&args)[N]) {
         return SWAR{baseFromLaneLiterals(args)};
-   }
-
-
-
+    }
 
     #define SWAR_UNARY_OPERATORS_X_LIST \
         X(SWAR, ~)
