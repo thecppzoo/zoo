@@ -26,6 +26,15 @@ using S32_32 = SWAR<32, uint32_t>;
 
 using S64_64 = SWAR<64, uint64_t>;
 
+static_assert(SWAR<8, u32>::fromLaneLiterals({0, 0, 0, 0}).value() == 0);
+static_assert(SWAR<8, u32>::fromLaneLiterals({0, 0, 0, 1}).value() == 1);
+static_assert(SWAR<8, u32>::fromLaneLiterals({8, 3, 2, 1}).value() == 0x08'03'02'01);
+static_assert(SWAR<8, u32>::fromLaneLiterals({42, 42, 42, 42}).value() == 0x2A'2A'2A'2A);
+
+static_assert(SWAR<4, u32>::fromLaneLiterals({0, 0, 0, 0, 0, 0, 0, 0}).value() == 0);
+static_assert(SWAR<4, u32>::fromLaneLiterals({0, 0, 0, 0, 0, 0, 0, 1}).value() == 1);
+static_assert(SWAR<4, u16>::fromLaneLiterals({8, 3, 2, 1}).value() == 0b1000'0011'0010'0001);
+
 namespace Multiplication {
 
 static_assert(~int64_t(0) == negate(S4_64{S4_64::LeastSignificantBit}).value());
@@ -346,7 +355,7 @@ TEST_CASE(
     "BooleanSWAR MSBtoLaneMask",
     "[swar]"
 ) {
-    // BooleanSWAR as a mask: 
+    // BooleanSWAR as a mask:
     auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
     auto mask = S4_32(0x0F0F'0000);
     CHECK(bswar.MSBtoLaneMask().value() == mask.value());
@@ -373,6 +382,6 @@ TEST_CASE(
     CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value());
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
 }
