@@ -188,7 +188,7 @@ constexpr auto isolateLSB(T v) {
 
 template<int NBits, typename T>
 constexpr auto leastNBitsMask() {
-    return (T(1ull)<<NBits)-1;
+    return (T{1}<<NBits)-1;
 }
 
 template<int NBits, uint64_t T>
@@ -198,7 +198,7 @@ constexpr auto leastNBitsMask() {
 
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
-  return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
+    return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
 }
 
 
@@ -298,7 +298,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
     template<int NB, typename TT>
     constexpr T
-    fastFirstLeftOn(SWAR<NBits, T> test) noexcept;
+    indexOfMostSignficantLaneSet(SWAR<NBits, T> test) noexcept;
 
     template<int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
@@ -367,7 +367,7 @@ constantIsGreaterEqual_MSB_off(SWAR<NBits, T> subtrahend) noexcept {
 
 template<typename T, typename U, typename V>
 constexpr T median(T x, U y, V z) {
-  return (x | y) & (y | z) & (x | z);
+    return (x | y) & (y | z) & (x | z);
 }
 
 template<int NBits, typename T>
@@ -386,16 +386,16 @@ greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
     return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
 }
 
-// In the condition where only MSBs will be on, we can fast lookup with 1 multiply the index of the leftmost byte.
+// In the condition where only MSBs will be on, we can fast lookup with 1 multiply the index of the most signficant byte that is on.
 // This appears to be a mapping from the (say) 256 unique values of a 64 bit int where only MSBs of each 8 bits can be on, but I don't fully understand it.
 // Adapted from TAOCP Vol 4A Page 153 Eq 94.
 template<int NBits, typename T>
 constexpr T
-fastFirstLeftOn(SWAR<NBits, T> test) noexcept {
-    const auto width = sizeof(T) * 8;
-    const auto tval = (1ull<<(width-NBits))-1, bval = (1ull<<(NBits-1))-1;
-    const u64 cval = tval / bval; 
-    return (test.value() * cval) >> (width - NBits);
+indexOfMostSignficantLaneSet(SWAR<NBits, T> test) noexcept {
+    const auto TypeWidth = sizeof(T) * 8;
+    const auto TopVal = (T{1}<<(TypeWidth-NBits))-1, BottomVal = (T{1}<<(NBits-1))-1;
+    const u64 MappingConstant = TopVal / BottomVal;
+    return (test.value() * MappingConstant) >> (TypeWidth - NBits);
 }
 
 template<int NBits, typename T>

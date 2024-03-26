@@ -277,67 +277,80 @@ static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).valu
 */
 
 
-// Unusual formatting for easy visual verification.
 #define GE_MSB_TEST(left, right, result) static_assert(result == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
-GE_MSB_TEST(0x1000'0010,
-            0x0111'1101,
-            0x8000'0080)
-GE_MSB_TEST(0x4333'3343,
-            0x4444'4444,
-            0x8000'0080)
-GE_MSB_TEST(0x0550'0110,
-            0x0110'0550,
-            0x8888'8008)
-GE_MSB_TEST(0x4771'1414,
-            0x4641'1774,
-            0x8888'8008)
+GE_MSB_TEST(
+    0x1000'0010,
+    0x0111'1101,
+    0x8000'0080)
+GE_MSB_TEST(
+    0x4333'3343,
+    0x4444'4444,
+    0x8000'0080)
+GE_MSB_TEST(
+    0x0550'0110,
+    0x0110'0550,
+    0x8888'8008)
+GE_MSB_TEST(
+    0x4771'1414,
+    0x4641'1774,
+    0x8888'8008)
+GE_MSB_TEST(
+    0x0123'4567,
+    0x0000'0000,
+    0x8888'8888)
+GE_MSB_TEST(
+    0x0123'4567,
+    0x7777'7777,
+    0x0000'0008)
+GE_MSB_TEST(
+    0x0000'0000,
+    0x0123'4567,
+    0x8000'0000)
+GE_MSB_TEST(
+    0x7777'7777,
+    0x0123'4567,
+    0x8888'8888)
 
-GE_MSB_TEST(0x0123'4567,
-            0x0000'0000,
-            0x8888'8888)
-GE_MSB_TEST(0x0123'4567,
-            0x7777'7777,
-            0x0000'0008)
-
-GE_MSB_TEST(0x0000'0000,
-            0x0123'4567,
-            0x8000'0000)
-GE_MSB_TEST(0x7777'7777,
-            0x0123'4567,
-            0x8888'8888)
-
-// Replicate the msb off tests with the lessthan that allows msb on
+// Replicate the msb off tests with the greaterEqual that allows msb on
 #define GE_MSB_ON_TEST(left, right, result) static_assert(result == greaterEqual<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
-GE_MSB_ON_TEST(0x1000'0010,
-               0x0111'1101,
-               0x8000'0080)
-GE_MSB_ON_TEST(0x4333'3343,
-               0x4444'4444,
-               0x8000'0080)
-GE_MSB_ON_TEST(0x0550'0110,
-               0x0110'0550,
-               0x8888'8008)
-GE_MSB_ON_TEST(0x4771'1414,
-               0x4641'1774,
-               0x8888'8008)
-GE_MSB_ON_TEST(0x0123'4567,
-               0x0000'0000,
-               0x8888'8888)
-GE_MSB_ON_TEST(0x0123'4567,
-               0x7777'7777,
-               0x0000'0008)
-GE_MSB_ON_TEST(0x0000'0000,
-               0x0123'4567,
-               0x8000'0000)
-GE_MSB_ON_TEST(0x7777'7777,
-               0x0123'4567,
-               0x8888'8888)
+GE_MSB_ON_TEST(
+    0x1000'0010,
+    0x0111'1101,
+    0x8000'0080)
+GE_MSB_ON_TEST(
+    0x4333'3343,
+    0x4444'4444,
+    0x8000'0080)
+GE_MSB_ON_TEST(
+    0x0550'0110,
+    0x0110'0550,
+    0x8888'8008)
+GE_MSB_ON_TEST(
+    0x4771'1414,
+    0x4641'1774,
+    0x8888'8008)
+GE_MSB_ON_TEST(
+    0x0123'4567,
+    0x0000'0000,
+    0x8888'8888)
+GE_MSB_ON_TEST(
+    0x0123'4567,
+    0x7777'7777,
+    0x0000'0008)
+GE_MSB_ON_TEST(
+    0x0000'0000,
+    0x0123'4567,
+    0x8000'0000)
+GE_MSB_ON_TEST(
+    0x7777'7777,
+    0x0123'4567,
+    0x8888'8888)
 
 TEST_CASE(
     "greaterEqualMSBOn",
-    "[swar][signed-swar][unsigned-swar]"
+    "[swar][unsigned-swar]"
 ) {
     SECTION("single") {
         for (uint32_t i = 1; i < 4; i++) {
