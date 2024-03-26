@@ -394,7 +394,7 @@ constexpr T
 indexOfMostSignficantLaneSet(SWAR<NBits, T> test) noexcept {
     const auto TypeWidth = sizeof(T) * 8;
     const auto TopVal = (T{1}<<(TypeWidth-NBits))-1, BottomVal = (T{1}<<(NBits-1))-1;
-    const u64 MappingConstant = TopVal / BottomVal;
+    const T MappingConstant = TopVal / BottomVal;
     return (test.value() * MappingConstant) >> (TypeWidth - NBits);
 }
 
