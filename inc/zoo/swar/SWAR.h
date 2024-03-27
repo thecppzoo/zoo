@@ -78,9 +78,18 @@ struct SWAR {
     constexpr T value() const noexcept { return m_v; }
 
     // is this the right name?
-    constexpr static T maxLaneValue = (T{1} << NBits) - 1;
+    constexpr static MaxUnsignedLaneValue = {}() { // a lambda to give names to the intermediate steps
+        T
+            numberOneInTheLeastSignificantLane{1},
+            turnedToMSB = numberOneInTheLeastSignificantLane << (NBits - 1),
+            leastSignificantLaneFlipped = turnedToMSB - 1,
+            rv = turnedToMSB | leastSignificantLaneFlipped;
+        return rv;
+    }();        
 
-    template<std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
+template<std::size_t N>
+std::enable_if<N == Lanes, T>
+baseFromLaneLiterals(const T (&args)[N]) {
     constexpr static T baseFromLaneLiterals(const T (&args)[N]) {
         auto result = T{0};
         for (const auto arg: args) {
