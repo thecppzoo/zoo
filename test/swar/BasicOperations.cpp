@@ -27,11 +27,11 @@ using S32_32 = SWAR<32, uint32_t>;
 
 using S64_64 = SWAR<64, uint64_t>;
 
-static_assert(SWAR<16, u64>::maxLaneValue == 65535);
-static_assert(SWAR<16, u32>::maxLaneValue == 65535);
-static_assert(SWAR<8, u32>::maxLaneValue == 255);
-static_assert(SWAR<4, u32>::maxLaneValue == 15);
-static_assert(SWAR<2, u32>::maxLaneValue == 3);
+static_assert(SWAR<16, u64>::MaxUnsignedLaneValue == 65535);
+static_assert(SWAR<16, u32>::MaxUnsignedLaneValue == 65535);
+static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
+static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
+static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
 static_assert(SWAR<8, u32>::fromLaneLiterals({0, 0, 0, 0}).value() == 0);
 static_assert(SWAR<8, u32>::fromLaneLiterals({0, 0, 0, 1}).value() == 1);
