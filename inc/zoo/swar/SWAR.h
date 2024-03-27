@@ -274,8 +274,8 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr static BooleanSWAR fromBooleanLiterals(const bool (&args)[N]) {
         constexpr auto msbOfFirstLane = T(1) << (NBits - 1);
         auto result = T{0};
-        for (int i = 0; i < N; ++i) {
-            auto bit = args[i] ? msbOfFirstLane : 0;
+        for (auto arg: args) {
+            auto bit = arg ? msbOfFirstLane : 0;
             result = (result << NBits) | bit;
         }
         return BooleanSWAR{result};
