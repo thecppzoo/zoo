@@ -48,6 +48,7 @@ static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, false, false, fal
 static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({true, false, false, false}).value() == 0b1000'0000'0000'0000);
 static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, true, false, false}).value() == 0b0000'1000'0000'0000);
 static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, false, false, true}).value() == 0b0000'0000'0000'1000);
+static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({true, true, true, true}).value() == 0b1000'1000'1000'1000);
 
 namespace Multiplication {
 
