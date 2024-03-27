@@ -76,6 +76,26 @@ struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
 
+    // is this the right name?
+    constexpr static T MaxUnsignedLaneValue = ~(((~T{0}) << (NBits - 1)) << 1);
+
+    template<std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
+    constexpr static T baseFromLaneLiterals(const T (&args)[N]) {
+        auto result = T{0};
+        for (const auto arg: args) {
+            // would be nice to have a static assert here
+            // static_assert(arg <= maxLaneValue, "Lane value exceeds maximum");
+            // but the compiler seems sad about it
+            result = (result << NBits) | arg;
+        }
+        return result;
+    }
+
+    template<std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
+    constexpr static SWAR fromLaneLiterals(const T (&args)[N]) {
+        return SWAR{baseFromLaneLiterals(args)};
+    }
+
     #define SWAR_UNARY_OPERATORS_X_LIST \
         X(SWAR, ~)
     //constexpr SWAR operator~() const noexcept { return SWAR{~m_v}; }
@@ -240,13 +260,24 @@ struct BooleanSWAR: SWAR<NBits, T> {
     static constexpr auto MaskNonLSB = ~MaskLSB;
     static constexpr auto MaskNonMSB = ~MaskMSB;
     constexpr explicit BooleanSWAR(T v): Base(v) {}
-  
+
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
 
     constexpr BooleanSWAR clearLSB() const noexcept {
         return BooleanSWAR(swar::clearLSB(this->value()));
+    }
+
+    template<std::size_t N, typename = std::enable_if_t<N == SWAR<NBits, T>::Lanes, T>>
+    constexpr static BooleanSWAR fromBooleanLiterals(const bool (&args)[N]) {
+        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
+        auto result = T{0};
+        for (auto arg: args) {
+            auto bit = arg ? msbOfFirstLane : 0;
+            result = (result << NBits) | bit;
+        }
+        return BooleanSWAR{result};
     }
 
     /// BooleanSWAR treats the MSB of each lane as the boolean associated with that lane.
@@ -256,7 +287,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr auto operator ~() const noexcept {
         return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
-  
+
     constexpr auto operator not() const noexcept {
         return BooleanSWAR(MaskMSB ^ *this);
     }
