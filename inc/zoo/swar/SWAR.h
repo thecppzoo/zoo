@@ -272,7 +272,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
     template<std::size_t N, typename = std::enable_if_t<N == SWAR<NBits, T>::Lanes, T>>
     constexpr static BooleanSWAR fromBooleanLiterals(const bool (&args)[N]) {
-        constexpr auto msbOfFirstLane = T(1) << (NBits - 1);
+        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
         auto result = T{0};
         for (auto arg: args) {
             auto bit = arg ? msbOfFirstLane : 0;
