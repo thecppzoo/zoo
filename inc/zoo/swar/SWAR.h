@@ -77,10 +77,16 @@ struct SWAR {
 
     constexpr T value() const noexcept { return m_v; }
 
+    // is this the right name?
+    constexpr static T maxLaneValue = (T{1} << NBits) - 1;
+
     template<std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
     constexpr static T baseFromLaneLiterals(const T (&args)[N]) {
         auto result = T{0};
-        for (auto arg: args) {
+        for (const auto arg: args) {
+            // would be nice to have a static assert here
+            // static_assert(arg <= maxLaneValue, "Lane value exceeds maximum");
+            // but the compiler seems sad about it
             result = (result << NBits) | arg;
         }
         return result;
@@ -262,6 +268,17 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
     constexpr BooleanSWAR clearLSB() const noexcept {
         return BooleanSWAR(swar::clearLSB(this->value()));
+    }
+
+    template<std::size_t N, typename = std::enable_if_t<N == SWAR<NBits, T>::Lanes, T>>
+    constexpr static BooleanSWAR fromBooleanLiterals(const bool (&args)[N]) {
+        constexpr auto msbOfFirstLane = T(1) << (NBits - 1);
+        auto result = T{0};
+        for (int i = 0; i < N; ++i) {
+            auto bit = args[i] ? msbOfFirstLane : 0;
+            result = (result << NBits) | bit;
+        }
+        return BooleanSWAR{result};
     }
 
     /// BooleanSWAR treats the MSB of each lane as the boolean associated with that lane.
