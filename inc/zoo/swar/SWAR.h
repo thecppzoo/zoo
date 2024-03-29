@@ -85,7 +85,6 @@ struct SWAR {
     baseFromLaneLiterals(const T (&args)[N]) {
         auto result = T{0};
         for (const auto arg : args) {
-            static_assert(arg <= MaxUnsignedLaneValue, "Lane value exceeds maximum");
             result = (result << NBits) | arg;
         }
         return result;
