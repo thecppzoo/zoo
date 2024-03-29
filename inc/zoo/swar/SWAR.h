@@ -80,20 +80,20 @@ struct SWAR {
     // is this the right name?
     constexpr static T MaxUnsignedLaneValue = ~(((~T{0}) << (NBits - 1)) << 1);
 
-    template<std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
-    constexpr static T baseFromLaneLiterals(const T (&args)[N]) {
+    template<std::size_t N>
+    constexpr static std::enable_if_t<N == Lanes, T>
+    baseFromLaneLiterals(const T (&args)[N]) {
         auto result = T{0};
-        for (const auto arg: args) {
-            // would be nice to have a static assert here
-            // static_assert(arg <= maxLaneValue, "Lane value exceeds maximum");
-            // but the compiler seems sad about it
+        for (const auto arg : args) {
+            static_assert(arg <= MaxUnsignedLaneValue, "Lane value exceeds maximum");
             result = (result << NBits) | arg;
         }
         return result;
     }
 
-    template<std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
-    constexpr static SWAR fromLaneLiterals(const T (&args)[N]) {
+    template<std::size_t N>
+    constexpr static std::enable_if_t<N == Lanes, SWAR>
+    fromLaneLiterals(const T (&args)[N]) {
         return SWAR{baseFromLaneLiterals(args)};
     }
 
