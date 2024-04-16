@@ -33,6 +33,26 @@ using S32_32 = SWAR<32, uint32_t>;
 
 using S64_64 = SWAR<64, uint64_t>;
 
+static_assert(SWAR<16, u64>::MaxUnsignedLaneValue == 65535);
+static_assert(SWAR<16, u32>::MaxUnsignedLaneValue == 65535);
+static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
+static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
+static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
+
+static_assert(SWAR{Literals<8, u32>, {0, 0, 0, 0}}.value() == 0);
+static_assert(SWAR{Literals<8, u32>, {0, 0, 0, 1}}.value() == 1);
+static_assert(SWAR{Literals<8, u32>, {8, 3, 2, 1}}.value() == 0x08'03'02'01);
+static_assert(SWAR{Literals<8, u32>, {42, 42, 42, 42}}.value() == 0x2A'2A'2A'2A);
+static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 0}}.value() == 0);
+static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 1}}.value() == 1);
+static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 0}}.value() == 0);
+static_assert(SWAR{Literals<4, u32>, {8, 7, 6, 5, 4, 3, 2, 1}}.value() == 0x8765'4321);
+static_assert(SWAR{Literals<4, u32>, {8, 7, 6, 5, 4, 3, 2, 7}}.value() == 0x8765'4327);
+
+static_assert(BooleanSWAR{Literals<4, u16>, {false, false, false, false}}.value() == 0);
+static_assert(BooleanSWAR{Literals<4, u16>, {true, true, true, true}}.value() == 0b1000'1000'1000'1000);
+static_assert(BooleanSWAR{Literals<8, u32>, {true, true, true, true}}.value() == 0b10000000'10000000'10000000'10000000);
+
 namespace Multiplication {
 
 static_assert(~int64_t(0) == negate(S4_64{S4_64::LeastSignificantBit}).value());
@@ -357,7 +377,7 @@ TEST_CASE(
             const auto left = S2_16{0}.blitElement(1,  i);
             const auto right = S2_16{S2_16::AllOnes}.blitElement(1, i-1);
             const auto test = S2_16{0}.blitElement(1, 2);
-            CHECK(test.value() == greaterEqual<2, u16>(left, right).value()); 
+            CHECK(test.value() == greaterEqual<2, u16>(left, right).value());
         }
     }
     SECTION("single") {
@@ -365,7 +385,7 @@ TEST_CASE(
             const auto large = S4_32{0}.blitElement(1,  i+1);
             const auto small = S4_32{S4_32::AllOnes}.blitElement(1, i-1);
             const auto test = S4_32{0}.blitElement(1, 8);
-            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
     SECTION("allLanes") {
@@ -373,7 +393,7 @@ TEST_CASE(
             const auto small = S4_32(S4_32::LeastSignificantBit * (i-1));
             const auto large = S4_32(S4_32::LeastSignificantBit * (i+1));
             const auto test = S4_32(S4_32::LeastSignificantBit * 8);
-            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
 }
@@ -425,7 +445,7 @@ TEST_CASE(
     "BooleanSWAR MSBtoLaneMask",
     "[swar]"
 ) {
-    // BooleanSWAR as a mask: 
+    // BooleanSWAR as a mask:
     auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
     auto mask = S4_32(0x0F0F'0000);
     CHECK(bswar.MSBtoLaneMask().value() == mask.value());
@@ -452,6 +472,6 @@ TEST_CASE(
     CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value());
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
 }

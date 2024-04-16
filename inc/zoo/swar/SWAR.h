@@ -12,6 +12,15 @@
 
 namespace zoo { namespace swar {
 
+template <int NBits, typename T> struct SWAR;
+
+template <int NumBits, typename BaseType> struct Literals_t {
+  constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
+};
+
+template <int NumBits, typename BaseType>
+constexpr Literals_t<NumBits, BaseType> Literals{};
+
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
@@ -69,6 +78,18 @@ struct SWAR {
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit;
+
+    template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
+    constexpr
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{0} {
+        auto result = T{0};
+        for (const auto arg : values) {
+            result = (result << NBits) | arg;
+        }
+        m_v = result;
+    }
+
+    constexpr static T MaxUnsignedLaneValue = ~(((~T{0}) << (NBits - 1)) << 1);
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -161,6 +182,9 @@ struct SWAR {
     T m_v;
 };
 
+template <int NBits, typename T, typename Arg>
+SWAR(Literals_t<NBits, T>, const Arg (&values)[SWAR<NBits, T>::Lanes]) -> SWAR<NBits, T>;
+
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
 constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
@@ -231,6 +255,19 @@ template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
+    constexpr auto toMsbBools(const bool (&values)[Base::Lanes]) {
+        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
+        auto result = T{0};
+        for (auto arg : values) {
+            auto bit = arg ? msbOfFirstLane : 0;
+            result = (result << NBits) | bit;
+        }
+        return BooleanSWAR{result};
+    }
+
+    template <std::size_t N, typename = std::enable_if_t<N == Base::Lanes, T>>
+    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base(toMsbBools(values)) {}
+
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
         broadcast<NBits, T>(Base(T(1) << (NBits -1)));
@@ -240,7 +277,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     static constexpr auto MaskNonLSB = ~MaskLSB;
     static constexpr auto MaskNonMSB = ~MaskMSB;
     constexpr explicit BooleanSWAR(T v): Base(v) {}
-  
+
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
@@ -256,7 +293,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr auto operator ~() const noexcept {
         return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
-  
+
     constexpr auto operator not() const noexcept {
         return BooleanSWAR(MaskMSB ^ *this);
     }
@@ -304,6 +341,9 @@ struct BooleanSWAR: SWAR<NBits, T> {
     friend constexpr BooleanSWAR<NB, TT>
     convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
+
+template <int NBits, typename T>
+BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[BooleanSWAR<NBits, T>::Lanes]) -> BooleanSWAR<NBits, T>;
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
@@ -381,7 +421,7 @@ greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
     using S = swar::SWAR<NBits, T>;
     const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
     const auto z = (x|h) - (y&~h);
-    // bitwise ternary median! 
+    // bitwise ternary median!
     const auto t = h & ~median(x, ~y, z);
     return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
 }
