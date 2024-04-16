@@ -12,15 +12,6 @@
 
 namespace zoo { namespace swar {
 
-template <int NBits, typename T> struct SWAR;
-
-template <int NumBits, typename BaseType> struct Literals_t {
-  constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
-};
-
-template <int NumBits, typename BaseType>
-constexpr Literals_t<NumBits, BaseType> Literals{};
-
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
@@ -82,18 +73,6 @@ struct SWAR {
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
-
-    template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
-    constexpr
-    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{0} {
-        auto result = T{0};
-        for (const auto arg : values) {
-            result = (result << NBits) | arg;
-        }
-        m_v = result;
-    }
-
-    constexpr static T MaxUnsignedLaneValue = ~(((~T{0}) << (NBits - 1)) << 1);
 
     constexpr T value() const noexcept { return m_v; }
 
@@ -182,9 +161,6 @@ struct SWAR {
     T m_v;
 };
 
-template <int NBits, typename T, typename Arg>
-SWAR(Literals_t<NBits, T>, const Arg (&values)[SWAR<NBits, T>::Lanes]) -> SWAR<NBits, T>;
-
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
 constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
@@ -254,19 +230,6 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
 template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
-
-    constexpr auto toMsbBools(const bool (&values)[Base::Lanes]) {
-        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
-        auto result = T{0};
-        for (auto arg : values) {
-            auto bit = arg ? msbOfFirstLane : 0;
-            result = (result << NBits) | bit;
-        }
-        return BooleanSWAR{result};
-    }
-
-    template <std::size_t N, typename = std::enable_if_t<N == Base::Lanes, T>>
-    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base(toMsbBools(values)) {}
 
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
@@ -341,9 +304,6 @@ struct BooleanSWAR: SWAR<NBits, T> {
     friend constexpr BooleanSWAR<NB, TT>
     convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
-
-template <int NBits, typename T>
-BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[BooleanSWAR<NBits, T>::Lanes]) -> BooleanSWAR<NBits, T>;
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
