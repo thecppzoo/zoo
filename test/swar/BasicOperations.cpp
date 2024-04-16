@@ -44,8 +44,6 @@ static_assert(BooleanSWAR{Literals<4, u16>, {false, false, false, false}}.value(
 static_assert(BooleanSWAR{Literals<4, u16>, {true, true, true, true}}.value() == 0b1000'1000'1000'1000);
 static_assert(BooleanSWAR{Literals<8, u32>, {true, true, true, true}}.value() == 0b10000000'10000000'10000000'10000000);
 
-static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, false, false, false}).value() == 0);
-
 namespace Multiplication {
 
 static_assert(~int64_t(0) == negate(S4_64{S4_64::LeastSignificantBit}).value());
