@@ -40,10 +40,8 @@ static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
 // static_assert(SWAR<4, u32>::fromLaneLiterals({0, 0, 0, 0, 0, 0, 0, 0}).value() == 0);
 // static_assert(SWAR<4, u32>::fromLaneLiterals({0, 0, 0, 0, 0, 0, 0, 1}).value() == 1);
-static_assert(SWAR<4, u16>::fromLaneLiterals({8, 3, 2, 1}).value() == 0b1000'0011'0010'0001);
 
 static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 0}}.value() == 0);
-
 static_assert(SWAR{Literals<4, u32>, {8, 7, 6, 5, 4, 3, 2, 1}}.value() == 0x8765'4321);
 
 // static_assert(SWAR<4, u8>::fromLaneLiterals({7, 1}).value() == 0b0111'0001);
