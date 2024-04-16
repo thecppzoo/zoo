@@ -4,6 +4,7 @@
 
 #include "zoo/meta/log.h"
 
+#include <cmath>
 #include <type_traits>
 
 #ifdef _MSC_VER
@@ -12,10 +13,23 @@
 
 namespace zoo { namespace swar {
 
+template<int NBits, typename T>
+struct SWAR;
+
+template<int NumBits, typename BaseType>
+struct Literals_t {
+  // constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
+};
+
+template<int NumBits, typename BaseType>
+constexpr Literals_t <NumBits, BaseType> Literals{};
+
+
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
 using u8 = std::uint8_t;
+
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
@@ -75,26 +89,19 @@ struct SWAR {
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
 
+    template<typename Arg>
+    constexpr SWAR(Literals_t<NBits, T>, const Arg(&values)[Lanes]) : m_v(0) {
+        auto result = T{0};
+        for (const auto arg : values) {
+            result = (result << NBits) | arg;
+        }
+        m_v = result;
+    }
+
     constexpr T value() const noexcept { return m_v; }
 
     // is this the right name?
     constexpr static T MaxUnsignedLaneValue = ~(((~T{0}) << (NBits - 1)) << 1);
-
-    template<std::size_t N>
-    constexpr static std::enable_if_t<N == Lanes, T>
-    baseFromLaneLiterals(const T (&args)[N]) {
-        auto result = T{0};
-        for (const auto arg : args) {
-            result = (result << NBits) | arg;
-        }
-        return result;
-    }
-
-    template<std::size_t N>
-    constexpr static std::enable_if_t<N == Lanes, SWAR>
-    fromLaneLiterals(const T (&args)[N]) {
-        return SWAR{baseFromLaneLiterals(args)};
-    }
 
     #define SWAR_UNARY_OPERATORS_X_LIST \
         X(SWAR, ~)
@@ -181,6 +188,9 @@ struct SWAR {
     T m_v;
 };
 
+template<int NBits, typename T, typename Arg>
+SWAR(Literals_t<NBits, T>, const Arg(&values)[8])->SWAR<NBits, T>;
+
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
 constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
@@ -245,6 +255,8 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
     constexpr T Ones = meta::BitmaskMaker<T, 1, NBits>::value;
     return SWAR<NBits, T>(T(v) * Ones);
 }
+
+
 
 /// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
 template<int NBits, typename T>
@@ -446,6 +458,8 @@ constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
     auto popcounts = meta::PopcountLogic<LogNBits, T>::execute(whole);
     return SWAR<NBits, T>{popcounts - ones};
 }
+
+
 
 static_assert(
     logarithmFloor(SWAR<8>{0x8040201008040201ull}).value() ==
