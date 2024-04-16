@@ -79,9 +79,9 @@ template <int NBits_, typename T = uint64_t> struct SWAR {
   constexpr explicit SWAR(T v) : m_v(v) {}
   constexpr explicit operator T() const noexcept { return m_v; }
 
-  template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, T>>
+  template <typename Arg, std::size_t N>
   constexpr
-  SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v(0) {
+  SWAR(Literals_t<NBits, T>, const Arg (&values)[N], std::enable_if_t<N == Lanes, int> = 0) : m_v(0) {
       auto result = T{0};
       for (const auto arg : values) {
           result = (result << NBits) | arg;
@@ -277,8 +277,8 @@ template <int NBits, typename T> struct BooleanSWAR : SWAR<NBits, T> {
     return BooleanSWAR{result};
   }
 
-  template <std::size_t N, typename = std::enable_if_t<N == Base::Lanes, T>>
-  BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base(toMsbBools(values)) {}
+  template <std::size_t N>
+  constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base(toMsbBools(values)) {}
 
   // Booleanness is stored in the MSBs
   static constexpr auto MaskMSB =
