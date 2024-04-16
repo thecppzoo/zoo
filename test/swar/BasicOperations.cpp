@@ -3,9 +3,6 @@
 
 #include "catch2/catch.hpp"
 
-#include <type_traits>
-
-
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -33,24 +30,21 @@ static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
 static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
 static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
-// static_assert(SWAR<8, u32>::fromLaneLiterals({0, 0, 0, 0}).value() == 0);
-// static_assert(SWAR<8, u32>::fromLaneLiterals({0, 0, 0, 1}).value() == 1);
-// static_assert(SWAR<8, u32>::fromLaneLiterals({8, 3, 2, 1}).value() == 0x08'03'02'01);
-// static_assert(SWAR<8, u32>::fromLaneLiterals({42, 42, 42, 42}).value() == 0x2A'2A'2A'2A);
-
-// static_assert(SWAR<4, u32>::fromLaneLiterals({0, 0, 0, 0, 0, 0, 0, 0}).value() == 0);
-// static_assert(SWAR<4, u32>::fromLaneLiterals({0, 0, 0, 0, 0, 0, 0, 1}).value() == 1);
-
+static_assert(SWAR{Literals<8, u32>, {0, 0, 0, 0}}.value() == 0);
+static_assert(SWAR{Literals<8, u32>, {0, 0, 0, 1}}.value() == 1);
+static_assert(SWAR{Literals<8, u32>, {8, 3, 2, 1}}.value() == 0x08'03'02'01);
+static_assert(SWAR{Literals<8, u32>, {42, 42, 42, 42}}.value() == 0x2A'2A'2A'2A);
+static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 0}}.value() == 0);
+static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 1}}.value() == 1);
 static_assert(SWAR{Literals<4, u32>, {0, 0, 0, 0, 0, 0, 0, 0}}.value() == 0);
 static_assert(SWAR{Literals<4, u32>, {8, 7, 6, 5, 4, 3, 2, 1}}.value() == 0x8765'4321);
+static_assert(SWAR{Literals<4, u32>, {8, 7, 6, 5, 4, 3, 2, 7}}.value() == 0x8765'4327);
 
-// static_assert(SWAR<4, u8>::fromLaneLiterals({7, 1}).value() == 0b0111'0001);
-//
-// static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, false, false, false}).value() == 0);
-// static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({true, false, false, false}).value() == 0b1000'0000'0000'0000);
-// static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, true, false, false}).value() == 0b0000'1000'0000'0000);
-// static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, false, false, true}).value() == 0b0000'0000'0000'1000);
-// static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({true, true, true, true}).value() == 0b1000'1000'1000'1000);
+static_assert(BooleanSWAR{Literals<4, u16>, {false, false, false, false}}.value() == 0);
+static_assert(BooleanSWAR{Literals<4, u16>, {true, true, true, true}}.value() == 0b1000'1000'1000'1000);
+static_assert(BooleanSWAR{Literals<8, u32>, {true, true, true, true}}.value() == 0b10000000'10000000'10000000'10000000);
+
+static_assert(BooleanSWAR<4, u16>::fromBooleanLiterals({false, false, false, false}).value() == 0);
 
 namespace Multiplication {
 
