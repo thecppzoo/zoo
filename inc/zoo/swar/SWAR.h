@@ -81,12 +81,11 @@ struct SWAR {
         LowerBits = MostSignificantBit - LeastSignificantBit,
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
-    template <typename U, typename ManipulationFn>
-    constexpr auto loadIntoLanes(const U (&values)[Lanes], const ManipulationFn&& manipulation) {
+    template <typename U>
+    constexpr auto loadIntoLanes(const U (&values)[Lanes]) const noexcept {
         auto result = T{0};
         for (auto value : values) {
-            auto laneValue = manipulation(value);
-            result = (result << NBits) | laneValue;
+            result = (result << NBits) | value;
         }
         return result;
     }
@@ -94,7 +93,7 @@ struct SWAR {
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
     SWAR(Literals_t<NBits, T>, const Arg (&values)[N])
-      : m_v{loadIntoLanes(values, [](auto x) { return x; })} {}
+      : m_v{loadIntoLanes(values)} {}
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -261,10 +260,8 @@ struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
     template <std::size_t N>
-    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base{0} {
-        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
-        this->m_v = Base::loadIntoLanes(values, [](auto x) { return x ? msbOfFirstLane : 0; });
-    }
+    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N])
+    : Base(Literals<NBits, T>, values) { this->m_v <<= (NBits - 1); }
 
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =

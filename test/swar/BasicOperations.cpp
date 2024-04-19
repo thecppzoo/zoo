@@ -5,9 +5,7 @@
 #include <ios>
 #include <iomanip>
 #include <iostream>
-#include <sys/wait.h>
 #include <type_traits>
-
 
 using namespace zoo;
 using namespace zoo::swar;
