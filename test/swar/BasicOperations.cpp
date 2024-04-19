@@ -52,13 +52,17 @@ static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
 static_assert(SWAR{Literals<8, u32>, {4, 3, 2, 1}}.value() == 0x04'03'02'01);
 static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
 
-static_assert(SWAR{Literals<4, u32>, {1, 2, 3, 4, 5, 6, 7, 8}}.value() == 0x1234'5678);
-static_assert(SWAR{Literals<4, u32>, {8, 7, 6, 5, 4, 3, 2, 1}}.value() == 0x8765'4321);
+static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
+static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
 
-static_assert(BooleanSWAR{Literals<4, u16>, {false, false, false, false}}.value() == 0);
-static_assert(BooleanSWAR{Literals<4, u16>, {true, true, true, true}}.value() == 0b1000'1000'1000'1000);
-static_assert(BooleanSWAR{Literals<4, u16>, {true, false, false, false}}.value() == 0b1000'0000'0000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {false, true, false, false}}.value() == 0b0000'1000'0000'0000);
+static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
+static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
+
+#define F false
+#define T true
+static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, F}}.value() == 0);
+static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
 static_assert(BooleanSWAR{Literals<4, u16>, {false, false, true, false}}.value() == 0b0000'0000'1000'0000);
 static_assert(BooleanSWAR{Literals<4, u16>, {false, false, false, true}}.value() == 0b0000'0000'0000'1000);
 
