@@ -82,7 +82,7 @@ struct SWAR {
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
     template <typename U>
-    constexpr auto loadIntoLanes(const U (&values)[Lanes]) const noexcept {
+    constexpr static auto from_array(const U (&values)[Lanes]) noexcept {
         auto result = T{0};
         for (auto value : values) {
             result = (result << NBits) | value;
@@ -92,7 +92,7 @@ struct SWAR {
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
-    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{loadIntoLanes(values)} {}
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{from_array(values)} {}
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
