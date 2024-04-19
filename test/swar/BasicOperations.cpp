@@ -65,9 +65,9 @@ static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000
 static_assert(BooleanSWAR{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
 static_assert(BooleanSWAR{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
 static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
-
 static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
+#undef F
+#undef T
 
 namespace Multiplication {
 
