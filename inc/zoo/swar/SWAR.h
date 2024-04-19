@@ -92,8 +92,7 @@ struct SWAR {
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
-    SWAR(Literals_t<NBits, T>, const Arg (&values)[N])
-      : m_v{loadIntoLanes(values)} {}
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{loadIntoLanes(values)} {}
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
