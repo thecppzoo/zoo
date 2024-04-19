@@ -77,7 +77,8 @@ struct SWAR {
                 ~(~T(0) << NBits),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
-        LowerBits = MostSignificantBit - LeastSignificantBit;
+        LowerBits = MostSignificantBit - LeastSignificantBit,
+        MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
@@ -89,7 +90,6 @@ struct SWAR {
         m_v = result;
     }
 
-    constexpr static T MaxUnsignedLaneValue = ~(((~T{0}) << (NBits - 1)) << 1);
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
