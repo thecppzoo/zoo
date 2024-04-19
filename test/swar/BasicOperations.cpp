@@ -60,11 +60,14 @@ static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
 
 #define F false
 #define T true
-static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, F}}.value() == 0);
+static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, F}}.value() == 0b0000'0000'0000'0000);
 static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
 static_assert(BooleanSWAR{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {false, false, true, false}}.value() == 0b0000'0000'1000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {false, false, false, true}}.value() == 0b0000'0000'0000'1000);
+static_assert(BooleanSWAR{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
+
+static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
 
 namespace Multiplication {
 
