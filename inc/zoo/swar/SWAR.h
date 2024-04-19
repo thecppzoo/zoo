@@ -261,8 +261,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
     template <std::size_t N>
-    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N])
-       : Base(Literals<NBits, T>, values) { this->m_v << (NBits - 1); }
+    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base{0} {
+        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
+        this->m_v = Base::loadIntoLanes(values, [](auto x) { return x ? msbOfFirstLane : 0; });
+    }
 
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
