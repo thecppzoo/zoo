@@ -15,9 +15,7 @@ namespace zoo { namespace swar {
 template <int NBits, typename T>
 struct SWAR;
 
-template <int NumBits, typename BaseType> struct Literals_t {
-  constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
-};
+template <int NumBits, typename BaseType> struct Literals_t {};
 
 template <int NumBits, typename BaseType>
 constexpr Literals_t<NumBits, BaseType> Literals{};
