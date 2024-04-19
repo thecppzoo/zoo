@@ -82,8 +82,8 @@ struct SWAR {
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
     template <typename U, typename ManipulationFn>
-    constexpr auto loadBaseTypeIntoLanes(const U (&values)[Lanes],
-                                         const ManipulationFn&& manipulation) {
+    constexpr auto loadIntoLanes(const U (&values)[Lanes],
+                                 const ManipulationFn&& manipulation) {
         auto result = T{0};
         for (auto value : values) {
             auto laneValue = manipulation(value);
@@ -95,7 +95,7 @@ struct SWAR {
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
     SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{0} {
-        m_v = loadBaseTypeIntoLanes(values, [](auto x) { return x; });
+        m_v = loadIntoLanes(values, [](auto x) { return x; });
     }
 
 
@@ -266,7 +266,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     template <std::size_t N, typename = std::enable_if_t<N == Base::Lanes, T>>
     constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base{0} {
         constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
-        this->m_v = Base::loadBaseTypeIntoLanes(values, [](auto x) { return x ? msbOfFirstLane : 0; });
+        this->m_v = Base::loadIntoLanes(values, [](auto x) { return x ? msbOfFirstLane : 0; });
     }
 
     // Booleanness is stored in the MSBs
