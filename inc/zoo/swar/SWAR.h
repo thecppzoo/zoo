@@ -12,7 +12,8 @@
 
 namespace zoo { namespace swar {
 
-template <int NBits, typename T> struct SWAR;
+template <int NBits, typename T>
+struct SWAR;
 
 template <int NumBits, typename BaseType> struct Literals_t {
   constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
@@ -80,14 +81,21 @@ struct SWAR {
         LowerBits = MostSignificantBit - LeastSignificantBit,
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
+    template <typename U, typename ManipulationFn>
+    constexpr auto loadBaseTypeIntoLanes(const U (&values)[Lanes],
+                                         const ManipulationFn&& manipulation) {
+        auto result = T{0};
+        for (auto value : values) {
+            auto laneValue = manipulation(value);
+            result = (result << NBits) | laneValue;
+        }
+        return result;
+    }
+
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
     SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{0} {
-        auto result = T{0};
-        for (const auto arg : values) {
-            result = (result << NBits) | arg;
-        }
-        m_v = result;
+        m_v = loadBaseTypeIntoLanes(values, [](auto x) { return x; });
     }
 
 
@@ -255,18 +263,11 @@ template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
-    constexpr auto toMsbBools(const bool (&values)[Base::Lanes]) {
-        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
-        auto result = T{0};
-        for (auto arg : values) {
-            auto bit = arg ? msbOfFirstLane : 0;
-            result = (result << NBits) | bit;
-        }
-        return BooleanSWAR{result};
-    }
-
     template <std::size_t N, typename = std::enable_if_t<N == Base::Lanes, T>>
-    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base(toMsbBools(values)) {}
+    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]) : Base{0} {
+        constexpr auto msbOfFirstLane = T{1} << (NBits - 1);
+        this->m_v = Base::loadBaseTypeIntoLanes(values, [](auto x) { return x ? msbOfFirstLane : 0; });
+    }
 
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
