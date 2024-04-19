@@ -2,11 +2,6 @@
 
 #include "catch2/catch.hpp"
 
-#include <ios>
-#include <iomanip>
-#include <iostream>
-#include <type_traits>
-
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -55,6 +50,13 @@ static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
 
 static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
 static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
+
+static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
+static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
+
+static_assert(SWAR{Literals<4, u8>, {1, 2}}.to_array() == std::array<u8, 2>{1, 2});
+static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
+
 
 #define F false
 #define T true
