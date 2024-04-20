@@ -55,7 +55,10 @@ static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
 
 template <size_t N, typename A, typename B>
-constexpr auto compareContents(A a, B b) {
+constexpr auto compareContainers(A a, B b) {
+    if (a.size() != b.size()) {
+        return false;
+    }
     for (auto i = 0; i < N; ++i) {
         if (a[i] != b[i]) {
             return false;
@@ -64,13 +67,24 @@ constexpr auto compareContents(A a, B b) {
     return true;
 }
 
-using S4U8 = SWAR<4, u8>;
-constexpr auto A = S4U8{Literals<4, u8>, {4, 4}};
-constexpr auto B = std::array<u8, 2>{4, 4};
+#define ARRAY_TEST  \
+    constexpr auto A = S{Literals<NBits, S::type>, {ArrayLiteral}};  \
+    constexpr auto B = std::array<S::type, S::Lanes>{ArrayLiteral};  \
+    return compareContainers<S::Lanes>(A.to_array(), B);
 
-static_assert(compareContents<S4U8::Lanes>(A.to_array(), B));
+static_assert([]() {
+    using S = S8_32;
+    constexpr auto NBits = 8;
+    #define ArrayLiteral 4, 3, 2, 1
+    ARRAY_TEST
+}());
 
-static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
+static_assert([]() {
+    using S = S4_16;
+    constexpr auto NBits = 4;
+    #define ArrayLiteral 4, 3, 2, 1
+    ARRAY_TEST
+}());
 
 
 #define F false

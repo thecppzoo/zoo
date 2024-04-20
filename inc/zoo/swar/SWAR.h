@@ -74,8 +74,7 @@ struct SWAR {
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask = []() {
-          constexpr auto NBitsLessThanByteOfT = NBits < sizeof(T) * 8;
-          if constexpr (NBitsLessThanByteOfT) {
+          if constexpr (NBits < sizeof(T) * 8) {
             return (T(1) << NBits) - 1;
           } else {
             return ~T(0);
