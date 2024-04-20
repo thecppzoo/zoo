@@ -85,14 +85,23 @@ struct SWAR {
         LowerBits = MostSignificantBit - LeastSignificantBit,
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
+    template <typename InputIt>
+    constexpr static auto from_range(InputIt first, InputIt last) noexcept {
+        auto result = T{0};
+        for (; first != last; ++first) {
+            result = (result << NBits) | *first;
+        }
+        return result;
+    }
+
     template <typename U>
     constexpr static auto from_array(const U (&values)[Lanes]) noexcept {
-        auto result = T{0};
-        for (auto value : values) {
-            result = (result << NBits) | value;
-        }
-        return SWAR{result};
+        return SWAR{from_range(std::begin(values), std::end(values))};
     }
+
+    using ArrayType = std::array<T, Lanes>;
+
+    constexpr SWAR(const ArrayType& array) : m_v{from_range(array.begin(), array.end())} {}
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr

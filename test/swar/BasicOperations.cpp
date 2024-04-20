@@ -54,6 +54,8 @@ static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
 
+static_assert(SWAR<8, u32>::from_array({1, 2, 3, 4}).value() == 0x0102'0304);
+
 template <size_t N, typename A, typename B>
 constexpr auto compareContainers(A a, B b) {
     if (a.size() != b.size()) {
