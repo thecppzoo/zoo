@@ -15,7 +15,7 @@ if(MSVC)
     # Avoids multiple problems
 
     # Due to multiple bugs, forced upgrade to C++ 20
-    set(CMAKE_CXX_STANDARD 23)
+    set(CMAKE_CXX_STANDARD 20)
 
     # Set the policy to use the new behavior
     if(POLICY CMP0067)
@@ -81,7 +81,7 @@ if(MSVC)
     endif()
 else()
     # Non-MSVC specific configuration (original content)
-    set(CMAKE_CXX_STANDARD 23)
+    set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_FLAGS_UBSAN "-fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
     set(CMAKE_CXX_FLAGS_ASAN "-fsanitize=address -fno-omit-frame-pointer")
 

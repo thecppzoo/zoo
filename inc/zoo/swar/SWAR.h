@@ -73,10 +73,14 @@ struct SWAR {
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
-        LeastSignificantLaneMask =
-            sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
-                ~T(0) :
-                ~(~T(0) << NBits),
+        LeastSignificantLaneMask = []() {
+          constexpr auto NBitsLessThanByteOfT = NBits < sizeof(T) * 8;
+          if constexpr (NBitsLessThanByteOfT) {
+            return (T(1) << NBits) - 1;
+          } else {
+            return ~T(0);
+          }
+        }(),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit,
@@ -96,7 +100,7 @@ struct SWAR {
     SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{from_array(values)} {}
 
     constexpr std::array<T, Lanes> to_array() const noexcept {
-        std::array<T, Lanes> result;
+        std::array<T, Lanes> result = {};
         for (int i = 0; i < Lanes; ++i) {
             auto otherEnd = Lanes - i - 1;
             result[otherEnd] = at(i);

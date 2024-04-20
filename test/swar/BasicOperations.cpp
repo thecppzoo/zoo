@@ -54,7 +54,22 @@ static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
 
-static_assert(SWAR{Literals<4, u8>, {1, 2}}.to_array() == std::array<u8, 2>{1, 2});
+template <size_t N, typename A, typename B>
+constexpr auto compareContents(A a, B b) {
+    for (auto i = 0; i < N; ++i) {
+        if (a[i] != b[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+using S4U8 = SWAR<4, u8>;
+constexpr auto A = S4U8{Literals<4, u8>, {4, 4}};
+constexpr auto B = std::array<u8, 2>{4, 4};
+
+static_assert(compareContents<S4U8::Lanes, std::array<u8, 2>>(A.to_array(), B));
+
 static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
 
 
