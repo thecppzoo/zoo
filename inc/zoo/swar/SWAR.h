@@ -75,9 +75,9 @@ struct SWAR {
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask = []() {
           if constexpr (NBits < sizeof(T) * 8) {
-            return (T(1) << NBits) - 1;
+              return (T(1) << NBits) - 1;
           } else {
-            return ~T(0);
+              return ~T(0);
           }
         }(),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
