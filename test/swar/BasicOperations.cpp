@@ -68,7 +68,7 @@ using S4U8 = SWAR<4, u8>;
 constexpr auto A = S4U8{Literals<4, u8>, {4, 4}};
 constexpr auto B = std::array<u8, 2>{4, 4};
 
-static_assert(compareContents<S4U8::Lanes, std::array<u8, 2>>(A.to_array(), B));
+static_assert(compareContents<S4U8::Lanes>(A.to_array(), B));
 
 static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
 
