@@ -96,12 +96,19 @@ struct SWAR {
 
     template <typename U>
     constexpr static auto from_array(const U (&values)[Lanes]) noexcept {
-        return SWAR{from_range(std::begin(values), std::end(values))};
+        using std::begin; using std::end;
+        return SWAR{from_range(begin(values), end(values))};
+    }
+
+    template <typename U>
+    constexpr static auto from_array(const std::array<T, Lanes> &values) noexcept {
+        using std::begin; using std::end;
+        return SWAR{from_range(begin(values), end(values))};
     }
 
     using ArrayType = std::array<T, Lanes>;
 
-    constexpr SWAR(const ArrayType& array) : m_v{from_range(array.begin(), array.end())} {}
+    constexpr SWAR(const ArrayType &array) : m_v{from_range(array.begin(), array.end())} {}
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
@@ -119,6 +126,28 @@ struct SWAR {
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
+
+//     constexpr auto operator==(T (&values)[Lanes]) const noexcept {
+//         return compareToContainer(values);
+//     }
+//
+//     constexpr auto operator==(std::array<T, Lanes> values) const noexcept {
+//         return compareToContainer(values);
+//     }
+
+    template <typename B>
+    constexpr bool compareToContainer(B b) const noexcept {
+        auto a = to_array();
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (auto i = 0; i < Lanes; ++i) {
+            if (a[i] != b[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     constexpr T value() const noexcept { return m_v; }
 
@@ -209,6 +238,9 @@ struct SWAR {
 
 template <int NBits, typename T, typename Arg>
 SWAR(Literals_t<NBits, T>, const Arg (&values)[SWAR<NBits, T>::Lanes]) -> SWAR<NBits, T>;
+
+template <int NBits, typename T>
+SWAR(Literals_t<NBits, T>, const std::array<T, SWAR<NBits, T>::Lanes>&) -> SWAR<NBits, T>;
 
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
