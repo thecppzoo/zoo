@@ -367,7 +367,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
 };
 
 template <int NBits, typename T>
-BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[BooleanSWAR<NBits, T>::Lanes]) -> BooleanSWAR<NBits, T>;
+BooleanSWAR(
+    Literals_t<NBits, T>,
+    const bool (&values)[BooleanSWAR<NBits, T>::Lanes])
+  -> BooleanSWAR<NBits, T>;
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
