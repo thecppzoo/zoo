@@ -46,6 +46,7 @@ static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
 
 static_assert(SWAR{Literals<8, u32>, {4, 3, 2, 1}}.value() == 0x04'03'02'01);
 static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
+static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
 
 static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
 static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);

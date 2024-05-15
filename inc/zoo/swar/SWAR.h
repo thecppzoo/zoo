@@ -125,28 +125,6 @@ struct SWAR {
     constexpr explicit SWAR(T v): m_v(v) {}
     constexpr explicit operator T() const noexcept { return m_v; }
 
-//     constexpr auto operator==(T (&values)[Lanes]) const noexcept {
-//         return compareToContainer(values);
-//     }
-//
-//     constexpr auto operator==(std::array<T, Lanes> values) const noexcept {
-//         return compareToContainer(values);
-//     }
-
-    template <typename B>
-    constexpr bool compareToContainer(B b) const noexcept {
-        auto a = to_array();
-        if (a.size() != b.size()) {
-            return false;
-        }
-        for (auto i = 0; i < Lanes; ++i) {
-            if (a[i] != b[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     constexpr T value() const noexcept { return m_v; }
 
     #define SWAR_UNARY_OPERATORS_X_LIST \
