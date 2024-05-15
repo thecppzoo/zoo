@@ -106,9 +106,7 @@ struct SWAR {
         return SWAR{from_range(begin(values), end(values))};
     }
 
-    using ArrayType = std::array<T, Lanes>;
-
-    constexpr SWAR(const ArrayType &array) : m_v{from_range(array.begin(), array.end())} {}
+    constexpr SWAR(const std::array<T, Lanes> &array) : m_v{from_range(array.begin(), array.end())} {}
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
