@@ -1,4 +1,5 @@
 #include "atoi.h"
+#include "atoi_impl.h"
 
 #include "zoo/swar/associative_iteration.h"
 
@@ -53,6 +54,19 @@ uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexc
     return uint32_t(by10001base2to32.value() >> 32);
 }
 
+uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
+    auto by11base256 = convertedToIntegers.multiply(256*10 + 1);
+    auto bytePairs = zoo::swar::doublePrecision(by11base256).odd;
+    //static_assert(std::is_same_v<decltype(bytePairs), zoo::swar::SWAR<16, uint64_t>>);
+    auto by101base2to16 = bytePairs.multiply(1 + (100 << 16));
+    auto byteQuads = zoo::swar::doublePrecision(by101base2to16).odd;
+    auto by10001base2to32 = byteQuads.multiply(1 + (10000ull << 32));
+    auto byteOcts = zoo::swar::doublePrecision(by10001base2to32).odd;
+    auto byHundredMillionBase2to64 =
+        byteOcts.multiply(1 + (__uint128_t(100'000'000) << 64));
+    return uint64_t(byHundredMillionBase2to64.value() >> 64);
+}
+
 // Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
 // of 10^9 is slightly less than 30, thus, only 30 bits are needed.
 uint32_t lemire_as_zoo_swar(const char *chars) noexcept {
@@ -102,25 +116,6 @@ std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     auto notWhiteSpace = ~whiteSpace;
     auto rv = notWhiteSpace ? notWhiteSpace.lsbIndex() : S::Lanes;
     return rv;
-}
-
-/// @brief Loads the "block" containing the pointer, by proper alignment
-/// @tparam PtrT Pointer type for loading
-/// @tparam Block as the name indicates
-/// @param pointerInsideBlock the potentially misaligned pointer
-/// @param b where the loaded bytes will be put
-/// @return a pair to indicate the aligned pointer to the base of the block
-/// and the misalignment, in bytes, of the source pointer
-template<typename PtrT, typename Block>
-std::tuple<PtrT *, int>
-blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
-    uintptr_t asUint = reinterpret_cast<uintptr_t>(pointerInsideBlock);
-    constexpr auto Alignment = alignof(Block), Size = sizeof(Block);
-    static_assert(Alignment == Size);
-    auto misalignment = asUint % Alignment;
-    auto *base = reinterpret_cast<PtrT *>(asUint - misalignment);
-    memcpy(b, base, Size);
-    return { base, misalignment };
 }
 
 std::size_t leadingSpacesCount(const char *p) noexcept {
@@ -173,11 +168,33 @@ auto leadingDigitsCount(const char *p) noexcept {
     }
 }
 
-int c_strToI(const char *str) noexcept {
-    constexpr static std::array<int, 8> LastFactor = {
-        1, 10, 100, 1000,
-        10'000, 100'000, 1000'000, 10'000'000
-    };
+namespace impl {
+
+template<typename> struct ConversionTraits;
+template<> struct ConversionTraits<int32_t>{
+    constexpr static auto NPositions = 9; // from 10^0 to 10^8
+    using PowersOf10Array = std::array<int32_t, NPositions>;
+    using DoublePrecision = uint64_t;
+};
+template<> struct ConversionTraits<int64_t>{
+    constexpr static auto NPositions = 17; // from 10^0 to 10^16
+    using PowersOf10Array = std::array<int64_t, NPositions>;
+    using DoublePrecision = __uint128_t;
+};
+
+template<typename Result>
+auto PowersOf10Array() {
+    using Traits = ConversionTraits<Result>;
+    typename Traits::PowersOf10Array rv{1};
+    for (std::size_t i = 1; i < Traits::NPositions; ++i) {
+        rv[i] = rv[i - 1] * 10;
+    }
+    return rv;
+};
+
+template<typename Return>
+Return c_strToIntegral(const char *str) noexcept {
+    auto LastFactor = PowersOf10Array<Return>();
     auto leadingSpaces = leadingSpacesCount(str);
     auto s = str + leadingSpaces;
     auto sign = 1;
@@ -187,14 +204,19 @@ int c_strToI(const char *str) noexcept {
         case '+': ++s; break;
         default: ;
     }
-    using S = swar::SWAR<8, uint64_t>;
+
+    using SWAR_BaseType = typename ConversionTraits<Return>::DoublePrecision;
+    constexpr auto
+        NBytes = sizeof(SWAR_BaseType),
+        NBitsPerByte = 8ul; // 8 bits per byte
+    using S = swar::SWAR<NBitsPerByte, SWAR_BaseType>;
     S bytes;
     auto [base, misalignment] = blockAlignedLoad(s, &bytes.m_v);
-    auto bitDisplacement = 8 * misalignment;
+    auto bitDisplacement = NBitsPerByte * misalignment;
     constexpr static S
-        AllZeroCharacter{meta::BitmaskMaker<uint64_t, '0', 8>::value},
+        AllZeroCharacter{meta::BitmaskMaker<SWAR_BaseType, '0', NBitsPerByte>::value},
         AllOn = ~S{0};
-    // blit the zero-characters to the misaligned part
+
     auto mask = S{AllOn.value() << bitDisplacement};
     auto misalignedEliminated = bytes & mask;
     auto zeroCharactersIntroduced = AllZeroCharacter & ~mask;
@@ -210,21 +232,33 @@ int c_strToI(const char *str) noexcept {
             auto nonDigitIndex = nonDigits.lsbIndex();
             auto asIntegers = bytes - AllZeroCharacter; // upper lanes garbage
             auto integersInHighLanes =
-                // allow complete clearing of the 8 bytes by doing 2 shifts,
-                // since it is UB to shift 64 bits.
-                asIntegers.shiftLanesLeft(7 - nonDigitIndex).shiftLanesLeft(1);
+                // split the shift in two steps because if nonDigitIndex is
+                // zero, then you'd shift all bits, this would result in U.B.
+                // for a single shift
+                asIntegers.shiftLanesLeft(NBytes - 1 - nonDigitIndex)
+                          .shiftLanesLeft(1);
             auto inBase10 = calculateBase10(integersInHighLanes);
             auto scaledAccumulator = accumulator * LastFactor[nonDigitIndex];
-            return int((scaledAccumulator + inBase10) * sign);
+            return Return((scaledAccumulator + inBase10) * sign);
         }
-        // all 8 bytes are digits
+        // all bytes are digits
         auto asIntegers = bytes - AllZeroCharacter;
-        accumulator *= 100'000'000;
+        accumulator *= LastFactor.back();
         auto inBase10 = calculateBase10(asIntegers);
         accumulator += inBase10;
-        base += 8;
-        memcpy(&bytes.m_v, base, 8);
+        base += NBytes;
+        memcpy(&bytes.m_v, base, NBytes);
     }
+}
+
+}
+
+int c_strToI(const char *str) noexcept {
+    return impl::c_strToIntegral<int>(str);
+}
+
+int64_t c_strToL(const char *str) noexcept {
+    return impl::c_strToIntegral<int64_t>(str);
 }
 
 /// \brief Helper function to fix the non-string part of block
@@ -252,7 +286,7 @@ std::size_t c_strLength(const char *s) {
 
     auto indexOfFirstTrue = [](auto bs) { return bs.lsbIndex(); };
 
-     // Misalignment must be taken into account because a SWAR read is
+    // Misalignment must be taken into account because a SWAR read is
     // speculative, it might read bytes outside of the actual string.
     // It is safe to read within the page where the string occurs, and to
     // guarantee that, simply make aligned reads because the size of the SWAR
