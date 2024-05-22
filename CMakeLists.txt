@@ -18,6 +18,8 @@ include_directories("include")
 # Create a library target
 add_library(zoo ${SOURCES})
 
+message(STATUS "Hello from zoo")
+
 # Install the library and headers
 install(TARGETS zoo DESTINATION zoo/lib)
 install(DIRECTORY include/ DESTINATION include)
