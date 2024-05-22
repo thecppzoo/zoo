@@ -5,6 +5,9 @@ project(zoo)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+message(STATUS "Updating submodules")
+execute_process(COMMAND git submodule update --init --recursive WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 # add header files
 include_directories(inc)
 
@@ -24,6 +27,8 @@ message(STATUS "Hello from zoo")
 install(TARGETS zoo DESTINATION zoo/lib)
 install(DIRECTORY include/ DESTINATION include)
 
+# git submodule update --init --recursive
+# do the submodule update
 
 
 

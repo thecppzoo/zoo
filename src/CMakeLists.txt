@@ -29,7 +29,6 @@ add_compile_definitions(TESTS)
 
 add_executable(
     zooDemonstrations${CMAKE_BUILD_TYPE}
-    demoTightPolicy.cpp
     ../test/catch_main.cpp
      ${ADDITIONAL_SOURCES}
 )
