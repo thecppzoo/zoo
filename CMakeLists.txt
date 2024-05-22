@@ -1,34 +1,47 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(zoo)
+project(zoo VERSION 1.0)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+option(ENABLE_TESTING "Enable testing" OFF)
 
-message(STATUS "Updating submodules")
-execute_process(COMMAND git submodule update --init --recursive WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-# add header files
+# Include directories
 include_directories(inc)
 
-# add source files
+# Get all header files in the 'inc' directory
+file(GLOB HEADERS "inc/*.h" "inc/*.hpp")
+
+# Get all source files in the 'src' directory
 file(GLOB SOURCES "src/*.cpp")
 
-
-# Add the include directory
-include_directories("include")
-
 # Create a library target
-add_library(zoo ${SOURCES})
+add_library(zoo ${SOURCES} ${HEADERS})
 
-message(STATUS "Hello from zoo")
+# Set include directories for the library
+target_include_directories(zoo PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+    $<INSTALL_INTERFACE:include>
+)
 
-# Install the library and headers
-install(TARGETS zoo DESTINATION zoo/lib)
-install(DIRECTORY include/ DESTINATION include)
+# Installation
+install(TARGETS zoo EXPORT zoo-targets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+)
 
-# git submodule update --init --recursive
-# do the submodule update
+install(FILES ${HEADERS} DESTINATION include)
 
+install(EXPORT zoo-targets
+    FILE zoo-config.cmake
+    NAMESPACE zoo::
+    DESTINATION lib/cmake/zoo
+)
 
+export(TARGETS zoo FILE zoo-config.cmake)
 
+if (ENABLE_TESTING)
+    enable_testing()
+    add_subdirectory(test)
+endif()
