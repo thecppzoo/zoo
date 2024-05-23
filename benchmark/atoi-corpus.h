@@ -267,7 +267,9 @@ struct CorpusAtoi {
             }
             int number = exp(logBase10 * M_LN10);
             auto n = sprintf(conversionBuffer, "%d%c", number, postNumber(generator));
-            if(n < 0) { throw 0; }
+            if(n < 0) {
+                throw 0;
+            }
             allCharacters.append(conversionBuffer);
             sizes.push_back(count + negativeSign + iz + n);
             consumeStrPtr(allCharacters.c_str() + currentLength, count + negativeSign + iz + n);
@@ -302,7 +304,9 @@ struct CorpusAtoi {
 };
 
 #define ATOI_CORPUS_X_LIST \
-    X(GLIBC_atoi, atoi) X(ZOO_ATOI, zoo::c_strToI) X(COMPARE_ATOI, zoo::compareAtoi)
+    X(GLIBC_atoi, atoi) X(ZOO_ATOI, zoo::c_strToI)\
+    X(COMPARE_ATOI, zoo::compareAtoi) \
+    X(COMPARE_ATOL, zoo::compareAtol)
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };

@@ -106,7 +106,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     #undef X
 }
 
-TEST_CASE("Atoi correctness", "[swar][atoi]") {
+TEST_CASE("Atoi correctness", "[pure-test][swar][atoi]") {
     auto empty = "";
     REQUIRE(0 == zoo::c_strToI(empty));
     alignas(8) constexpr char EmptyMisaligned[8] = { 'Q', '\0', '0', '1', '2', '3', '9', '\0' };

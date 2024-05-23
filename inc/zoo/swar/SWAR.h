@@ -34,8 +34,14 @@ constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
 }
 
 /// Index into the bits of the type T that contains the LSB.
+///
+/// \todo incorporate __builtin_ctzg when it is more widely available
 template<typename T>
 constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
+    // This check should be SFINAE, but supporting all sorts
+    // of base types is an ongoing task, we put a bare-minimum
+    // temporary preventive measure with static_assert
+    static_assert(sizeof(T) <= 8, "Unsupported");
     #ifdef _MSC_VER
         // ~v & (v - 1) turns on all trailing zeroes, zeroes the rest
         return meta::logFloor(1 + (~v & (v - 1)));
@@ -43,6 +49,14 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
         return ~v ? __builtin_ctzll(v) : sizeof(T) * 8;
     #endif
 }
+
+#ifndef _MSC_VER
+constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
+    auto low = (v << 64) >> 64;
+    if(low) { return __builtin_ctzll(low); }
+    return 64 + __builtin_ctzll(v >> 64);
+}
+#endif
 
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
 /// of NBits width against a type T, and provides an abstraction for performing
