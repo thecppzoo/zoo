@@ -20,6 +20,7 @@ namespace zoo {
 /// @param b where the loaded bytes will be put
 /// @return a pair to indicate the aligned pointer to the base of the block
 /// and the misalignment, in bytes, of the source pointer
+/// \note The misalignment is in the range [ 0, sizeof(Block) [
 template<typename PtrT, typename Block>
 std::tuple<PtrT *, int>
 blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {

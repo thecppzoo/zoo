@@ -57,10 +57,12 @@ uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexc
 uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
     auto by11base256 = convertedToIntegers.multiply(256*10 + 1);
     auto bytePairs = zoo::swar::doublePrecision(by11base256).odd;
-    //static_assert(std::is_same_v<decltype(bytePairs), zoo::swar::SWAR<16, uint64_t>>);
     auto by101base2to16 = bytePairs.multiply(1 + (100 << 16));
     auto byteQuads = zoo::swar::doublePrecision(by101base2to16).odd;
     auto by10001base2to32 = byteQuads.multiply(1 + (10000ull << 32));
+    // Now, truly work with 128 bits: combine two 32 bit results, each
+    // corresponding to 8 bytes of inputs, into the the 64 bit result by
+    // scaling one by 10^8
     auto byteOcts = zoo::swar::doublePrecision(by10001base2to32).odd;
     auto byHundredMillionBase2to64 =
         byteOcts.multiply(1 + (__uint128_t(100'000'000) << 64));
