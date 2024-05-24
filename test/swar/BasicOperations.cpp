@@ -7,7 +7,6 @@
 #include <iostream>
 #include <type_traits>
 
-
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -64,7 +63,30 @@ static_assert(
     multiplication_OverflowUnsafe_SpecificBitCount<3>(Micand, Mplier).value()
 );
 
+static_assert(0b00000010000000110000010100000110 == 0x02'03'05'06);
+
+TEST_CASE("Expontiation with 8-bit lane width (overflow unsafe)") {
+  using S = SWAR<8, u32>;
+  constexpr auto base     = S::fromLaneLiterals({2,   3,  5,  6});
+  constexpr auto exponent = S::fromLaneLiterals({7,   4,  2,  3});
+  constexpr auto expected = S::fromLaneLiterals({128, 81, 25, 216});
+  constexpr auto actual = exponentiation_OverflowUnsafe(base, exponent);
+  static_assert(expected.value() == actual.value());
+  CHECK(expected.value() == actual.value());
 }
+
+TEST_CASE("Expontiation with 16-bit lane width (overflow unsafe)") {
+  using S = SWAR<16, u64>; // Change to 16-bit lane width
+  constexpr auto base     = S::fromLaneLiterals({10,   2,  7, 3});
+  constexpr auto exponent = S::fromLaneLiterals({3,    5,  1, 4});
+  constexpr auto expected = S::fromLaneLiterals({1000, 32, 7, 81});
+  constexpr auto actual = exponentiation_OverflowUnsafe(base, exponent);
+  static_assert(expected.value() == actual.value());
+  CHECK(expected.value() == actual.value());
+}
+
+};
+
 
 #define HE(nbits, t, v0, v1) \
     static_assert(horizontalEquality<nbits, t>(\
@@ -425,7 +447,7 @@ TEST_CASE(
     "BooleanSWAR MSBtoLaneMask",
     "[swar]"
 ) {
-    // BooleanSWAR as a mask: 
+    // BooleanSWAR as a mask:
     auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
     auto mask = S4_32(0x0F0F'0000);
     CHECK(bswar.MSBtoLaneMask().value() == mask.value());
@@ -452,6 +474,6 @@ TEST_CASE(
     CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value());
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
 }
