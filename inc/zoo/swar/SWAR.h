@@ -28,7 +28,6 @@ constexpr uint64_t popcount(uint64_t a) noexcept {
         >::execute(a);
 }
 
-
 /// Index into the bits of the type T that contains the MSB.
 template<typename T>
 constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
@@ -36,8 +35,14 @@ constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
 }
 
 /// Index into the bits of the type T that contains the LSB.
+///
+/// \todo incorporate __builtin_ctzg when it is more widely available
 template<typename T>
 constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
+    // This check should be SFINAE, but supporting all sorts
+    // of base types is an ongoing task, we put a bare-minimum
+    // temporary preventive measure with static_assert
+    static_assert(sizeof(T) <= 8, "Unsupported");
     #ifdef _MSC_VER
         // ~v & (v - 1) turns on all trailing zeroes, zeroes the rest
         return meta::logFloor(1 + (~v & (v - 1)));
@@ -45,6 +50,14 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
         return ~v ? __builtin_ctzll(v) : sizeof(T) * 8;
     #endif
 }
+
+#ifndef _MSC_VER
+constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
+    auto low = (v << 64) >> 64;
+    if(low) { return __builtin_ctzll(low); }
+    return 64 + __builtin_ctzll(v >> 64);
+}
+#endif
 
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
 /// of NBits width against a type T, and provides an abstraction for performing
@@ -205,7 +218,7 @@ constexpr auto isolateLSB(T v) {
 
 template<int NBits, typename T>
 constexpr auto leastNBitsMask() {
-    return (T(1ull)<<NBits)-1;
+    return (T{1}<<NBits)-1;
 }
 
 template<int NBits, uint64_t T>
@@ -215,7 +228,7 @@ constexpr auto leastNBitsMask() {
 
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
-  return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
+    return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
 }
 
 
@@ -314,6 +327,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
     greaterEqual_MSB_off(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
 
     template<int NB, typename TT>
+    constexpr T
+    indexOfMostSignficantLaneSet(SWAR<NBits, T> test) noexcept;
+
+    template<int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
     convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
@@ -376,6 +393,39 @@ constantIsGreaterEqual_MSB_off(SWAR<NBits, T> subtrahend) noexcept {
             minuendWithMSBs_turnedOn - subtrahendMSBs_turnedOff;
         return MSB_Mask & leastSignificantComparison;
     }
+}
+
+template<typename T, typename U, typename V>
+constexpr T median(T x, U y, V z) {
+    return (x | y) & (y | z) & (x | z);
+}
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
+    // Adapted from TAOCP V4 P152
+    // h is msbselector, x is right, l is lower/left.  Sets MSB to 1 in lanes
+    // in test variable t for when xi < yi for lane i . Invert for greaterEqual.
+    // t = h & ~<x~yz>
+    // z = (x|h) - (y&~h)
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
+    const auto z = (x|h) - (y&~h);
+    // bitwise ternary median! 
+    const auto t = h & ~median(x, ~y, z);
+    return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
+}
+
+// In the condition where only MSBs will be on, we can fast lookup with 1 multiply the index of the most signficant byte that is on.
+// This appears to be a mapping from the (say) 256 unique values of a 64 bit int where only MSBs of each 8 bits can be on, but I don't fully understand it.
+// Adapted from TAOCP Vol 4A Page 153 Eq 94.
+template<int NBits, typename T>
+constexpr T
+indexOfMostSignficantLaneSet(SWAR<NBits, T> test) noexcept {
+    const auto TypeWidth = sizeof(T) * 8;
+    const auto TopVal = (T{1}<<(TypeWidth-NBits))-1, BottomVal = (T{1}<<(NBits-1))-1;
+    const T MappingConstant = TopVal / BottomVal;
+    return (test.value() * MappingConstant) >> (TypeWidth - NBits);
 }
 
 template<int NBits, typename T>

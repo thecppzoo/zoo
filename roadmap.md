@@ -1,21 +1,28 @@
-Roadmap items:
-  Robin Hood
-    Deletion
-    Unaligned Find
-    Insertion no journal metadata
-    Insertion incremental apply
-    Equivalence class detection
-    Rotation
-    Deletion opt by equivalence class
-    Extended benchmarking via some mechanism
-    Add F14 to benchmarks
-    Add Swisstable to benchmarks
-    Harden testing around lower level primitives
-    Add alternate hash/scatter/hoist/reduce objects
-    Add all-in-one hash strategy for using double-fibonacci or similar
-
-  SWAR
-    Prototype useful application of generic vs simd code emit that isn't robin hood related.
-    
-  Type Erasure
-    Define standard affordances
+- Roadmap items:
+  - Robin Hood
+    - Deletion
+    - Unaligned Find
+    - Insertion no journal metadata
+    - Insertion incremental apply
+    - Equivalence class detection
+    - Rotation
+    - Deletion opt by equivalence class
+    - Extended benchmarking via some mechanism
+    - Harden testing around lower level primitives
+    - Add alternate hash/scatter/hoist/reduce objects
+    - Add all-in-one hash strategy for using double-fibonacci or similar
+  - SWAR
+    - Get string utilities hardened enough they can be used in prod.
+    - Provide docs and examples for simple uses of library (to further cut and paste)
+  - Type Erasure
+    - Provide examples and documentation for one simple use case.
+    - Define standard affordance list.
+  - Relocatability
+    - Basic definitions doc.
+    - Doc to drive user understanding of what the concept even is.
+    - Example use cases doc (zero copy serialize, alternate layouts, inline compression, etc)
+  - Presentations:
+    - SWAR Intro - Jamie (late may)
+    - Performance Presentation - Eduardo (late may)
+    - SWAR Demo - Jamie ( late july?)
+    - Relocatability and Value Manager - Eduardo and Scott (late july?)

@@ -2,8 +2,17 @@
 
 #include "catch2/catch.hpp"
 
+#include <ios>
+#include <iomanip>
+#include <iostream>
+#include <type_traits>
+
 using namespace zoo;
 using namespace zoo::swar;
+
+using S2_64 = SWAR<2, uint64_t>;
+using S2_32 = SWAR<2, uint32_t>;
+using S2_16 = SWAR<2, uint16_t>;
 
 using S4_64 = SWAR<4, uint64_t>;
 using S4_32 = SWAR<4, uint32_t>;
@@ -280,8 +289,8 @@ static_assert(8 == lsbIndex(1<<8));
 static_assert(17 == lsbIndex(1<<17));
 static_assert(30 == lsbIndex(1<<30));
 
-/*
-These tests were not catching errors known to have been present
+
+/*These tests were not catching errors known to have been present
 static_assert(0x80880008 == greaterEqual<3>(SWAR<4, uint32_t>(0x3245'1027)).value());
 static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x0123'4567)).value());
 static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x7654'3210)).value());
@@ -289,35 +298,107 @@ static_assert(0x00000008 == greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).valu
 static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).value());
 */
 
-// Unusual formatting for easy visual verification.
-#define GE_MSB_TEST(left, right, result) static_assert(result== greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
-GE_MSB_TEST(0x1000'0010,
-            0x0111'1101,
-            0x8000'0080)
-GE_MSB_TEST(0x4333'3343,
-            0x4444'4444,
-            0x8000'0080)
-GE_MSB_TEST(0x0550'0110,
-            0x0110'0550,
-            0x8888'8008)
-GE_MSB_TEST(0x4771'1414,
-            0x4641'1774,
-            0x8888'8008)
+#define GE_MSB_TEST(left, right, result) static_assert(result == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
-GE_MSB_TEST(0x0123'4567,
-            0x0000'0000,
-            0x8888'8888)
-GE_MSB_TEST(0x0123'4567,
-            0x7777'7777,
-            0x0000'0008)
+GE_MSB_TEST(
+    0x1000'0010,
+    0x0111'1101,
+    0x8000'0080)
+GE_MSB_TEST(
+    0x4333'3343,
+    0x4444'4444,
+    0x8000'0080)
+GE_MSB_TEST(
+    0x0550'0110,
+    0x0110'0550,
+    0x8888'8008)
+GE_MSB_TEST(
+    0x4771'1414,
+    0x4641'1774,
+    0x8888'8008)
+GE_MSB_TEST(
+    0x0123'4567,
+    0x0000'0000,
+    0x8888'8888)
+GE_MSB_TEST(
+    0x0123'4567,
+    0x7777'7777,
+    0x0000'0008)
+GE_MSB_TEST(
+    0x0000'0000,
+    0x0123'4567,
+    0x8000'0000)
+GE_MSB_TEST(
+    0x7777'7777,
+    0x0123'4567,
+    0x8888'8888)
 
-GE_MSB_TEST(0x0000'0000,
-            0x0123'4567,
-            0x8000'0000)
-GE_MSB_TEST(0x7777'7777,
-            0x0123'4567,
-            0x8888'8888)
+// Replicate the msb off tests with the greaterEqual that allows msb on
+#define GE_MSB_ON_TEST(left, right, result) static_assert(result == greaterEqual<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
+
+GE_MSB_ON_TEST(
+    0x1000'0010,
+    0x0111'1101,
+    0x8000'0080)
+GE_MSB_ON_TEST(
+    0x4333'3343,
+    0x4444'4444,
+    0x8000'0080)
+GE_MSB_ON_TEST(
+    0x0550'0110,
+    0x0110'0550,
+    0x8888'8008)
+GE_MSB_ON_TEST(
+    0x4771'1414,
+    0x4641'1774,
+    0x8888'8008)
+GE_MSB_ON_TEST(
+    0x0123'4567,
+    0x0000'0000,
+    0x8888'8888)
+GE_MSB_ON_TEST(
+    0x0123'4567,
+    0x7777'7777,
+    0x0000'0008)
+GE_MSB_ON_TEST(
+    0x0000'0000,
+    0x0123'4567,
+    0x8000'0000)
+GE_MSB_ON_TEST(
+    0x7777'7777,
+    0x0123'4567,
+    0x8888'8888)
+
+TEST_CASE(
+    "greaterEqualMSBOn",
+    "[swar][unsigned-swar]"
+) {
+    SECTION("single") {
+        for (uint32_t i = 1; i < 4; i++) {
+            const auto left = S2_16{0}.blitElement(1,  i);
+            const auto right = S2_16{S2_16::AllOnes}.blitElement(1, i-1);
+            const auto test = S2_16{0}.blitElement(1, 2);
+            CHECK(test.value() == greaterEqual<2, u16>(left, right).value()); 
+        }
+    }
+    SECTION("single") {
+        for (uint32_t i = 1; i < 15; i++) {
+            const auto large = S4_32{0}.blitElement(1,  i+1);
+            const auto small = S4_32{S4_32::AllOnes}.blitElement(1, i-1);
+            const auto test = S4_32{0}.blitElement(1, 8);
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+        }
+    }
+    SECTION("allLanes") {
+        for (uint32_t i = 1; i < 15; i++) {
+            const auto small = S4_32(S4_32::LeastSignificantBit * (i-1));
+            const auto large = S4_32(S4_32::LeastSignificantBit * (i+1));
+            const auto test = S4_32(S4_32::LeastSignificantBit * 8);
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+        }
+    }
+}
 
 static_assert(0x123 == SWAR<4, uint32_t>(0x173).blitElement(1, 2).value());
 static_assert(0 == isolateLSB(u32(0)));
