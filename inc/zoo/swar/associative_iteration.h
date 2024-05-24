@@ -451,6 +451,38 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     return product;
 }
 
+template<int ActualBits, int NB, typename T>
+constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto left, auto right, auto counts) {
+      const auto mask = makeLaneMaskFromMSB(counts);
+      const auto product =
+        multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
+      return (product & mask) | (left & ~mask);
+    };
+
+    // halver should work same as multiplication... i think...
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        return S{static_cast<T>(msbCleared.value() << 1)};
+    };
+
+    exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
+    return associativeOperatorIterated_regressive(
+        x,
+        S{meta::BitmaskMaker<T, 1, NB>().value}, // neutral is lane wise..
+        exponent,
+        S{S::MostSignificantBit},
+        operation,
+        ActualBits,
+        halver
+    );
+}
+
 template<int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe(
     SWAR<NB, T> multiplicand,
