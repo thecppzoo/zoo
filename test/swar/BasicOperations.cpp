@@ -37,7 +37,7 @@ static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
 static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
 static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
-static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
+static_assert(SWAR{zoo::swar::Literals<32, zoo::swar::u64>, {2, 1}}.value() == 0x00000002'00000001);
 static_assert(SWAR{Literals<32, u64>, {1, 2}}.value() == 0x00000001'00000002);
 
 static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
