@@ -17,7 +17,7 @@ template <int NBits, typename T>
 struct SWAR;
 
 template <int NumBits, typename BaseType> struct Literals_t {
-  constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
+    constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
 };
 
 template <int NumBits, typename BaseType>
