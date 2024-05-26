@@ -135,8 +135,8 @@ static_assert(modulo_power_of_two<4>(S{0}).value() == 0);
 static_assert(modulo_power_of_two<4>(S{S::Literal, {0, 2, 4, 6}}).value()
                                   == S{S::Literal, {0, 2, 0, 2}}.value());
 
-static_assert(modulo_power_of_two<8>(S{S::Literal, {0, 2, 4, 6}}).value()
-                                  == S{S::Literal, {0, 2, 4, 6}}.value());
+static_assert(modulo_power_of_two<8>(S{S::Literal, {0, 2, 4, 9}}).value()
+                                  == S{S::Literal, {0, 2, 4, 1}}.value());
 
 static_assert(modulo_power_of_two<64>(S{S::Literal, {0, 1, 64, 65}}).value()
                                   == S{S::Literal,  {0, 1, 0, 1}}.value());
