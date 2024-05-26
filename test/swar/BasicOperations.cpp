@@ -1,6 +1,8 @@
+#include "zoo/swar/SWAR.h"
 #include "zoo/swar/associative_iteration.h"
 
 #include "catch2/catch.hpp"
+#include "math.h"
 
 #include <ios>
 #include <iomanip>
@@ -93,6 +95,24 @@ static_assert(BS{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'000
 static_assert(BS{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
 static_assert(BS{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
 static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+
+
+namespace equality {
+using S = SWAR<8, u32>;
+using BS = BooleanSWAR<8, u32>;
+static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
+                     S{S::Literal,      {1, 2, 3, 4}}).value()
+                     == BS{BS::Literal, {T, T, T, T}}.value());
+
+static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
+                     S{S::Literal,      {5, 6, 7, 8}}).value()
+                     == BS{BS::Literal, {F, F, F, F}}.value());
+
+static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
+                     S{S::Literal,      {5, 2, 7, 4}}).value()
+                     == BS{BS::Literal, {F, T, F, T}}.value());
+}
+
 #undef F
 #undef T
 
