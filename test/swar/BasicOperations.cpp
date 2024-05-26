@@ -3,6 +3,7 @@
 
 #include "catch2/catch.hpp"
 #include "math.h"
+#include "zoo/swar/math.h"
 
 #include <ios>
 #include <iomanip>
@@ -111,6 +112,23 @@ static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
 static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
                      S{S::Literal,      {5, 2, 7, 4}}).value()
                      == BS{BS::Literal, {F, T, F, T}}.value());
+}
+
+namespace math {
+using S = SWAR<8, u32>;
+using BS = BooleanSWAR<8, u32>;
+
+static_assert(subtract_one_unsafe(S{S::Literal,    {1, 3, 4, 8}}).value()
+                                  == S{S::Literal, {0, 2, 3, 7}}.value());
+
+static_assert(is_power_of_two(S{S::Literal,      {1, 3, 4, 8}}).value()
+                              == BS{BS::Literal, {T, F, T, T}}.value());
+
+static_assert(is_power_of_two(S{S::Literal,      {3, 7, 11, 101}}).value()
+                              == BS{BS::Literal, {F, F, F, F}}.value());
+
+static_assert(is_power_of_two(S{S::Literal,      {2, 64, 128, 7}}).value()
+                              == BS{BS::Literal, {T, T, T, 0}}.value());
 }
 
 #undef F

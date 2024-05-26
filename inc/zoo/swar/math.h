@@ -32,17 +32,23 @@ static_assert(modulo_power_of_two<4096>(4097) == 1);
 
 // SWAR power of two
 
+namespace zoo::swar {
 template <typename S>
-constexpr static auto is_power_of_two_sw(S x) noexcept {
-  constexpr auto NBits = S::NBits;
-  using T = typename S::Type;
-  // return x > 0 && (x & (x - 1)) == 0;
-  auto gt_zero = zoo::swar::greaterEqual_MSB_off(x, S{0});
-
+constexpr static auto subtract_one_unsafe(S x) noexcept {
   constexpr auto Ones = S::LeastSignificantBit;
-  auto x_minus_1 = x - Ones;
-  auto x_and_x_minus_1 = x & x_minus_1;
-  using BS = zoo::swar::BooleanSWAR<NBits, T>;
-  return B
+  auto x_minus_1 = S{x.value() - Ones};
+  return x_minus_1;
 }
+
+// todo subtract K unsafe using BitmaskMaker
+
+template <typename S>
+constexpr static auto is_power_of_two(S x) noexcept {
+  constexpr auto NBits = S::NBits;
+  using T = typename S::type;
+  auto x_minus_1 = subtract_one_unsafe(x);
+  return equals(S{x_minus_1.value() & x.value()}, S{0});
+}
+
+} // namespace zoo::swar
 
