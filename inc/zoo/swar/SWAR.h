@@ -21,7 +21,7 @@ template <int NumBits, typename BaseType> struct Literals_t {
 };
 
 template <int NumBits, typename BaseType>
-constexpr Literals_t<NumBits, BaseType> Literals{};
+constexpr Literals_t<NumBits, BaseType> Literals {};
 
 using u64 = uint64_t;
 using u32 = uint32_t;
