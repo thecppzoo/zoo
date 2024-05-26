@@ -60,9 +60,8 @@ constexpr static auto is_power_of_two(S x) noexcept {
 
 template <size_t N, typename S>
 constexpr static
-auto
+std::enable_if_t<zoo::math::is_power_of_two<size_t, N>(), S>
 modulo_power_of_two(const S x) noexcept {
-  static_assert(zoo::math::is_power_of_two<size_t, N>());
   constexpr auto NBits = S::NBits;
   using T = typename S::type;
   constexpr auto N_minus_1 = N - 1;
