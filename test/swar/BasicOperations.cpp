@@ -114,7 +114,7 @@ static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
                      == BS{BS::Literal, {F, T, F, T}}.value());
 }
 
-namespace math {
+namespace math_test {
 using S = SWAR<8, u32>;
 using BS = BooleanSWAR<8, u32>;
 
@@ -129,6 +129,18 @@ static_assert(is_power_of_two(S{S::Literal,      {3, 7, 11, 101}}).value()
 
 static_assert(is_power_of_two(S{S::Literal,      {2, 64, 128, 7}}).value()
                               == BS{BS::Literal, {T, T, T, 0}}.value());
+
+static_assert(modulo_power_of_two<4>(S{0}).value() == 0);
+
+static_assert(modulo_power_of_two<4>(S{S::Literal, {0, 2, 4, 6}}).value()
+                                  == S{S::Literal, {0, 2, 0, 2}}.value());
+
+static_assert(modulo_power_of_two<512>(S{S::Literal, {0, 2, 4, 6}}).value()
+                                  == S{S::Literal, {0, 2, 4, 6}}.value());
+
+static_assert(modulo_power_of_two<64>(S{S::Literal, {0, 1, 64, 65}}).value()
+                                  == S{S::Literal,  {0, 1, 0, 1}}.value());
+
 }
 
 #undef F

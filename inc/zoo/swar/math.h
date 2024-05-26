@@ -71,17 +71,6 @@ modulo_power_of_two(const S x) noexcept {
   return S{y};
 }
 
-using S = zoo::swar::SWAR<4, uint16_t>;
-static_assert(modulo_power_of_two<4>(S{0}).value() == 0);
-
-static_assert(modulo_power_of_two<4>(S{S::Literal, {0, 2, 4, 6}}).value()
-                                  == S{S::Literal, {0, 2, 0, 2}}.value());
-
-static_assert(modulo_power_of_two<512>(S{S::Literal, {0, 2, 4, 6}}).value()
-                                  == S{S::Literal, {0, 2, 4, 6}}.value());
-
-static_assert(modulo_power_of_two<512>(S{S::Literal, {0, 511, 512, 1024}}).value()
-                                  == S{S::Literal, {0, 511, 0, 0}}.value());
 
 } // namespace zoo::swar
 
