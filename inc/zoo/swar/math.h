@@ -1,5 +1,9 @@
 #pragma once
 #include "SWAR.h"
+#include <cstddef>
+#include <cstdint>
+
+namespace zoo::math {
 
 template <typename IntegerType = size_t>
 constexpr static
@@ -30,6 +34,8 @@ static_assert(modulo_power_of_two<4>(0) == 0);
 static_assert(modulo_power_of_two<8>(9) == 1);
 static_assert(modulo_power_of_two<4096>(4097) == 1);
 
+}
+
 // SWAR power of two
 
 namespace zoo::swar {
@@ -39,16 +45,43 @@ constexpr static auto subtract_one_unsafe(S x) noexcept {
   auto x_minus_1 = S{x.value() - Ones};
   return x_minus_1;
 }
-
 // todo subtract K unsafe using BitmaskMaker
+// todo subtract K "saturated" using BitmaskMaker
 
 template <typename S>
 constexpr static auto is_power_of_two(S x) noexcept {
   constexpr auto NBits = S::NBits;
   using T = typename S::type;
+  auto greater_than_0 = greaterEqual_MSB_off(x, S{0});
   auto x_minus_1 = subtract_one_unsafe(x);
-  return equals(S{x_minus_1.value() & x.value()}, S{0});
+  auto zero = equals(S{x_minus_1.value() & x.value()}, S{0});
+  return greater_than_0 & zero;
 }
+
+template <size_t N, typename S>
+constexpr static
+auto
+modulo_power_of_two(const S x) noexcept {
+  static_assert(zoo::math::is_power_of_two<size_t, N>());
+  constexpr auto NBits = S::NBits;
+  using T = typename S::type;
+  constexpr auto N_minus_1 = N - 1;
+  constexpr auto N_in_lanes = zoo::meta::BitmaskMaker<T, N_minus_1, NBits>::value;
+  T y = x.value() & N_in_lanes;
+  return S{y};
+}
+
+using S = zoo::swar::SWAR<4, uint16_t>;
+static_assert(modulo_power_of_two<4>(S{0}).value() == 0);
+
+static_assert(modulo_power_of_two<4>(S{S::Literal, {0, 2, 4, 6}}).value()
+                                  == S{S::Literal, {0, 2, 0, 2}}.value());
+
+static_assert(modulo_power_of_two<512>(S{S::Literal, {0, 2, 4, 6}}).value()
+                                  == S{S::Literal, {0, 2, 4, 6}}.value());
+
+static_assert(modulo_power_of_two<512>(S{S::Literal, {0, 511, 512, 1024}}).value()
+                                  == S{S::Literal, {0, 511, 0, 0}}.value());
 
 } // namespace zoo::swar
 

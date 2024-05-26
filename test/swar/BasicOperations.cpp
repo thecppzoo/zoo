@@ -5,10 +5,10 @@
 #include "math.h"
 #include "zoo/swar/math.h"
 
-#include <ios>
-#include <iomanip>
-#include <iostream>
-#include <type_traits>
+// #include <ios>
+// #include <iomanip>
+// #include <iostream>
+// #include <type_traits>
 using namespace zoo;
 using namespace zoo::swar;
 
