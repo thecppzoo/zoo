@@ -63,6 +63,7 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
     using type = std::make_unsigned_t<T>;
+    constexpr static auto Literal = Literals<NBits_, T>;
     constexpr static inline type
         NBits = NBits_,
         BitWidth = sizeof(T) * 8,

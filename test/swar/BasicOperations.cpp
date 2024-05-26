@@ -6,8 +6,6 @@
 #include <iomanip>
 #include <iostream>
 #include <type_traits>
-
-
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -42,10 +40,8 @@ static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
 static_assert(SWAR{Literals<32, u64>, {1, 2}}.value() == 0x00000001'00000002);
 
-static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() ==
-              0x0004'0003'0002'0001);
-static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.value() ==
-              0x0001'0002'0003'0004);
+static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
+static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.value() == 0x0001'0002'0003'0004);
 
 static_assert(SWAR{Literals<16, u32>, {2, 1}}.value() == 0x0002'0001);
 static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
@@ -60,51 +56,33 @@ static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
 static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
 static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
 
+// Little-endian
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
 
- // static_assert([]() -> bool {
- //   constexpr auto array = std::array<u64, 4>{1, 2, 3, 4};
- //   auto s = SWAR{Literals<16, u64>, array};
- //   return s.at(0) == 4;
- // }());
+// Macro required because initializer lists are not constexpr
+#define ARRAY_TEST(SwarType, ...)                                              \
+    static_assert([]() {                                                       \
+        using S = SwarType;                                                    \
+        constexpr auto arry = std::array{__VA_ARGS__};                         \
+        constexpr auto test_array = S{S::Literal, {__VA_ARGS__}}.to_array();   \
+        static_assert(arry.size() == S::Lanes);                                \
+        for (auto i = 0; i < S::Lanes; ++i) {                                  \
+            if (arry[i] != test_array.at(i)) {                                 \
+                return false;                                                  \
+            }                                                                  \
+        }                                                                      \
+        return true;                                                           \
+    }());                                                                      \
 
-template <int NBits, typename T>
-constexpr auto operator==(const SWAR<NBits, T> &sw,
-                          const std::array<T, SWAR<NBits, T>::Lanes> &arr) {
-  const auto swArr = sw.to_array();
-  if (swArr.size() != arr.size()) {
-    return false;
-  }
-  for (auto i = 0; i < SWAR<NBits, T>::Lanes; ++i) {
-    if (swArr.at(i) != arr[i]) {
-      return false;
-    }
-  }
-  return true;
-}
+ARRAY_TEST(S16_64, 1, 2, 3, 4);
+ARRAY_TEST(S16_64, 4, 3, 2, 1);
 
-static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}} ==
-              std::array<u32, 4>{1, 2, 3, 4});
+ARRAY_TEST(S8_32, 255, 255, 255, 255);
+ARRAY_TEST(S8_64, 255, 255, 255, 255, 255, 255, 255, 255);
 
-#define ARRAY_TEST                                                             \
-  constexpr auto A = S{Literals<NBits, S::type>, {ArrayLiteral}};              \
-  constexpr auto B = std::array<S::type, S::Lanes>{ArrayLiteral};              \
-  return A == B;
-
-static_assert([]() {
-  using S = S8_32;
-  constexpr auto NBits = 8;
-#define ArrayLiteral 4, 3, 2, 1
-  ARRAY_TEST
-}());
-
-static_assert([]() {
-  using S = S4_16;
-  constexpr auto NBits = 4;
-#define ArrayLiteral 4, 3, 2, 1
-  ARRAY_TEST
-}());
+ARRAY_TEST(S16_32, 65534, 65534);
+ARRAY_TEST(S16_64, 65534, 65534, 65534, 65534);
 
 #define F false
 #define T true
