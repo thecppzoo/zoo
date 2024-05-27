@@ -1,4 +1,3 @@
-#include "zoo/swar/SWAR.h"
 #include "zoo/swar/associative_iteration.h"
 
 #include "catch2/catch.hpp"
@@ -115,9 +114,13 @@ static_assert(equals(S{S::Literal,      {1, 2, 3, 4}},
 }
 
 namespace math_test {
+static_assert(math::isPowerOfTwo<int, 4>());
+static_assert(math::moduloPowerOfTwo<4>(0) == 0);
+static_assert(math::moduloPowerOfTwo<8>(9) == 1);
+static_assert(math::moduloPowerOfTwo<4096>(4097) == 1);
+
 using S = SWAR<8, u32>;
 using BS = BooleanSWAR<8, u32>;
-
 static_assert(subtractOneUnsafe(S{S::Literal,    {1, 3, 4, 8}}).value()
                                   == S{S::Literal, {0, 2, 3, 7}}.value());
 
@@ -140,7 +143,6 @@ static_assert(moduloPowerOfTwo<8>(S{S::Literal, {0, 2, 4, 9}}).value()
 
 static_assert(moduloPowerOfTwo<64>(S{S::Literal, {0, 1, 64, 65}}).value()
                                   == S{S::Literal,  {0, 1, 0, 1}}.value());
-
 }
 
 #undef F
