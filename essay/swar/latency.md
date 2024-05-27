@@ -96,3 +96,6 @@ In the early planning stages for support of "hardware" SIMD (architectures that 
 ## A hard challenge
 
 As with much of what superficially looks bad in our SWAR library, upon closer examination, we determine fairly rigorously that these are the best choices, the essential costs.  In that regard, it meets the primary mission of serving as a way to express in software all that we know about performance so that users can benefit the most from our expertise.
+
+-ed
+
