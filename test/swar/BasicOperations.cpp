@@ -118,27 +118,27 @@ namespace math_test {
 using S = SWAR<8, u32>;
 using BS = BooleanSWAR<8, u32>;
 
-static_assert(subtract_one_unsafe(S{S::Literal,    {1, 3, 4, 8}}).value()
+static_assert(subtractOneUnsafe(S{S::Literal,    {1, 3, 4, 8}}).value()
                                   == S{S::Literal, {0, 2, 3, 7}}.value());
 
-static_assert(is_power_of_two(S{S::Literal,      {1, 3, 4, 8}}).value()
+static_assert(isPowerOfTwo(S{S::Literal,      {1, 3, 4, 8}}).value()
                               == BS{BS::Literal, {T, F, T, T}}.value());
 
-static_assert(is_power_of_two(S{S::Literal,      {3, 7, 11, 101}}).value()
+static_assert(isPowerOfTwo(S{S::Literal,      {3, 7, 11, 101}}).value()
                               == BS{BS::Literal, {F, F, F, F}}.value());
 
-static_assert(is_power_of_two(S{S::Literal,      {2, 64, 128, 7}}).value()
+static_assert(isPowerOfTwo(S{S::Literal,      {2, 64, 128, 7}}).value()
                               == BS{BS::Literal, {T, T, T, 0}}.value());
 
-static_assert(modulo_power_of_two<4>(S{0}).value() == 0);
+static_assert(moduloPowerOfTwo<4>(S{0}).value() == 0);
 
-static_assert(modulo_power_of_two<4>(S{S::Literal, {0, 2, 4, 6}}).value()
+static_assert(moduloPowerOfTwo<4>(S{S::Literal, {0, 2, 4, 6}}).value()
                                   == S{S::Literal, {0, 2, 0, 2}}.value());
 
-static_assert(modulo_power_of_two<8>(S{S::Literal, {0, 2, 4, 9}}).value()
+static_assert(moduloPowerOfTwo<8>(S{S::Literal, {0, 2, 4, 9}}).value()
                                   == S{S::Literal, {0, 2, 4, 1}}.value());
 
-static_assert(modulo_power_of_two<64>(S{S::Literal, {0, 1, 64, 65}}).value()
+static_assert(moduloPowerOfTwo<64>(S{S::Literal, {0, 1, 64, 65}}).value()
                                   == S{S::Literal,  {0, 1, 0, 1}}.value());
 
 }
