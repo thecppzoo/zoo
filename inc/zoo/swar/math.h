@@ -58,13 +58,12 @@ template <size_t N, typename S>
 constexpr static
 std::enable_if_t<zoo::math::isPowerOfTwo<size_t, N>(), S>
 moduloPowerOfTwo(const S x) noexcept {
-    constexpr auto NBits = S::NBits;
-    using T = typename S::type;
     constexpr auto N_minus_1 = N - 1;
-    constexpr auto N_in_lanes = zoo::meta::BitmaskMaker<T, N_minus_1, NBits>::value;
+    constexpr auto N_in_lanes = zoo::meta::BitmaskMaker<typename S::type, N_minus_1, S::NBits>::value;
     auto y = x.value() & N_in_lanes;
     return S{y};
 }
+
 
 } // namespace zoo::swar
 
