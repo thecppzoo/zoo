@@ -16,9 +16,6 @@ namespace zoo { namespace swar {
 template <int NBits, typename T>
 struct SWAR;
 
-template <int NBits, typename T>
-struct BooleanSWAR;
-
 template <int NumBits, typename BaseType> struct Literals_t {
     constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
 };
@@ -66,7 +63,6 @@ constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
     using type = std::make_unsigned_t<T>;
-    using Boolean = BooleanSWAR<NBits_, T>;
     constexpr static auto Literal = Literals<NBits_, T>;
     constexpr static inline type
         NBits = NBits_,
