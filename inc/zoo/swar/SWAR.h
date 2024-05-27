@@ -16,17 +16,17 @@ namespace zoo { namespace swar {
 template <int NBits, typename T>
 struct SWAR;
 
-template <int NumBits, typename BaseType> struct Literals_t {
-    constexpr static void (SWAR<NumBits, BaseType>::*value)() = nullptr;
-};
+template <int NumBits, typename BaseType>
+struct Literals_t {};
 
 template <int NumBits, typename BaseType>
-constexpr Literals_t<NumBits, BaseType> Literals{};
+constexpr Literals_t<NumBits, BaseType>
+Literals{};
 
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = std::uint8_t;
+using u8 = uint8_t;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
