@@ -4,6 +4,8 @@ Recently a colleague asked me about the latencies in applications of our SWAR li
 
 Are they high?
 
+## Deep data dependencies
+
 Let's see, for example, what Prof. Daniel Lemire said of one of my favorite pieces of code of his, "parsing eight digits", discussed in his blog [Quickly parsing eight digits](https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/):
 With regards to this code,
 ```c++
@@ -21,7 +23,7 @@ uint32_t parse_eight_digits_swar(const char *chars) {
   return short100plus >> 32;
 }
 ```
-That we then implemented [as](https://github.com/thecppzoo/zoo/blob/9a1e406c63ede7cbc16cf16bde3731fcf9ee8c86/benchmark/atoi.cpp#L33-L55)
+That we then implemented [as](https://github.com/thecppzoo/zoo/blob/9a1e406c63ede7cbc16cf16bde3731fcf9ee8c86/benchmark/atoi.cpp#L33-L55):
 ```c++
 uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexcept {
     /* the idea is to perform the following multiplication:
@@ -47,13 +49,16 @@ uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexc
     return uint32_t(by10001base2to32.value() >> 32);
 }
 ```
-and we will keep iterating so that the code reflects this is just one example of associative iteration, Lemire commented the following, which I think is unfortunate:
+that results in identical code generation with minimal optimization, and we will keep iterating so that the code reflects this is just one example of associative iteration, Lemire commented the following, which I think is unfortunate:
 
 > The fact that each step depends on the completion of the previous step is less good: it means that the latency is relatively high
 
-This begs the question, relatively to what?
+This begs the question, relatively high to what?
+
+## Parallelism
 
 The essence of parallel algorithms is the "mapping" of an operation that is associative to multiple data elements simultaneously or in parallel, and the collection (reduction) of the partial results into the final result.
+
 The collection (gathering, reduction) of the partial results induce a tree structure, whose height is in the order of the logarithm of the number of elements N.
 For a binary operation, the minimum height for this tree is the logarithm base 2 of the number of initial elements: for a binary operation, the minimum latency is achieved when at each pass we can reduce the data elements by half.
 
@@ -72,16 +77,22 @@ Lemire's point of view that his mechanism has high latency seems to be just wron
 
 This example goes to show why SWAR mechanisms also have good latencies:  If the SWAR operation is the parallel mapping of computation and the parallel combination of partial results, they very well be of optimal latency.
 
-Sometimes there is no need to combine partial results, for example, in `strlen`, we don't need to, for example, calculate the number of bytes that are null, we just want the first null; any good SIMD programming interface would give you "horizontal" operations to extract the desired result directly.  Curiously enough, our SWAR library gives that capability directly; in the `strlen` case, the operation is "count trailing zeros", however, most SIMD architectures, what we call "hardware SIMD", do not!
+Sometimes there is no need to combine partial results, for example, in `strlen`, we don't need to, for example, calculate the number of bytes that are null, we just want the first null; any good SIMD programming interface would give you "horizontal" operations to extract the desired result directly.
+
+## How hardware SIMD leads to inefficiences due to design mistakes
+
+Curiously enough, our SWAR library gives that capability directly; in the `strlen` case, the operation is "count trailing zeros", however, most SIMD architectures, what we call "hardware SIMD", do not!
 
 As we have demonstrated in our AVX2 and ARM NEON implementations of `strlen`, the way to process the results of comparisons is devoid of any horizontal operation, in both cases, there is the need to transform SIMD data into scalars to then use the execution resources for general purpose computing to extract the desired result.
 
-I believe why our SWAR implementations are competitive with the software that uses "hardware SIMD".
+I believe this helps our SWAR, "software SIMD" implementations to be competitive with the software that uses "hardware SIMD".
 
-This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" types that are bitfields of the results of comparisons, not SIMD type values.  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this encapsulation would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document.
+This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" values of types that are bitfields of the results of comparisons, not SIMD type values.  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this "back and forth SIMD-scalar" conversions would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document.
 
-Our SWAR library, in this regard, is "future proof": boolean results are just an specific form of SIMD values.  We use this already for SIMD operations such as saturated addition: unsigned overflow (carry) is detected lane wise and lane-wise propagated to the whole lane.  Saturation is implemented seamlessly as after-processing of computation, without having to convert to "scalar" (the result mask) and back.
+Our SWAR library, in this regard, is "future proof": boolean results are just an specific form of SIMD values.  We use this already for SIMD operations such as saturated addition: unsigned overflow (carry) is detected lane wise and lane-wise propagated to the whole lane, without conversion to scalar.  Saturation is implemented seamlessly as after-processing of computation, without having to convert to "scalar" (the result mask) and back.
 
 In the early planning stages for support of "hardware" SIMD (architectures that do SIMD), I've thought that perhaps we will have to keep our emulated SIMD implementations on "hardware SIMD" as a flavor for users to choose from, since they may be the only way to avoid performance penalties that are higher than the cost of emulation, to prevent the error in the standard library.
+
+## A hard challenge
 
 As with much of what superficially looks bad in our SWAR library, upon closer examination, we determine fairly rigorously that these are the best choices, the essential costs.  In that regard, it meets the primary mission of serving as a way to express in software all that we know about performance so that users can benefit the most from our expertise.
