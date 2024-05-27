@@ -62,7 +62,7 @@ moduloPowerOfTwo(const S x) noexcept {
     using T = typename S::type;
     constexpr auto N_minus_1 = N - 1;
     constexpr auto N_in_lanes = zoo::meta::BitmaskMaker<T, N_minus_1, NBits>::value;
-    T y = x.value() & N_in_lanes;
+    auto y = x.value() & N_in_lanes;
     return S{y};
 }
 
