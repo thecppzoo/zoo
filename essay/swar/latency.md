@@ -6,8 +6,7 @@ Are they high?
 
 ## Deep data dependencies
 
-Let's see, for example, what Prof. Daniel Lemire said of one of my favorite pieces of code of his, "parsing eight digits", discussed in his blog [Quickly parsing eight digits](https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/):
-With regards to this code,
+Let's see, for example, what Prof. Daniel Lemire said of one of my favorite pieces of his code, "parsing eight digits", discussed in his blog [Quickly parsing eight digits](https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/):
 ```c++
 uint32_t parse_eight_digits_swar(const char *chars) {
   uint64_t val;
@@ -23,7 +22,14 @@ uint32_t parse_eight_digits_swar(const char *chars) {
   return short100plus >> 32;
 }
 ```
-That we then implemented [as](https://github.com/thecppzoo/zoo/blob/9a1e406c63ede7cbc16cf16bde3731fcf9ee8c86/benchmark/atoi.cpp#L33-L55):
+
+Lemire commented:
+
+> The fact that each step depends on the completion of the previous step is less good: it means that the latency is relatively high
+
+Certainly this implementation is a long chain of data dependencies, or deep data dependencies, but I still think Lemire's comment is unfortunate, the main topic of this essay.
+
+By the way, we [implemented this code using SWAR](https://github.com/thecppzoo/zoo/blob/9a1e406c63ede7cbc16cf16bde3731fcf9ee8c86/benchmark/atoi.cpp#L33-L55):
 ```c++
 uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexcept {
     /* the idea is to perform the following multiplication:
@@ -49,45 +55,41 @@ uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexc
     return uint32_t(by10001base2to32.value() >> 32);
 }
 ```
-that results in identical code generation with minimal optimization, and we will keep iterating so that the code reflects this is just one example of associative iteration, Lemire commented the following, which I think is unfortunate:
-
-> The fact that each step depends on the completion of the previous step is less good: it means that the latency is relatively high
-
-This begs the question, relatively high to what?
+resulting in identical code generation even with minimal optimization, and we will keep iterating so that the code reflects this is just one example of what we call "associative iteration" --[Glossary](../../glossary.md#associative-iteration)--.
 
 ## Parallelism
 
-The essence of parallel algorithms is the "mapping" of an operation that is associative to multiple data elements simultaneously or in parallel, and the collection (reduction) of the partial results into the final result.
+The essence of parallel algorithms is the "mapping" of an operation that is associative to multiple data elements simultaneously or in parallel, and the collection (reduction, gathering, combination) of the partial results into the final result.
 
-The collection (gathering, reduction) of the partial results induce a tree structure, whose height is in the order of the logarithm of the number of elements N.
+The combination of the partial results induce a tree structure, whose height is in the order of the logarithm of the number of elements N.
 For a binary operation, the minimum height for this tree is the logarithm base 2 of the number of initial elements: for a binary operation, the minimum latency is achieved when at each pass we can reduce the data elements by half.
 
 This is what happens in Lemire's method:  There are enough execution resources to halve 8 byte elements into 4.  The second stage reduces 4 partial results into 2.
-It is clear that with the mathematical technique of squaring the base, this mechanism is optimal with regards to latency.  So, the latency of this mechanism is not high compared to anything else that uses this base progression scheme, in fact, this is optimal with regards to parallel operations.
+It is clear that with the mathematical technique of squaring the base, **this mechanism is optimal with regards to latency** compared to anything else that uses this numeric base progression scheme.
 
-The immediate comparison is to revert to the linear, serial mechanism of "multiplying by 10 the previous result and adding the current digit".  That obviously leads to a latency of 7 partial results, 7 is worse than 3, so, Lemire's mechanism has, relatively, much lower, not higher, latency compared to the serial mechanism.
+A comparison with a fundamentally different technique is to revert to the linear, serial mechanism of "multiplying by 10 the previous result and adding the current digit".  That obviously leads to a latency of 7 partial results, multiplication is present in the stages of both schemes, and multiplication is the dominant latency[^1], 7 is worse than 3, so, Lemire's mechanism has, relatively, much lower, not higher, latency.
 
-Then Lemire is comparing his mechanism to some unknown mechanism that might have smaller latency that can not be the normal mathematics of multiplication by a base.  The mathematical need is to convert numbers in base 10 into base 2.  There may be exotic mathematics for base conversions that use other methods, perhaps something based on fourier transform as the best multiplication algorithms, but that for sure would be practical only for immense numbers of digits.
+Then Lemire is comparing his mechanism to some unknown mechanism that might have smaller latency that can not be the normal mathematics of multiplication by a base.  The mathematical need is to convert numbers in base 10 into base 2.  There may be exotic mathematics for base conversions that use other methods, perhaps something based on fourier transform as the best multiplication algorithms, but for sure would be practical only for immense numbers of digits.
 
-No, Lemire's is, for practical applications, the minimum latency in terms of the number of operations.  At each stage of gathering results, the multiplication is the dominant latency.  Can we devise processing stages of smaller latencies?
+No, Lemire's is, for practical applications, the minimum latency.  At each stage of gathering results, the multiplication is the dominant latency.  Can we devise processing stages of smaller latencies?
 
-I strongly suspect not, since the cheapest instructions such as bitwise operations and additions have latencies in the order of 1 cycle.  This method requires 1 multiplication, 1 mask, and 1 shift per stage, not more than 6 cycles, let's say that all of the register renaming, constant loading take one 1 cycle.  That's 7 cycles per stage, and the number of stages is minimal.
+I strongly suspect not, since the cheapest instructions such as bitwise operations and additions have latencies in the order of 1 cycle.  This method requires 1 multiplication, 1 mask, and 1 shift per stage, not more than 6 cycles, let's say that all of the register renaming, constant loading take one cycle.  That's 7 cycles per stage, and the number of stages is minimal.  See that multiplying by 10 as an addition chain requires 5 steps, so, that's a dead end.  Even the trick of using "Load Effective Address" in x86-64 using its very complex addressing modes ends quickly.  We can see this in the [compiler explorer](https://godbolt.org/z/PjMoGzbPa), multiplying by 10 might be implemented with just 2 instructions of minimal latency (adding and `LEA`), but the compiler optimizer would not multiply by 100 without using the actual multiplication instruction.
 
 Lemire's point of view that his mechanism has high latency seems to be just wrong.
 
 This example goes to show why SWAR mechanisms also have good latencies:  If the SWAR operation is the parallel mapping of computation and the parallel combination of partial results, they very well be of optimal latency.
 
-Sometimes there is no need to combine partial results, for example, in `strlen`, we don't need to, for example, calculate the number of bytes that are null, we just want the first null; any good SIMD programming interface would give you "horizontal" operations to extract the desired result directly.
+## How [hardware SIMD](../../glossary.md#hardware-simd) leads to inefficiences due to design mistakes
 
-## How hardware SIMD leads to inefficiences due to design mistakes
+Sometimes there is no need to combine partial results, for example, in `strlen`, we don't need to, for example, calculate the number of bytes that are null, we just want the first null; any good SIMD programming interface would give you "horizontal" operations to extract the desired result directly.
 
 Curiously enough, our SWAR library gives that capability directly; in the `strlen` case, the operation is "count trailing zeros", however, most SIMD architectures, what we call "hardware SIMD", do not!
 
-As we have demonstrated in our AVX2 and ARM NEON implementations of `strlen`, the way to process the results of comparisons is devoid of any horizontal operation, in both cases, there is the need to transform SIMD data into scalars to then use the execution resources for general purpose computing to extract the desired result.
+I think our colleagues in GLIBC that are so fond of assembler (we have proven this since our equivalents are more than 90% just C++ with very topical use of intrinsics, but theirs are through and through assembler code) would have identified the architectural primitive that would have spared them to have to use general purpose computation to identify the index into the block where the first null occurs.  Since they need to create a "mask" of booleans, it seems that those horizontal primitives are missing from AVX2 and Arm Neon.
 
-I believe this helps our SWAR, "software SIMD" implementations to be competitive with the software that uses "hardware SIMD".
+In our Robin Hood implementation there are many examples of our generation of a SIMD of boolean results and the immediate use of those booleans as SIMD values for further computation. I believe this helps our SWAR, ["software SIMD"](https://github.com/thecppzoo/zoo/blob/em/essay-swar-latency.md/glossary.md#software-simd) implementations to be competitive with the software that uses "hardware SIMD".
 
-This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" values of types that are bitfields of the results of comparisons, not SIMD type values.  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this "back and forth SIMD-scalar" conversions would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document.
+This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" values of types that are bitfields of the results of comparisons, not SIMD type values.  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this "back and forth SIMD-scalar" conversions would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document, wait for us to write an essay that contains the phrase "cuckoo-bananas".
 
 Our SWAR library, in this regard, is "future proof": boolean results are just an specific form of SIMD values.  We use this already for SIMD operations such as saturated addition: unsigned overflow (carry) is detected lane wise and lane-wise propagated to the whole lane, without conversion to scalar.  Saturation is implemented seamlessly as after-processing of computation, without having to convert to "scalar" (the result mask) and back.
 
@@ -96,6 +98,8 @@ In the early planning stages for support of "hardware" SIMD (architectures that 
 ## A hard challenge
 
 As with much of what superficially looks bad in our SWAR library, upon closer examination, we determine fairly rigorously that these are the best choices, the essential costs.  In that regard, it meets the primary mission of serving as a way to express in software all that we know about performance so that users can benefit the most from our expertise.
+
+[^1] We're beginning to work on explaining the basics of processor instructions and operations costs.
 
 -ed
 
