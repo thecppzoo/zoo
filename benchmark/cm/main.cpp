@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdint.h>
 
+#include "variant.h"
+
 /* Some definitions necessary, they are not in the listings */
 using f32 = float;
 constexpr f32 Pi32 = M_PI;
@@ -169,13 +171,108 @@ using P = zoo::Policy<void *[2], ShapeAffordance, zoo::Destroy, zoo::Move>;
 using Shape = zoo::AnyContainer<P>;
 
 static_assert(24 == sizeof(Shape));
+struct VariantShape: zoo::Variant<square, rectangle, triangle, circle> {
+    using Base = zoo::Variant<square, rectangle, triangle, circle>;
+    using Base::Base;
 
-auto zooTraverse(std::vector<Shape> &s) {
+    f32 area() {
+        auto rv = zoo::visit<f32>(
+            [](auto &s) {
+                if constexpr (std::is_same_v<zoo::BadVariant &, decltype(s)>) {
+                    return 0.0;
+                } else {
+                    return s.AreaNP();
+                }
+            },
+            *this
+        );
+        return rv;
+    }
+};
+
+template<typename E>
+auto zooTraverse(std::vector<E> &s) {
     f32 rv = 0;
     for(auto &shape: s) {
         rv += shape.area();
     }
     return rv;
+}
+
+/* ========================================================================
+   LISTING 25
+   ======================================================================== */
+
+enum shape_type : u32
+{
+    Shape_Square,
+    Shape_Rectangle,
+    Shape_Triangle,
+    Shape_Circle,
+    
+    Shape_Count,
+};
+
+struct shape_union
+{
+    shape_type Type;
+    f32 Width;
+    f32 Height;
+};
+
+f32 GetAreaSwitch(shape_union Shape)
+{
+    f32 Result = 0.0f;
+    
+    switch(Shape.Type)
+    {
+        case Shape_Square: {Result = Shape.Width*Shape.Width;} break;
+        case Shape_Rectangle: {Result = Shape.Width*Shape.Height;} break;
+        case Shape_Triangle: {Result = 0.5f*Shape.Width*Shape.Height;} break;
+        case Shape_Circle: {Result = Pi32*Shape.Width*Shape.Width;} break;
+        
+        case Shape_Count: {} break;
+    }
+    
+    return Result;
+}
+
+/* ========================================================================
+   LISTING 26
+   ======================================================================== */
+
+f32 TotalAreaSwitch(u32 ShapeCount, shape_union *Shapes)
+{
+    f32 Accum = 0.0f;
+    
+    for(u32 ShapeIndex = 0; ShapeIndex < ShapeCount; ++ShapeIndex)
+    {
+        Accum += GetAreaSwitch(Shapes[ShapeIndex]);
+    }
+
+    return Accum;
+}
+
+f32 TotalAreaSwitch4(u32 ShapeCount, shape_union *Shapes)
+{
+    f32 Accum0 = 0.0f;
+    f32 Accum1 = 0.0f;
+    f32 Accum2 = 0.0f;
+    f32 Accum3 = 0.0f;
+    
+    ShapeCount /= 4;
+    while(ShapeCount--)
+    {
+        Accum0 += GetAreaSwitch(Shapes[0]);
+        Accum1 += GetAreaSwitch(Shapes[1]);
+        Accum2 += GetAreaSwitch(Shapes[2]);
+        Accum3 += GetAreaSwitch(Shapes[3]);
+        
+        Shapes += 4;
+    }
+    
+    f32 Result = (Accum0 + Accum1 + Accum2 + Accum3);
+    return Result;
 }
 
 int main(int argc, const char *argv[]) {
@@ -208,20 +305,60 @@ int main(int argc, const char *argv[]) {
         }
         return
             benchmark(
-                zooTraverse,
+                zooTraverse<Shape>,
                 shapes
             );
     };
-    auto report = [](auto duration) {
+    auto zooVariant = [](auto &&m) {
+        std::vector<VariantShape> shapes;
+        std::uniform_int_distribution sti(0, 2);
+        std::uniform_real_distribution<float> rd(0.00001, 1.2);
+        for(int i = Count; i--; ) {
+            auto shapeTypeIndex = sti(m);
+            switch(shapeTypeIndex) {
+                case 0: shapes.emplace_back(std::in_place_index<0>, square(rd(m))); break;
+                case 1: shapes.emplace_back(std::in_place_index<1>, rectangle(rd(m), rd(m))); break;
+                case 2: shapes.emplace_back(std::in_place_index<2>, triangle(rd(m), rd(m))); break;
+                case 3: shapes.emplace_back(std::in_place_index<3>, circle(rd(m))); break;
+                default: throw std::runtime_error("Impossible shape type index");
+            }
+        }
+        return
+            benchmark(
+                zooTraverse<VariantShape>,
+                shapes
+            );
+    };
+    auto CaseyMuratoriUnion = [](auto &&m) {
+        std::vector<shape_union> shapes;
+        std::uniform_int_distribution sti(0, 2);
+        std::uniform_real_distribution<float> rd(0.00001, 1.2);
+        for(int i = Count; i--; ) {
+            auto shapeTypeIndex = sti(m);
+            shape_union element = { static_cast<shape_type>(shapeTypeIndex), rd(m), rd(m) };
+            shapes.push_back(element);
+        }
+        return
+            benchmark(
+                TotalAreaSwitch,
+                shapes.size(),
+                shapes.data()
+            );
+    };
+    auto report = [](auto duration, auto txt) {
         auto nanos = toNanoseconds(duration);
         constexpr auto Cycle = 1/3.6;
-        std::cout << nanos << ' ' << nanos/double(Count) << ' ' << nanos/Cycle/Count << ' ' << sideEffect << std::endl;
+        std::cout << nanos << ' ' << nanos/double(Count) << ' ' << nanos/Cycle/Count << ' ' << sideEffect << ' ' << txt << std::endl;
     };
     auto zte1 = zooTypeErasure(mersenne);
     auto durationVI = virtualInheritance(mersenne);
+    auto zooVar = zooVariant(mersenne);
+    auto cmSwitch = CaseyMuratoriUnion(mersenne);
     auto zte2 = zooTypeErasure(mersenne);
-    report(zte1);
-    report(durationVI);
-    report(zte2);
+    report(zte1, "ZTE 1");
+    report(durationVI, "Virtual + inheritance");
+    report(zooVar, "Zoo variant");
+    report(cmSwitch, "Casey Muratori's SWITCH");
+    report(zte2, "ZTE 2");
     return 0;
 }
