@@ -21,8 +21,8 @@ macro(set_xcode_properties TARGET_NAME)
         set_target_properties(${TARGET_NAME} PROPERTIES
             XCODE_ATTRIBUTE_ENABLE_AVX YES
             XCODE_ATTRIBUTE_ENABLE_AVX2 YES
-            XCODE_ATTRIBUTE_OTHER_CPLUSPLUSFLAGS "-mavx -mavx2"
-            XCODE_ATTRIBUTE_OTHER_CFLAGS "-mavx -mavx2"
+            XCODE_ATTRIBUTE_OTHER_CPLUSPLUSFLAGS "-mavx -mavx2 -mbmi2"
+            XCODE_ATTRIBUTE_OTHER_CFLAGS "-mavx -mavx2 -mbmi2"
         )
     endif()
 endmacro()
@@ -44,7 +44,7 @@ add_subdirectory(dependencies/google_benchmark)
 add_executable(
   catch2Benchmark
     catch2BenchmarkMain.cpp catch2Functions.cpp catch2swar-demo.cpp
-    atoi.cpp
+    atoi.cpp atoi-catch2-tests.cpp
     egyptian.cpp
     # RobinHood.benchmark.cpp
 )
