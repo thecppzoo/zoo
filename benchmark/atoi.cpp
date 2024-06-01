@@ -54,7 +54,7 @@ uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexc
     return uint32_t(by10001base2to32.value() >> 32);
 }
 
-uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
+uint64_t calculateBase10_128(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
     auto by11base256 = convertedToIntegers.multiply(256*10 + 1);
     auto bytePairs = zoo::swar::doublePrecision(by11base256).odd;
     auto by101base2to16 = bytePairs.multiply(1 + (100 << 16));
@@ -67,6 +67,19 @@ uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) no
     auto byHundredMillionBase2to64 =
         byteOcts.multiply(1 + (__uint128_t(100'000'000) << 64));
     return uint64_t(byHundredMillionBase2to64.value() >> 64);
+}
+
+uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
+    auto v = convertedToIntegers.value();
+    using S = zoo::swar::SWAR<8, uint64_t>;
+    uint64_t
+        high = v >> 64,
+        low = (v << 64) >> 64;
+    auto
+        highNumbers = calculateBase10(S{low}),
+        lowNumbers = calculateBase10(S{high});
+    auto combine = highNumbers * __uint128_t(100'000'000) + lowNumbers;
+    return combine;
 }
 
 // Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
@@ -194,7 +207,14 @@ auto PowersOf10Array() {
     return rv;
 };
 
-template<typename Return>
+
+template<
+    typename Return,
+    std::make_unsigned_t<Return>
+        (*CB10)(
+            zoo::swar::SWAR<8, typename ConversionTraits<Return>::DoublePrecision>
+        )
+>
 Return c_strToIntegral(const char *str) noexcept {
     auto LastFactor = PowersOf10Array<Return>();
     auto leadingSpaces = leadingSpacesCount(str);
@@ -239,14 +259,14 @@ Return c_strToIntegral(const char *str) noexcept {
                 // for a single shift
                 asIntegers.shiftLanesLeft(NBytes - 1 - nonDigitIndex)
                           .shiftLanesLeft(1);
-            auto inBase10 = calculateBase10(integersInHighLanes);
+            auto inBase10 = CB10(integersInHighLanes);
             auto scaledAccumulator = accumulator * LastFactor[nonDigitIndex];
             return Return((scaledAccumulator + inBase10) * sign);
         }
         // all bytes are digits
         auto asIntegers = bytes - AllZeroCharacter;
         accumulator *= LastFactor.back();
-        auto inBase10 = calculateBase10(asIntegers);
+        auto inBase10 = CB10(asIntegers);
         accumulator += inBase10;
         base += NBytes;
         memcpy(&bytes.m_v, base, NBytes);
@@ -256,12 +276,17 @@ Return c_strToIntegral(const char *str) noexcept {
 }
 
 int c_strToI(const char *str) noexcept {
-    return impl::c_strToIntegral<int>(str);
+    return impl::c_strToIntegral<int, calculateBase10>(str);
 }
 
 int64_t c_strToL(const char *str) noexcept {
-    return impl::c_strToIntegral<int64_t>(str);
+    return impl::c_strToIntegral<int64_t, calculateBase10>(str);
 }
+
+int64_t c_strToL128(const char *str) noexcept {
+    return impl::c_strToIntegral<int64_t, calculateBase10_128>(str);
+}
+
 
 /// \brief Helper function to fix the non-string part of block
 template<typename S>
