@@ -310,8 +310,9 @@ long long zooAtoi(const char *s) { return zoo::c_strToI(s); }
     X(ZOO_ATOI, zoo::c_strToI) \
     X(ZOO_ATOL, zoo::c_strToL) \
     X(ZOO_ATOL128, zoo::c_strToL128) \
+    X(GLIBC_ATOL, atol) \
     X(COMPARE_ATOI, zooAtoi) \
-    X(COMPARE_ATOL, zoo::c_strToL128)
+    X(COMPARE_ATOL, zoo::c_strToL128) \
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };
