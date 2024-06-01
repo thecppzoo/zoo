@@ -101,7 +101,7 @@ struct SWAR {
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
     template <typename InputIt>
-    constexpr static auto from_range(InputIt first, InputIt last) noexcept {
+    constexpr static auto fromRange(InputIt first, InputIt last) noexcept {
         auto result = T{0};
         for (; first != last; ++first) {
             result = (result << NBits) | *first;
@@ -112,7 +112,7 @@ struct SWAR {
     template <typename Range>
     constexpr static auto from(const Range &values) noexcept {
         using std::begin; using std::end;
-        return SWAR{from_range(begin(values), end(values))};
+        return SWAR{fromRange(begin(values), end(values))};
     }
 
     constexpr SWAR(const std::array<T, Lanes> &array) : m_v{from(array.begin(), array.end())} {}
