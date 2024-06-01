@@ -222,7 +222,10 @@ struct SWAR {
 };
 
 template <int NBits, typename T, typename Arg>
-SWAR(Literals_t<NBits, T>, const Arg (&values)[SWAR<NBits, T>::Lanes]) -> SWAR<NBits, T>;
+SWAR(
+    Literals_t<NBits, T>,
+    const Arg (&values)[SWAR<NBits, T>::Lanes]
+) -> SWAR<NBits, T>;
 
 template <int NBits, typename T>
 SWAR(Literals_t<NBits, T>, const std::array<T, SWAR<NBits, T>::Lanes>&) -> SWAR<NBits, T>;
