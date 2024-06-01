@@ -44,6 +44,7 @@ if(MSVC)
         egyptian.cpp var.cpp
         # variant.cpp investigate why this is failing
         CopyMoveAbilities.cpp
+        root/mem.cpp
     )
 
     add_subdirectory(third_party EXCLUDE_FROM_ALL)
@@ -120,7 +121,10 @@ else()
         map/BasicMap.cpp map/RobinHood.test.cpp map/RobinHood.hybrid.test.cpp
     )
     set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
-    set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
+    set(
+        MISCELLANEA_SOURCES
+        egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp root/mem.cpp
+    )
     set(
         ZOO_TEST_SOURCES
         ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
