@@ -109,12 +109,6 @@ struct SWAR {
         return result;
     }
 
-    template <typename U>
-    constexpr static auto from_array(const U (&values)[Lanes]) noexcept {
-        using std::begin; using std::end;
-        return SWAR{from_range(begin(values), end(values))};
-    }
-
     template <typename Range>
     constexpr static auto from(const Range &values) noexcept {
         using std::begin; using std::end;
@@ -125,7 +119,7 @@ struct SWAR {
 
     template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
     constexpr
-    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{from_array(values)} {}
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{from(values)} {}
 
     constexpr std::array<T, Lanes> to_array() const noexcept {
         std::array<T, Lanes> result = {};
