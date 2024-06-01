@@ -19,21 +19,15 @@ std::size_t c_strLength(const char *s);
 std::size_t c_strLength_natural(const char *s);
 int32_t c_strToI(const char *) noexcept;
 int64_t c_strToL(const char *) noexcept;
+int64_t c_strToL128(const char *) noexcept;
 
-inline int compareAtoi(const char *s) {
-    auto
-        from_stdlib = atoi(s),
-        from_zoo = c_strToI(s);
-    if(from_stdlib != from_zoo) { throw 0; }
-    return from_stdlib;
-}
-
+template<long long (*FUN)(const char *s)>
 inline int compareAtol(const char *s) {
     auto
         from_stdlib = atoll(s),
-        from_zoo = c_strToL(s);
+        from_zoo = FUN(s);
     if(from_stdlib != from_zoo) {
-        auto recalc = c_strToL(s);
+        auto recalc = FUN(s);
         throw 0; }
     return from_stdlib;
 }

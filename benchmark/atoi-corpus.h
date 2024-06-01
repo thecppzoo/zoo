@@ -303,10 +303,15 @@ struct CorpusAtoi {
     }
 };
 
+long long zooAtoi(const char *s) { return zoo::c_strToI(s); }
+
 #define ATOI_CORPUS_X_LIST \
-    X(GLIBC_atoi, atoi) X(ZOO_ATOI, zoo::c_strToI)\
-    X(COMPARE_ATOI, zoo::compareAtoi) \
-    X(COMPARE_ATOL, zoo::compareAtol)
+    X(GLIBC_atoi, atoi) \
+    X(ZOO_ATOI, zoo::c_strToI) \
+    X(ZOO_ATOL, zoo::c_strToL) \
+    X(ZOO_ATOL128, zoo::c_strToL128) \
+    X(COMPARE_ATOI, zooAtoi) \
+    X(COMPARE_ATOL, zoo::c_strToL128)
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };

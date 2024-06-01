@@ -1,6 +1,7 @@
 #include "catch2/catch.hpp"
 
 #include "zoo/swar/SWAR.h"
+#include "atoi.h"
 
 uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t>) noexcept;
 namespace zoo {
@@ -50,4 +51,9 @@ TEST_CASE("Atol", "[pure-test][swar][atoi]") {
         auto converted = zoo::c_strToL(secondNumber);
         REQUIRE(converted == expected);
     }
+}
+
+TEST_CASE("String function regressions", "[pure-test][atoi][swar]") {
+    auto input = "\x80\0";
+    REQUIRE(1 == zoo::c_strLength(input));
 }
