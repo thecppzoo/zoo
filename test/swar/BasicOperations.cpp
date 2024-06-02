@@ -2,6 +2,7 @@
 
 #include "catch2/catch.hpp"
 
+#include <string.h>
 #include <type_traits>
 
 using namespace zoo;
@@ -10,6 +11,9 @@ using namespace zoo::swar;
 using S2_64 = SWAR<2, uint64_t>;
 using S2_32 = SWAR<2, uint32_t>;
 using S2_16 = SWAR<2, uint16_t>;
+
+using S3_16 = SWAR<3, uint16_t>;
+using S3_32 = SWAR<4, uint32_t>;
 
 using S4_64 = SWAR<4, uint64_t>;
 using S4_32 = SWAR<4, uint32_t>;
@@ -469,7 +473,7 @@ TEST_CASE(
     "greaterEqualMSBOn",
     "[swar][unsigned-swar]"
 ) {
-    SECTION("single") {
+    SECTION("single S2_16") {
         for (uint32_t i = 1; i < 4; i++) {
             const auto left = S2_16{0}.blitElement(1,  i);
             const auto right = S2_16{S2_16::AllOnes}.blitElement(1, i-1);
@@ -477,7 +481,7 @@ TEST_CASE(
             CHECK(test.value() == greaterEqual<2, u16>(left, right).value());
         }
     }
-    SECTION("single") {
+    SECTION("single S4_32") {
         for (uint32_t i = 1; i < 15; i++) {
             const auto large = S4_32{0}.blitElement(1,  i+1);
             const auto small = S4_32{S4_32::AllOnes}.blitElement(1, i-1);
@@ -485,7 +489,7 @@ TEST_CASE(
             CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
-    SECTION("allLanes") {
+    SECTION("allLanes S4_32") {
         for (uint32_t i = 1; i < 15; i++) {
             const auto small = S4_32(S4_32::LeastSignificantBit * (i-1));
             const auto large = S4_32(S4_32::LeastSignificantBit * (i+1));
@@ -493,6 +497,20 @@ TEST_CASE(
             CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
+    // This uncovered an extension required for non-power of two lane sizes for
+    // equals/greaterEqual/etc related to the broadword nullcheck technique
+    // from taocp pg 152
+    // TODO(sbruce) figure out a performant fix.
+/*
+    SECTION("single 3_16") {
+        for (uint32_t i = 1; i < 3; i++) {
+            const auto left = S3_16{0}.blitElement(1,  i);
+            const auto right = S3_16{S3_16::AllOnes}.blitElement(1, i-1);
+            const auto test = S3_16{0}.blitElement(1, 2);
+            CHECK(test.value() == greaterEqual<3, u16>(left, right).value()); 
+        }
+    }
+*/
 }
 
 static_assert(0x123 == SWAR<4, uint32_t>(0x173).blitElement(1, 2).value());
@@ -565,10 +583,196 @@ TEST_CASE(
     "saturatingUnsignedAddition",
     "[swar][saturation]"
 ) {
-    CHECK(SWAR<4, u16>(0x0200).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0100)).value());
-    CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
-    CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value());
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
+    CHECK(S4_16(0x0200).value() == saturatingUnsignedAddition(S4_16(0x0100), S4_16(0x0100)).value());
+    CHECK(S4_16(0x0400).value() == saturatingUnsignedAddition(S4_16(0x0100), S4_16(0x0300)).value());
+    CHECK(S4_16(0x0B00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0300)).value());
+    CHECK(S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0700)).value());
+    CHECK(S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0800)).value()); 
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+}
+
+TEST_CASE(
+    "first zero lane 4 wide 32 bit",
+    "[swar]"
+) {
+    {
+        // The last value / lsb null lane is all these care about, but the
+        // implementation is so tied to the execution we check both.
+        // firstZeroLane finds the least significant zero (little endian). This
+        // results in the least significant zero being marked, and everything more
+        // significant than it being turned into garbage data.
+        CHECK(S4_32{0x0008'0080}.value() == firstZeroLane<4, uint32_t>( S4_32(0xaaa0'aa0a)).value());
+        CHECK(1 == S4_32(firstZeroLane<4, uint32_t>( S4_32(0xaaa0'aa0a))).lsbIndex());
+        CHECK(S4_32{0x8888'8888}.value() == firstZeroLane<4, uint32_t>( S4_32(0x1110'1110)).value());
+        CHECK(S4_32{0x8800'0000}.value() == firstZeroLane<4, uint32_t>( S4_32(0x1025'3552)).value());
+        CHECK(S4_32{0x8880'0000}.value() == firstZeroLane<4, uint32_t>( S4_32(0x1105'5352)).value());
+
+        const char * c = "aaa\0aaa\0";
+        uint64_t x;
+        memcpy(&x, c, 8);
+        S8_64 testBytes{x};
+        auto nulls = firstZeroLane<8, uint64_t>(testBytes);
+        CHECK(3 == S8_64(nulls).lsbIndex());
+    }
+
+    {
+        CHECK(S4_32{0x0000'0000}.value() == firstMatchingLane<4, uint32_t>(S4_32(0x7321'4257), S4_32(0x0000'0000)).value());
+        CHECK(S4_32{0x0000'8000}.value() == firstMatchingLane<4, uint32_t>(S4_32(0x7325'0257), S4_32(0x0000'0000)).value());
+        CHECK(S4_32{0x0000'0000}.value() == firstMatchingLane<4, uint32_t>(S4_32(0x7341'4157), S4_32(0x2222'2222)).value());
+        CHECK(S4_32{0x0880'0800}.value() == firstMatchingLane<4, uint32_t>(S4_32(0x7321'4257), S4_32(0x2222'2222)).value());
+        CHECK(S4_32{0x0880'0800}.value() == firstMatchingLane<4, uint32_t>(S4_32(0x7321'4357), S4_32(0x2222'3333)).value());
+        // Since only the least signficant zero and lower bits have
+        // significance, we just mask out the don't care bits to illustrate for
+        // utests.  When actually using this to find a lane instead of test for
+        // its existence, one should probably just take the least significant
+        // index.
+        // We know our answer, so we mask out the dontcare higher bits.
+        constexpr auto dontCareMask = S4_32{0x0000'0888};
+        CHECK(S4_32{0x0000'0800}.value() == (firstMatchingLane<4, uint32_t>(S4_32(0x7321'4257), S4_32(0x2222'2222))&dontCareMask).value());
+        CHECK(S4_32{0x0000'0800}.value() == (firstMatchingLane<4, uint32_t>(S4_32(0x7321'4357), S4_32(0x2222'3333))&dontCareMask).value());
+    }
+
+}
+
+TEST_CASE(
+    "equals S4_16",
+    "[swar]"
+) {
+    // This test is intentionally horrific b/c blit / at / etc do not work right for 16 bit SWARs.
+    auto incr_lane_zero = [](S4_16 s, int i)  ->S4_16{
+        return s + S4_16{1};
+    };
+    auto incr_lane_one = [](S4_16 s, int i)  ->S4_16{
+        return s + S4_16{0x0010};
+    };
+    auto incr_lane_two = [](S4_16 s, int i)  ->S4_16{
+        return s + S4_16{0x0100};
+    };
+    auto incr_lane_three = [](S4_16 s, int i)  ->S4_16{
+        return s + S4_16{0x1000};
+    };
+    auto cmp = [](S4_16 test, S4_16 expected, int i) ->S4_16 {return equals(test, expected);};
+    auto expectedf_zero = [](S4_16 in, int i) ->S4_16 {return S4_16{S4_16::MostSignificantBit}.clear(0);};
+    auto expectedf_one = [](S4_16 in, int i) ->S4_16 {return S4_16{S4_16::MostSignificantBit}.clear(1);};
+    auto expectedf_two = [](S4_16 in, int i) ->S4_16 {return S4_16{S4_16::MostSignificantBit}.clear(2);};
+    auto expectedf_three = [](S4_16 in, int i) ->S4_16 {return S4_16{S4_16::MostSignificantBit}.clear(3);};
+
+    auto v = S4_16{0x7341};
+    for (uint16_t i = 1; i < 15; i++) {
+      uint16_t s = 0;
+      for (int j = 0; j < i; j++) {
+          s +=  v.value();
+      } 
+      auto gen = S4_16{s};
+      {
+      auto right = incr_lane_zero(gen, i);
+      auto expected = expectedf_zero(gen, i).value();
+      CHECK(expected == cmp(gen, right, i).value());
+      }
+      {
+      auto right = incr_lane_one(gen, i);
+      auto expected = expectedf_one(gen, i).value();
+      CHECK(expected == cmp(gen, right, i).value());
+      }
+      {
+      auto right = incr_lane_two(gen, i);
+      auto expected = expectedf_two(gen, i).value();
+      CHECK(expected == cmp(gen, right, i).value());
+      }
+      {
+      auto right = incr_lane_three(gen, i);
+      auto expected = expectedf_three(gen, i).value();
+      CHECK(expected == cmp(gen, right, i).value());
+      }
+    }
+}
+
+TEST_CASE(
+    "equals S4_32",
+    "[swar]"
+) {
+    auto incr_lane = [](S4_32 s, int lane,  int i)  ->S4_32{
+        return s.blitElement(lane, (s.at(lane)+1)%16);
+    };
+    auto cmp = [](S4_32 test, S4_32 expected, int i) ->S4_32 {return equals(test, expected);};
+    auto expectedf = [](S4_32 in, int lane, int i) ->S4_32 {return S4_32{S4_32::MostSignificantBit}.clear(lane);};
+
+    auto v = S4_32{0x1357'acef};
+    for (size_t lane = 0; lane < 8; lane++) {
+        for (uint32_t i = 1; i < 15; i++) {
+            auto gen = v.multiply(i);  
+            auto right = incr_lane(gen, lane, i);
+            auto expected = expectedf(gen, lane, i).value();
+            CHECK(expected == cmp(gen, right, i).value());
+        }
+    }
+}
+
+TEST_CASE(
+    "equals S3_32",
+    "[swar]"
+) {
+    auto incr_lane = [](S3_32 s, int lane,  int i)  ->S3_32{
+        return s.blitElement(lane, (s.at(lane)+1)%8);
+    };
+    auto cmp = [](S3_32 test, S3_32 expected, int i) ->S3_32 {return equals(test, expected);};
+    auto expectedf = [](S3_32 in, int lane, int i) ->S3_32 {return S3_32{S3_32::MostSignificantBit}.clear(lane);};
+
+    auto v = S3_32{0x1357'acef};
+    for (size_t lane = 0; lane < 10; lane++) {
+        for (uint32_t i = 1; i < 15; i++) {
+            auto gen = v.multiply(i);  
+            auto right = incr_lane(gen, lane, i);
+            auto expected = expectedf(gen, lane, i).value();
+            CHECK(expected == cmp(gen, right, i).value());
+        }
+    }
+}
+
+TEST_CASE(
+    "greaterEqualGeneric S4_32",
+    "[swar]"
+) {
+    auto incr_lane = [](S4_32 s, int lane,  int i)  ->S4_32{
+        return s.blitElement(lane, s.at(lane)+1);
+    };
+    auto cmp = [](S4_32 test, S4_32 expected, int i) ->S4_32 {return greaterEqual(test, expected);};
+    auto expectedf = [](S4_32 in, int lane, int i) ->S4_32 {return S4_32{S4_32::MostSignificantBit}.clear(lane);};
+
+    auto v = S4_32{0x1357'acef};
+    for (size_t lane = 0; lane < 8; lane++) {
+        for (uint32_t i = 1; i < 15; i++) {
+            // We want to ensure we check GE and we are incrementing a lane to do it, so all 15s must go
+            constexpr auto destroy_fifteen = S4_32{0xeeee'eeee};
+            auto gen = v.multiply(i) & destroy_fifteen;  
+            auto right = incr_lane(gen, lane, i);
+            auto expected = expectedf(gen, lane, i).value();
+            CHECK(expected == cmp(gen, right, i).value());
+        }
+    }
+}
+
+TEST_CASE(
+    "greaterEqualGeneric S3_32",
+    "[swar]"
+) {
+    auto incr_lane = [](S3_32 s, int lane,  int i)  ->S3_32{
+        return s.blitElement(lane, s.at(lane)+1);
+    };
+    auto cmp = [](S3_32 test, S3_32 expected, int i) ->S3_32 {return greaterEqual(test, expected);};
+    auto expectedf = [](S3_32 in, int lane, int i) ->S3_32 {return S3_32{S3_32::MostSignificantBit}.clear(lane);};
+
+    auto v = S3_32{0x1357'acef};
+    for (size_t lane = 0; lane < 8; lane++) {
+        for (uint32_t i = 1; i < 15; i++) {
+            // We want to ensure we check GE and we are incrementing a lane to do it, so all 7s must go
+            // (use the literals library!!)
+            // 11011011'01101101'10110110'110110xx
+            constexpr auto destroy_seven = S3_32{0xdb6d'b6d8};
+            auto gen = v.multiply(i) & destroy_seven;  
+            auto right = incr_lane(gen, lane, i);
+            auto expected = expectedf(gen, lane, i).value();
+            CHECK(expected == cmp(gen, right, i).value());
+        }
+    }
 }
