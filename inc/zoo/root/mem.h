@@ -24,7 +24,9 @@ template<typename PtrT, typename Block>
 std::tuple<PtrT *, int>
 blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
     // conversion (casting) to use modulo arithmetic to detect misalignment
-    uintptr_t asUint = reinterpret_cast<uintptr_t>(pointerInsideBlock);
+    // Surprisingly, intptr_t is optional, let alone uintptr_t
+    using UPtr = std::make_unsigned_t<intptr_t>;
+    auto asUint = reinterpret_cast<UPtr>(pointerInsideBlock);
     constexpr auto Alignment = alignof(Block), Size = sizeof(Block);
     // It is preferable to have this hard error than to SFINAE it away
     static_assert(Alignment == Size);
