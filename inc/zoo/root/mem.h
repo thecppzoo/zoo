@@ -7,6 +7,8 @@
 #include <tuple>
 // memcpy
 #include <string.h>
+// for uintptr_t
+#include <stdlib.h>
 
 namespace zoo {
 
