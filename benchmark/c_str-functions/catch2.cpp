@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
 
 #include "zoo/swar/SWAR.h"
-#include "atoi.h"
+#include "c_str.h"
 
 uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t>) noexcept;
 namespace zoo {
