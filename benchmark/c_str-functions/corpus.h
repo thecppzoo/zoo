@@ -1,18 +1,18 @@
-#include "c_str.h"
+#include "c_str-impl.h"
 #include "zoo/pp/platform.h"
 
 #include <vector>
 #include <string>
-#include <cstring>
 #include <array>
 #include <random>
 #include <math.h>
 
-struct Corpus8DecimalDigits {
+template<int Digits>
+struct CorpusDecimalDigits {
     std::vector<int> asNumbers_;
     std::string characters_;
 
-    Corpus8DecimalDigits(std::vector<int> aNs, std::string cs):
+    CorpusDecimalDigits(std::vector<int> aNs, std::string cs):
         asNumbers_(aNs),
         characters_(cs)
     {}
@@ -24,28 +24,32 @@ struct Corpus8DecimalDigits {
         // of the code under measurement, not how the the unrealistic conditions
         // of microbenchmarking help/hurt the code under measurement
         std::string allCharacters;
-        allCharacters.resize(count * 9);
+        allCharacters.resize(count * (Digits + 1));
         std::vector<int> inputs;
-        std::uniform_int_distribution<> range(0, 100*1000*1000 - 1);
+        constexpr uint64_t
+            Top8 = 100*1000*1000,
+            TopOfRange = (8 == Digits ? Top8 : Top8 * Top8) - 1;
+        std::uniform_int_distribution<uint64_t> range(0, TopOfRange);
         char *base = allCharacters.data();
+        const char *format = 8 == Digits ? "%08lld" : "%016lld";
         for(;;) {
             auto input = range(generator);
-            snprintf(base, 9, "%08d", input);
+            snprintf(base, Digits + 1, format, input);
             inputs.push_back(input);
-            if(--count) { break; }
-            base += 9;
+            if(!(--count)) { break; }
+            base += Digits + 1;
         }
-        return Corpus8DecimalDigits(inputs, allCharacters);
+        return CorpusDecimalDigits(inputs, allCharacters);
     }
 
     struct Iterator {
-        Corpus8DecimalDigits *thy;
+        CorpusDecimalDigits *thy;
         int *ip;
         char *cp;
 
         Iterator &operator++() {
             ++ip;
-            cp += 9;
+            cp += Digits + 1;
             return *this;
         }
 
@@ -64,10 +68,15 @@ struct Corpus8DecimalDigits {
     }
 };
 
-#define PARSE8BYTES_CORPUS_X_LIST \
+#define PARSE_8_BYTES_CORPUS_X_LIST \
     X(Lemire, parse_eight_digits_swar)\
     X(Zoo, lemire_as_zoo_swar)\
     X(LIBC, atoi)
+#define PARSE_16_BYTES_CORPUS_X_LIST \
+    X(ZOO_16_SPLIT, zoo::parse16Bytes<calculateBase10>) \
+    X(ZOO_16_UINT128_T, zoo::parse16Bytes<calculateBase10_128>) \
+    X(Comparison1, zoo::compareAtol<zoo::parse16Bytes<calculateBase10>>) \
+    X(Comparison2, zoo::compareAtol<zoo::parse16Bytes<calculateBase10_128>>)
 
 struct CorpusStringLength {
     std::vector<int> skips_;
@@ -211,7 +220,8 @@ struct CorpusLeadingSpaces {
     }
 };
 
-#define LEADING_SPACES_CORPUS_X_LIST X(GLIB_Spaces, spaces_glibc) X(ZooSpaces, zoo::leadingSpacesCount)
+#define LEADING_SPACES_CORPUS_X_LIST \
+X(GLIB_Spaces, spaces_glibc) X(ZooSpaces, zoo::leadingSpacesCount)
 
 void (*consumeStrPtr)(const char *, unsigned) =
     [](const char *p, unsigned l) {
@@ -303,21 +313,22 @@ struct CorpusAtoi {
     }
 };
 
-long long zooAtoi(const char *s) { return zoo::c_strToI(s); }
+int64_t zooAtoi(const char *s) { return zoo::c_strToI(s); }
 
 #define ATOI_CORPUS_X_LIST \
     X(GLIBC_atoi, atoi) \
-    X(ZOO_ATOI, zoo::c_strToI) \
-    X(ZOO_ATOL, zoo::c_strToL) \
-    X(ZOO_ATOL128, zoo::c_strToL128) \
-    X(GLIBC_ATOL, atol) \
-    X(COMPARE_ATOI, zooAtoi) \
-    X(COMPARE_ATOL, zoo::c_strToL128) \
+    X(ZOO_c_strToI, zoo::c_strToI) \
+    X(ZOO_c_strToL, zoo::c_strToL) \
+    X(ZOO_c_strToL_uint128_t, zoo::c_strToL128) \
+    X(GLIBC_ATOL, atoll) \
+    X(COMPARE_ATOI, zoo::compareAtol<zooAtoi>) \
+    X(COMPARE_ATOL, zoo::compareAtol<zoo::c_strToL>) \
 
 #define X(Typename, FunctionToCall) \
     struct Invoke##Typename { int operator()(const char *p) { return FunctionToCall(p); } };
 
-PARSE8BYTES_CORPUS_X_LIST
+PARSE_8_BYTES_CORPUS_X_LIST
+PARSE_16_BYTES_CORPUS_X_LIST
 STRLEN_CORPUS_X_LIST
 LEADING_SPACES_CORPUS_X_LIST
 ATOI_CORPUS_X_LIST
