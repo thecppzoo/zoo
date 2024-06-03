@@ -1,5 +1,5 @@
-#include "atoi.h"
-#include "atoi-corpus.h"
+#include "c_str-functions/c_str.h"
+#include "c_str-functions/corpus.h"
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include "catch2/catch.hpp"

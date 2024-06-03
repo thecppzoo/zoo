@@ -1,7 +1,8 @@
-#include "atoi.h"
-#include "atoi_impl.h"
+#include "c_str.h"
+#include "c_str-impl.h"
 
 #include "zoo/swar/associative_iteration.h"
+#include "zoo/root/mem.h"
 
 #if ZOO_CONFIGURED_TO_USE_AVX()
 #include <immintrin.h>
@@ -12,9 +13,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <array>
-#include <tuple>
-
-static_assert(~uint32_t(0) == zoo::swar::SWAR<32, uint32_t>::LeastSignificantLaneMask);
 
 // Copied from Daniel Lemire's GitHub at
 // https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/
@@ -103,7 +101,7 @@ std::size_t spaces_glibc(const char *ptr) {
 namespace zoo {
 
 template<typename S>
-std::size_t leadingSpacesCountAligned(S bytes) noexcept {
+std::size_t leadingSpacesCountInBlock(S bytes) noexcept {
     /*
     space (0x20, ' ')
     form feed (0x0c, '\f')
@@ -122,6 +120,10 @@ std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     ExpressedAsEscapeCodes = { ' ', '\r', '\f', '\v', '\n', '\t' };
     static_assert(SpaceCharacters == ExpressedAsEscapeCodes); */
     static_assert(sizeof(S) == alignof(S));
+    // The strategy to classify bytes is this:
+    // 1. Equal to the space character is "white space"
+    // 2. Or
+    //    1. Above or equal to "tab" and below or equal to "carriage return"
     constexpr S Space{meta::BitmaskMaker<uint64_t, ' ', 8>::value};
     auto space = swar::equals(bytes, Space);
     auto belowEqualCarriageReturn = swar::constantIsGreaterEqual<'\r'>(bytes);
@@ -149,7 +151,7 @@ std::size_t leadingSpacesCount(const char *p) noexcept {
     auto spacesIntroduced = AllSpaces & ~mask;
     bytes = spacesIntroduced | misalignedEliminated;
     for(;;) {
-        auto spacesThisBlock = leadingSpacesCountAligned(bytes);
+        auto spacesThisBlock = leadingSpacesCountInBlock(bytes);
         base += spacesThisBlock;
         if(8 != spacesThisBlock) { return base - p; }
         memcpy(&bytes.m_v, base, 8);
@@ -212,7 +214,10 @@ template<
     typename Return,
     std::make_unsigned_t<Return>
         (*CB10)(
-            zoo::swar::SWAR<8, typename ConversionTraits<Return>::DoublePrecision>
+            zoo::swar::SWAR<
+                8,
+                typename ConversionTraits<Return>::DoublePrecision
+            >
         )
 >
 Return c_strToIntegral(const char *str) noexcept {
