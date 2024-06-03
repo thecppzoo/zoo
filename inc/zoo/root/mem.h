@@ -8,7 +8,7 @@
 // memcpy
 #include <string.h>
 // for uintptr_t, there are differences between C and C++
-#include <cstdlib>
+#include <cstdint>
 
 namespace zoo {
 
