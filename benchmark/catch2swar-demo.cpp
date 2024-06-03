@@ -35,7 +35,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
             REQUIRE(avx2 == strlen2);
         #endif
     }
-    auto corpus8D = Corpus8DecimalDigits::makeCorpus(g);
+    auto corpus8D = CorpusDecimalDigits<8>::makeCorpus(g);
     auto corpusLeadingSpaces = CorpusLeadingSpaces::makeCorpus(g);
     SECTION("Leading Spaces Comparison") {
         auto iterator = corpusLeadingSpaces.commence();
@@ -55,7 +55,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
         auto from##Type = traverse(CORPUS, Invoke##Type{}, 0);
 
         #define CORPUS corpus8D
-            PARSE8BYTES_CORPUS_X_LIST
+            PARSE_8_BYTES_CORPUS_X_LIST
         #undef CORPUS
 
         #define CORPUS corpusLeadingSpaces
@@ -82,7 +82,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     
     REQUIRE(fromZooSpaces == fromGLIB_Spaces);
 
-    REQUIRE(fromGLIBC_atoi == fromZOO_ATOI);
+    REQUIRE(fromGLIBC_atoi == fromZOO_c_strToI);
 
     auto haveTheRoleOfMemoryBarrier = -1;
     #define X(Type, Fun) \
@@ -93,7 +93,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
         };
 
         #define CORPUS corpus8D
-            PARSE8BYTES_CORPUS_X_LIST
+            PARSE_8_BYTES_CORPUS_X_LIST
         #undef CORPUS
 
         #define CORPUS corpusStrlen
