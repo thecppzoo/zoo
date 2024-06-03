@@ -7,8 +7,8 @@
 #include <tuple>
 // memcpy
 #include <string.h>
-// for uintptr_t
-#include <stdlib.h>
+// for uintptr_t, there are differences between C and C++
+#include <cstdlib>
 
 namespace zoo {
 
@@ -25,7 +25,7 @@ std::tuple<PtrT *, int>
 blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
     // conversion (casting) to use modulo arithmetic to detect misalignment
     // Surprisingly, intptr_t is optional, let alone uintptr_t
-    using UPtr = std::make_unsigned_t<intptr_t>;
+    using UPtr = std::make_unsigned_t<std::intptr_t>;
     auto asUint = reinterpret_cast<UPtr>(pointerInsideBlock);
     constexpr auto Alignment = alignof(Block), Size = sizeof(Block);
     // It is preferable to have this hard error than to SFINAE it away
