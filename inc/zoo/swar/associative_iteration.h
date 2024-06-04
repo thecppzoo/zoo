@@ -1,7 +1,10 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
+#include "zoo/meta/BitmaskMaker.h"
 #include "zoo/swar/SWAR.h"
+#include <cstdint>
+#include <array>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -256,13 +259,16 @@ constexpr auto makeLaneMaskFromLSB(SWAR<NB, B> input) {
     return impl::makeLaneMaskFromMSB_and_LSB(lsbCopiedToMSB, lsb);
 }
 
+// TODO WRITE TEST FOR THIS
 template<int NB, typename B>
 constexpr auto makeLaneMaskFromMSB(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto msb = input & S{S::MostSignificantBit};
-    auto msbCopiedToLSB = S{msb.value() >> (NB - 1)};
+    B val = msb.value() >> (NB - 1);
+    auto msbCopiedToLSB = S{val};
     return impl::makeLaneMaskFromMSB_and_LSB(msb, msbCopiedToLSB);
 }
+static_assert(makeLaneMaskFromMSB(SWAR<4, uint16_t>{0b1001'0000'0000'0000}).value() == 0b1111'0000'0000'0000);
 
 template<int NB, typename B>
 struct ArithmeticResultTriplet {
@@ -392,8 +398,13 @@ template<
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    Base base,
+    Base neutral,
+    IterationCount count,
+    IterationCount forSquaring,
+    Operator op,
+    unsigned log2Count,
+    CountHalver ch
 ) {
     auto result = neutral;
     if(!log2Count) { return result; }
@@ -482,6 +493,72 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
         halver
     );
 }
+
+using S = SWAR<4, uint16_t>;
+
+template<typename S>
+constexpr auto labelNumBits(S input) {
+    using T = typename S::type;
+    auto mask = makeLaneMaskFromMSB(input).value();
+    T result = 0;
+    for(auto i = 0; i < S::Lanes; ++i) {
+        result = result + T(mask & 1);
+        mask = mask >> 1;
+    }
+    return S{result};
+}
+static_assert(labelNumBits(S{0b0001'0010'0011'0100}).value() == S{0b0001'0011'0111'1111}.value());
+// HOLY SHIT THIS IS ALSO ASSOCIATIVE ITERATION!
+
+template<typename S>
+constexpr auto shiftOp(S left, S right, S counts) {
+    using T = typename S::type;
+    auto mask = makeLaneMaskFromMSB(counts).value();
+    auto inputLsbCleared = left.value() & ~S{S::LeastSignificantBit}.value();
+    auto shifted = inputLsbCleared >> 1;
+    T res = (shifted & mask) | (left.value() & ~mask);
+    return S{res};
+};
+using S = SWAR<4, uint16_t>;
+static_assert(shiftOp(S{0b1000'1000'1000'1000}, S{0b0001'0001'0001'0001}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
+
+template<int ActualBits, int NB, typename T>
+constexpr auto rightShift_LaneWise(
+    SWAR<NB, T> input, SWAR<NB, T> numShifts
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto left, auto right, auto counts) {
+        auto mask = makeLaneMaskFromMSB(counts).value();
+        auto inputLsbCleared = left.value() & ~S{S::LeastSignificantBit}.value();
+        auto shifted = inputLsbCleared >> 1;
+        T res = (shifted & mask) | (left.value() & ~mask);
+        return S{res};
+    };
+
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        T halved = msbCleared.value() >> T{1};
+        return S{halved};
+    };
+
+    return associativeOperatorIterated_regressive(
+        input,
+        S{1},
+        numShifts,
+        S{S::MostSignificantBit},
+        operation,
+        ActualBits,
+        halver
+    );
+}
+
+static_assert(1 >> 0 == 1);
+
+static_assert(rightShift_LaneWise<4>(
+    SWAR<4, uint16_t>{0b1000'1000'1000'1000},
+    SWAR<4, uint16_t>{0b0001'0001'0001'0001}
+).value() == 0b0100'0100'0100'0100);
 
 template<int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe(

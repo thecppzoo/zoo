@@ -349,6 +349,16 @@ GE_MSB_ON_TEST(
     0x8888'8888)
 
 TEST_CASE(
+    "right shift lanewise",
+    "[swar][jamie]"
+) {
+    CHECK(rightShift_LaneWise<4>(
+        SWAR<4, uint16_t>{0b1000'1000'1000'1000},
+        SWAR<4, uint16_t>{0b0001'0001'0001'0001}
+    ).value() == 0b0100'0100'0100'0100);
+}
+
+TEST_CASE(
     "greaterEqualMSBOn",
     "[swar][unsigned-swar]"
 ) {
@@ -357,7 +367,7 @@ TEST_CASE(
             const auto left = S2_16{0}.blitElement(1,  i);
             const auto right = S2_16{S2_16::AllOnes}.blitElement(1, i-1);
             const auto test = S2_16{0}.blitElement(1, 2);
-            CHECK(test.value() == greaterEqual<2, u16>(left, right).value()); 
+            CHECK(test.value() == greaterEqual<2, u16>(left, right).value());
         }
     }
     SECTION("single") {
@@ -365,7 +375,7 @@ TEST_CASE(
             const auto large = S4_32{0}.blitElement(1,  i+1);
             const auto small = S4_32{S4_32::AllOnes}.blitElement(1, i-1);
             const auto test = S4_32{0}.blitElement(1, 8);
-            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
     SECTION("allLanes") {
@@ -373,7 +383,7 @@ TEST_CASE(
             const auto small = S4_32(S4_32::LeastSignificantBit * (i-1));
             const auto large = S4_32(S4_32::LeastSignificantBit * (i+1));
             const auto test = S4_32(S4_32::LeastSignificantBit * 8);
-            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
 }
@@ -425,7 +435,7 @@ TEST_CASE(
     "BooleanSWAR MSBtoLaneMask",
     "[swar]"
 ) {
-    // BooleanSWAR as a mask: 
+    // BooleanSWAR as a mask:
     auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
     auto mask = S4_32(0x0F0F'0000);
     CHECK(bswar.MSBtoLaneMask().value() == mask.value());
@@ -452,6 +462,6 @@ TEST_CASE(
     CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value());
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
 }

@@ -4,6 +4,7 @@
 
 #include "zoo/meta/log.h"
 
+#include <cstdint>
 #include <type_traits>
 
 #ifdef _MSC_VER
@@ -75,6 +76,7 @@ struct SWAR {
         SignificantBitsCount = BitWidth - PaddingBitsCount,
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
+        AllOnesInFirstLane = AllOnes >> (NBits * (Lanes - 1)),
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask =
             sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
@@ -254,7 +256,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     static constexpr auto MaskNonLSB = ~MaskLSB;
     static constexpr auto MaskNonMSB = ~MaskMSB;
     constexpr explicit BooleanSWAR(T v): Base(v) {}
-  
+
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
@@ -270,7 +272,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr auto operator ~() const noexcept {
         return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
-  
+
     constexpr auto operator not() const noexcept {
         return BooleanSWAR(MaskMSB ^ *this);
     }
@@ -395,7 +397,7 @@ greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
     using S = swar::SWAR<NBits, T>;
     const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
     const auto z = (x|h) - (y&~h);
-    // bitwise ternary median! 
+    // bitwise ternary median!
     const auto t = h & ~median(x, ~y, z);
     return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
 }
@@ -475,5 +477,7 @@ static_assert(
     logarithmFloor(SWAR<8>{0xFF7F3F1F0F070301ull}).value() ==
     0x0706050403020100ull
 );
+
+static_assert(SWAR<4, uint16_t>::AllOnesInFirstLane == 0b0000'0000'0000'1111);
 
 }}
