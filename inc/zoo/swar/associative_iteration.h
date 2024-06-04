@@ -507,8 +507,53 @@ constexpr auto labelNumBits(S input) {
     }
     return S{result};
 }
-static_assert(labelNumBits(S{0b0001'0010'0011'0100}).value() == S{0b0001'0011'0111'1111}.value());
 // HOLY SHIT THIS IS ALSO ASSOCIATIVE ITERATION!
+using S = SWAR<4, uint16_t>;
+
+template<typename S, typename BS>
+constexpr S shiftLeftAppendOne(S input, BS should) {
+    using T = typename S::type;
+    auto mask = makeLaneMaskFromMSB(should).value();
+    auto inputMsbCleared = input.value() & ~S{S::MostSignificantBit}.value();
+    T shifted = inputMsbCleared << 1;
+    constexpr auto ones = S::LeastSignificantBit;
+    T appendedOnes = shifted | ones;
+    T result = (appendedOnes & mask) | (input.value() & ~mask);
+    return S{result};
+}
+
+static_assert(shiftLeftAppendOne(
+            S{0b0000'0001'0100'1000},
+            S{0b0000'1000'1000'1000}).value() ==
+              0b0000'0011'1001'0001);
+
+template<int ActualBits, int NB, typename T>
+constexpr auto labelNumBits_ai(
+    SWAR<NB, T> numShifts
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto left, auto _, auto counts) {
+        return shiftLeftAppendOne(left, counts);
+    };
+
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        T halved = msbCleared.value() >> T{1};
+        return S{halved};
+    };
+
+    return associativeOperatorIterated_regressive(
+        S{0},
+        S{0},
+        numShifts,
+        S{S::MostSignificantBit},
+        operation,
+        ActualBits,
+        halver
+    );
+}
+static_assert(labelNumBits_ai<4>(S{0b0001'0010'0011'0100}).value() == S{0b0001'0011'0111'1111}.value());
 
 template<typename S>
 constexpr auto shiftOp(S left, S right, S counts) {
@@ -519,7 +564,6 @@ constexpr auto shiftOp(S left, S right, S counts) {
     T res = (shifted & mask) | (left.value() & ~mask);
     return S{res};
 };
-using S = SWAR<4, uint16_t>;
 static_assert(shiftOp(S{0b1000'1000'1000'1000}, S{0b0001'0001'0001'0001}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
 
 template<int ActualBits, int NB, typename T>
