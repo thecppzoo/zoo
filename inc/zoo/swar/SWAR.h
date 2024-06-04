@@ -13,10 +13,14 @@
 
 namespace zoo { namespace swar {
 
+namespace type_defs {
+using u128 = __uint128_t;
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = std::uint8_t;
+using u8 = uint8_t;
+}
+using namespace type_defs;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
@@ -85,6 +89,14 @@ struct SWAR {
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit;
+
+    static_assert(std::is_unsigned_v<T>,
+        "You should not use an unsigned type as the base for a SWAR type. "
+        "If you have used `int` or `long`, please use `uint32_t` or `uint64_t` instead. "
+        "This type parameter is only used to determine the total width of the SWAR register. "
+        "The signed-ness of the type has no *intentional* semantic meaning to what you're defining and "
+        "furthermore, some bitwise operations are different for signed and unsigned types."
+    );
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}

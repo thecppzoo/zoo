@@ -494,7 +494,9 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     );
 }
 
-using S = SWAR<4, uint16_t>;
+using namespace zoo::swar::type_defs;
+using S = SWAR<4, u16>;
+static_assert(SWAR<4, u16>::LeastSignificantBit == 0b0001'0001'0001'0001);
 
 template<typename S>
 constexpr auto labelNumBits(S input) {
@@ -602,7 +604,7 @@ constexpr auto shiftOp_2(S left, S right, S counts) {
     T res = (shifted & mask) | (left.value() & ~mask);
     return S{res};
 };
-static_assert(shiftOp(S{0b1000'1000'1000'1000}, S{0b0001'0010'0001'0001}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
+static_assert(shiftOp_2(S{0b1000'1000'1000'1000}, S{0b0001'0010'0001'0001}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
 
 template<int ActualBits, int NB, typename T>
 constexpr auto rightShift_LaneWise(
