@@ -53,12 +53,19 @@ static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
 static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
 static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
 
+
 static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
 static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
 
 // Little-endian
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
+
+// Non-power of two
+static_assert(SWAR<5, u16>::Lanes == 3);
+static_assert(SWAR{Literals<5, u16>, {1, 1, 1}}.value() == 0b0'00001'00001'00001);
+static_assert(SWAR{Literals<5, u16>, {31, 31, 31}}.value() == 0b0'11111'11111'11111);
+static_assert(SWAR{Literals<5, u16>, {1, 7, 17}}.value() == 0b0'00001'00111'10001);
 
 // Macro required because initializer lists are not constexpr
 #define ARRAY_TEST(SwarType, ...)                                              \
