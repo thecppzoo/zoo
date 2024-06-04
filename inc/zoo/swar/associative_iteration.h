@@ -521,11 +521,36 @@ constexpr S shiftLeftAppendOne(S input, BS should) {
     T result = (appendedOnes & mask) | (input.value() & ~mask);
     return S{result};
 }
-
 static_assert(shiftLeftAppendOne(
             S{0b0000'0001'0100'1000},
             S{0b0000'1000'1000'1000}).value() ==
               0b0000'0011'1001'0001);
+
+constexpr auto maskedOperation = [](auto input, auto mask, auto op) {
+    auto output = op(input);
+    return (output & mask) | (input & ~mask);
+};
+
+template<typename S, typename BS>
+constexpr S shiftLeftNAppendN(S input, S numTimes, BS should) {
+    using T = typename S::type;
+    auto inputMsbCleared = input.value() & ~S{S::MostSignificantBit}.value();
+    auto mask = makeLaneMaskFromMSB(should).value();
+
+    T res = maskedOperation(inputMsbCleared, mask, [](auto input) {
+        auto shifted = input << 1;
+        constexpr auto ones = S::LeastSignificantBit;
+        auto appendedOnes = shifted | ones;
+        return appendedOnes;
+    });
+
+    return S{res};
+}
+static_assert(shiftLeftNAppendN(
+            S{0b0000'0001'0100'1000},
+            S{0b0000'0001'0100'1000},
+            S{0b1000'1000'1000'1000}).value() ==
+              0b0001'0011'1001'0001);
 
 template<int ActualBits, int NB, typename T>
 constexpr auto labelNumBits_ai(
@@ -556,7 +581,7 @@ constexpr auto labelNumBits_ai(
 static_assert(labelNumBits_ai<4>(S{0b0001'0010'0011'0100}).value() == S{0b0001'0011'0111'1111}.value());
 
 template<typename S>
-constexpr auto shiftOp(S left, S right, S counts) {
+constexpr auto shiftRightOnce_lanewise(S left, S counts) {
     using T = typename S::type;
     auto mask = makeLaneMaskFromMSB(counts).value();
     auto inputLsbCleared = left.value() & ~S{S::LeastSignificantBit}.value();
@@ -564,7 +589,20 @@ constexpr auto shiftOp(S left, S right, S counts) {
     T res = (shifted & mask) | (left.value() & ~mask);
     return S{res};
 };
-static_assert(shiftOp(S{0b1000'1000'1000'1000}, S{0b0001'0001'0001'0001}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
+static_assert(shiftRightOnce_lanewise(S{0b1000'1000'1000'1000}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
+static_assert(shiftRightOnce_lanewise(S{0b1111'1000'1111'1000}, S{0b1000'1000'1000'0000}).value() == 0b0111'0100'0111'1000);
+static_assert(shiftRightOnce_lanewise(S{0b1111'1111'1111'1111}, S{0b1000'1000'1000'1000}).value() == 0b0111'0111'0111'0111);
+
+template<typename S>
+constexpr auto shiftOp_2(S left, S right, S counts) {
+    using T = typename S::type;
+    auto mask = makeLaneMaskFromMSB(counts).value();
+    auto inputLsbCleared = left.value() & ~S{S::LeastSignificantBit}.value();
+    auto shifted = inputLsbCleared >> 1;
+    T res = (shifted & mask) | (left.value() & ~mask);
+    return S{res};
+};
+static_assert(shiftOp(S{0b1000'1000'1000'1000}, S{0b0001'0010'0001'0001}, S{0b1000'1000'1000'0000}).value() == 0b0100'0100'0100'1000);
 
 template<int ActualBits, int NB, typename T>
 constexpr auto rightShift_LaneWise(
