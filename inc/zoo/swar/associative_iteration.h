@@ -538,6 +538,8 @@ constexpr auto base2TallyTransform(S input) {
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
+static_assert(base2TallyTransform(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
+static_assert(base2TallyTransform(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
 
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
@@ -554,13 +556,11 @@ constexpr auto rightShift_Plural(S input, S shifts) {
     }
     return S{result};
 }
+
 static_assert(rightShift_Plural(
     S{0b0000'1000'1000'1000},
     S{0b0100'0011'0010'0001}
 ).value() == 0b0000'0001'0010'0100);
-
-static_assert(base2TallyTransform(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
-static_assert(base2TallyTransform(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
 
 static_assert(S::LeastSignificantLaneMask == 0b0000'0000'0000'1111);
 static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
