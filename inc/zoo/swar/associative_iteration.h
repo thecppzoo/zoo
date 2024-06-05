@@ -527,6 +527,11 @@ constexpr auto rightShift_Plural(S input, S shifts) {
 static_assert(1 >> 0 == 1);
 
 static_assert(rightShift_Plural(
+    S{0b0111'0111'0111'0111},
+    S{0b0010'0010'0010'0010}
+).value() == 0b0001'0001'0001'0001);
+
+static_assert(rightShift_Plural(
     S{0b0000'0000'1111'0001},
     S{0b0000'0000'0000'0001}
 ).value() == 0b0000'0000'1111'0000);
