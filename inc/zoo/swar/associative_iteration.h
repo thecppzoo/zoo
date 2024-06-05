@@ -528,6 +528,16 @@ static_assert(shiftLeftAppendOne(
             S{0b0000'1000'1000'1000}).value() ==
               0b0000'0011'1001'0001);
 
+template <typename S>
+constexpr auto createShiftMask(S input) {
+    constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
+    constexpr auto one = S::LeastSignificantBit;
+    typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
+    return S{v};
+}
+static_assert(createShiftMask(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
+static_assert(createShiftMask(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
+
 constexpr auto maskedOperation = [](auto input, auto mask, auto op) {
     auto output = op(input);
     return (output & mask) | (input & ~mask);
