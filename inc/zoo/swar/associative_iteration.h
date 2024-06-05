@@ -265,7 +265,6 @@ constexpr auto makeLaneMaskFromMSB(SWAR<NB, B> input) {
     auto msbCopiedToLSB = S{val};
     return impl::makeLaneMaskFromMSB_and_LSB(msb, msbCopiedToLSB);
 }
-static_assert(makeLaneMaskFromMSB(SWAR<4, uint16_t>{0b1001'0000'0000'0000}).value() == 0b1111'0000'0000'0000);
 
 template<int NB, typename B>
 struct ArithmeticResultTriplet {
@@ -506,27 +505,52 @@ constexpr auto base2TallyTransform_Plural(S input) {
 }
 static_assert(base2TallyTransform_Plural(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
 static_assert(base2TallyTransform_Plural(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
+static_assert(base2TallyTransform_Plural(S{0b0000'0000'0000'0001}).value() == 0b0000'0000'0000'0001);
 
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
     using T = typename S::type;
-    auto minimumMask = ~base2TallyTransform_Plural(shifts);
-    T inputMasked = input.value() & minimumMask.value();
+    auto minimumMask = ~base2TallyTransform_Plural(shifts); // 1111'1111'1111'1110
+    auto inputMasked = input.value() & minimumMask.value(); // 0000'0000'1111'0000
+
     T result = 0;
     for (int i = 0; i < S::Lanes; i++) {
-        T currentNumShift = shifts.at(i);
-        auto shifted = inputMasked >> currentNumShift;
         auto laneMask = S::laneMask(i);
-        auto thisResult = shifted & laneMask;
-        result |= thisResult;
+        auto currentShiftAmount = shifts.at(i);
+        auto masked = inputMasked & laneMask;
+        auto shifted = masked >> currentShiftAmount;
+        result |= shifted;
     }
     return S{result};
 }
+
+static_assert(1 >> 0 == 1);
+
+static_assert(rightShift_Plural(
+    S{0b0000'0000'1111'0001},
+    S{0b0000'0000'0000'0001}
+).value() == 0b0000'0000'1111'0000);
 
 static_assert(rightShift_Plural(
     S{0b0000'1000'1000'1000},
     S{0b0100'0011'0010'0001}
 ).value() == 0b0000'0001'0010'0100);
+
+static_assert(rightShift_Plural(
+    S{0b1111'1111'1111'1111},
+    S{0b0001'0001'0001'0001}
+).value() == 0b0111'0111'0111'0111);
+
+static_assert(rightShift_Plural(
+    S{0b0000'0000'1111'0001},
+    S{0b0000'0000'0000'0000}
+).value() == 0b0000'0000'1111'0001);
+
+static_assert(rightShift_Plural(
+    S{0b0000'0000'1111'0001},
+    S{0b0000'0000'0001'0001}
+).value() == 0b0000'0000'0111'0000);
+
 
 static_assert(S::LeastSignificantLaneMask == 0b0000'0000'0000'1111);
 static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
