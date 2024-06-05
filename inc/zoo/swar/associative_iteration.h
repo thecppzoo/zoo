@@ -528,31 +528,46 @@ static_assert(shiftLeftAppendOne(
             S{0b0000'1000'1000'1000}).value() ==
               0b0000'0011'1001'0001);
 
+
+/** Transforms a number into a number into a binary tally.
+ * E.g. 0b0011 (3) -> 0b0111 */
 template <typename S>
-constexpr auto createShiftMask(S input) {
+constexpr auto base2TallyTransform(S input) {
     constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
     constexpr auto one = S::LeastSignificantBit;
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
-static_assert(createShiftMask(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
-static_assert(createShiftMask(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
-
-static_assert(S::LeastSignificantLaneMask == 0x00'00'00'00'FF);
-
-// static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
 
 template <typename S>
-constexpr auto thing (S input, S shifts) {
-    auto minimumMask = createShiftMask(shifts);
-    auto inputMasked = input & minimumMask;
-
-    auto result = 0;
+constexpr auto rightShift_Plural(S input, S shifts) {
+    using T = typename S::type;
+    auto minimumMask = ~base2TallyTransform(shifts);
+    T inputMasked = input.value() & minimumMask.value();
+    T result = 0;
     for (int i = 0; i < S::Lanes; i++) {
-        auto laneMask
-        auto firstElement = inputMasked
+        T currentNumShift = shifts.at(i);
+        auto shifted = inputMasked >> currentNumShift;
+        auto laneMask = S::laneMask(i);
+        auto thisResult = shifted & laneMask;
+        result |= thisResult;
     }
+    return S{result};
 }
+static_assert(rightShift_Plural(
+    S{0b0000'1000'1000'1000},
+    S{0b0100'0011'0010'0001}
+).value() == 0b0000'0001'0010'0100);
+
+static_assert(base2TallyTransform(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
+static_assert(base2TallyTransform(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
+
+static_assert(S::LeastSignificantLaneMask == 0b0000'0000'0000'1111);
+static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
+static_assert(S::laneMask(1) == 0b0000'0000'1111'0000);
+static_assert(S::laneMask(2) == 0b0000'1111'0000'0000);
+static_assert(S::laneMask(3) == 0b1111'0000'0000'0000);
+static_assert(S{S::laneMask(3)}.at(3) == 0b0000'0000'0000'1111);
 
 constexpr auto maskedOperation = [](auto input, auto mask, auto op) {
     auto output = op(input);
