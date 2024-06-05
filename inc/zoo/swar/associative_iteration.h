@@ -3,6 +3,7 @@
 
 #include "zoo/meta/BitmaskMaker.h"
 #include "zoo/swar/SWAR.h"
+#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -495,7 +496,9 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
 using S = SWAR<4, u16>;
 
 /** Transforms a number into a number into a binary tally.
- * E.g. 0b0011 (3) -> 0b0111 */
+ * E.g. 0b0011 (3) -> 0b0111
+ * It seems that trying to get the lane width as a tally is weird and overflowy.
+ * */
 template <typename S>
 constexpr auto base2TallyTransform_Plural(S input) {
     constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
@@ -503,9 +506,11 @@ constexpr auto base2TallyTransform_Plural(S input) {
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
+static_assert(base2TallyTransform_Plural(S{0b0001'0010'0011'0011}).value() == 0b0001'0011'0111'0111);
 static_assert(base2TallyTransform_Plural(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
 static_assert(base2TallyTransform_Plural(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
 static_assert(base2TallyTransform_Plural(S{0b0000'0000'0000'0001}).value() == 0b0000'0000'0000'0001);
+static_assert(base2TallyTransform_Plural(SWAR<8, uint16_t>{0b000000111'00000101}).value() == 0b01111111'00011111); // 7 -> 5
 
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
