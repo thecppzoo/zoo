@@ -515,7 +515,6 @@ template <typename S>
 constexpr auto binaryToUnary_Plural(S input) {
     constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
     constexpr auto one = S::LeastSignificantBit;
-    constexpr auto max_size = S::LeastSignificantLaneMask;
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
@@ -578,31 +577,35 @@ static_assert(rightShift_Plural_Test<4, uint16_t,
    0b0001'0001'0001'0001  // notice, input, shifted over two to right!
 >());
 
-static_assert(rightShift_Plural(
-    S{0b0000'0000'1111'0001},
-    S{0b0000'0000'0000'0001}
-).value() == 0b0000'0000'1111'0000);
+static_assert(rightShift_Plural_Test<4, uint16_t,
+    0b0000'0000'1111'0001,
+    0b0000'0000'0000'0001,
+    0b0000'0000'1111'0000
+>());
 
-static_assert(rightShift_Plural(
-    S{0b0000'1000'1000'1000},
-    S{0b0100'0011'0010'0001}
-).value() == 0b0000'0001'0010'0100);
+static_assert(rightShift_Plural_Test<4, uint16_t,
+    0b0000'1000'1000'1000,
+    0b0100'0011'0010'0001,
+    0b0000'0001'0010'0100
+>());
 
-static_assert(rightShift_Plural(
-    S{0b1111'1111'1111'1111},
-    S{0b0001'0001'0001'0001}
-).value() == 0b0111'0111'0111'0111);
+static_assert(rightShift_Plural_Test<4, uint16_t,
+    0b1111'1111'1111'1111,
+    0b0001'0001'0001'0001,
+    0b0111'0111'0111'0111
+>());
 
-static_assert(rightShift_Plural(
-    S{0b0000'0000'1111'0001},
-    S{0b0000'0000'0000'0000}
-).value() == 0b0000'0000'1111'0001);
+static_assert(rightShift_Plural_Test<4, uint16_t,
+    0b0000'0000'1111'0001,
+    0b0000'0000'0000'0000,
+    0b0000'0000'1111'0001
+>());
 
-static_assert(rightShift_Plural(
-    S{0b0000'0000'1111'0001},
-    S{0b0000'0000'0001'0001}
-).value() == 0b0000'0000'0111'0000);
-
+static_assert(rightShift_Plural_Test<4, uint16_t,
+    0b0000'0000'1111'0001,
+    0b0000'0000'0001'0001,
+    0b0000'0000'0111'0000
+>());
 
 static_assert(S::LeastSignificantLaneMask == 0b0000'0000'0000'1111);
 static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
