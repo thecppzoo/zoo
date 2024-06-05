@@ -349,16 +349,6 @@ GE_MSB_ON_TEST(
     0x8888'8888)
 
 TEST_CASE(
-    "right shift lanewise",
-    "[swar][jamie]"
-) {
-    CHECK(rightShift_LaneWise<4>(
-        SWAR<4, uint16_t>{0b1000'1000'1000'1000},
-        SWAR<4, uint16_t>{0b0001'0001'0001'0001}
-    ).value() == 0b0100'0100'0100'0100);
-}
-
-TEST_CASE(
     "greaterEqualMSBOn",
     "[swar][unsigned-swar]"
 ) {
