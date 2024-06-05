@@ -500,19 +500,19 @@ using S = SWAR<4, u16>;
 /** Transforms a number into a number into a binary tally.
  * E.g. 0b0011 (3) -> 0b0111 */
 template <typename S>
-constexpr auto base2TallyTransform(S input) {
+constexpr auto base2TallyTransform_Plural(S input) {
     constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
     constexpr auto one = S::LeastSignificantBit;
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
-static_assert(base2TallyTransform(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
-static_assert(base2TallyTransform(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
+static_assert(base2TallyTransform_Plural(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
+static_assert(base2TallyTransform_Plural(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
 
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
     using T = typename S::type;
-    auto minimumMask = ~base2TallyTransform(shifts);
+    auto minimumMask = ~base2TallyTransform_Plural(shifts);
     T inputMasked = input.value() & minimumMask.value();
     T result = 0;
     for (int i = 0; i < S::Lanes; i++) {
