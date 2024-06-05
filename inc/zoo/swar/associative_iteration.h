@@ -494,20 +494,6 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
 }
 
 using S = SWAR<4, u16>;
-
-template<typename T>
-constexpr auto binaryToUnaryAtMSB(T binary) {
-    using UT = std::make_unsigned_t<T>;
-    constexpr auto
-        AllOnes = ~UT(0),
-        ZeroAtMSB_OnesRest = AllOnes >> UT(1),
-        MSB = ~ZeroAtMSB_OnesRest;
-    auto
-        MSB_Shifted = MSB >> binary,
-        unaryNearMSB = MSB - MSB_Shifted;
-    return unaryNearMSB << 1;
-}
-
 /** Transforms a binary number into it's unary representation (in binary).
   * E.g. 0b0011 (3) -> 0b0111
   * It seems that getting the lane width exactly is overflowy */
@@ -515,6 +501,7 @@ template <typename S>
 constexpr auto binaryToUnary_Plural(S input) {
     constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
     constexpr auto one = S::LeastSignificantBit;
+    constexpr auto max_size = S::LeastSignificantLaneMask;
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
