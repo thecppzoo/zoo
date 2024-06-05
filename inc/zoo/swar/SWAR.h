@@ -75,7 +75,6 @@ struct SWAR {
         SignificantBitsCount = BitWidth - PaddingBitsCount,
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
-        AllOnesInFirstLane = AllOnes >> (NBits * (Lanes - 1)),
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask = []() {
             if constexpr (NBits < sizeof(T) * 8) {
@@ -491,7 +490,5 @@ static_assert(
     logarithmFloor(SWAR<8>{0xFF7F3F1F0F070301ull}).value() ==
     0x0706050403020100ull
 );
-
-static_assert(SWAR<4, uint16_t>::AllOnesInFirstLane == 0b0000'0000'0000'1111);
 
 }}
