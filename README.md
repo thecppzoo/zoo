@@ -1,4 +1,4 @@
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)	
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![C++ CI](https://github.com/thecppzoo/zoo/actions/workflows/master.yaml/badge.svg)](https://github.com/thecppzoo/zoo/actions/workflows/master.yaml)
 
 ## Build suggestion

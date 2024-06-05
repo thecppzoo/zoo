@@ -76,13 +76,24 @@ struct SWAR {
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
-        LeastSignificantLaneMask =
-            sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
-                ~T(0) :
-                ~(~T(0) << NBits),
+        LeastSignificantLaneMask = []() {
+            if constexpr (NBits < sizeof(T) * 8) {
+                return (T(1) << NBits) - 1;
+            } else {
+                return ~T(0);
+            }
+        }(),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit;
+
+    static_assert(std::is_unsigned_v<T>,
+        "You should not use an unsigned type as the base for a SWAR type. "
+        "If you have used `int` or `long`, please use `uint32_t` or `uint64_t` instead. "
+        "This type parameter is only used to determine the total width of the SWAR register. "
+        "The signed-ness of the type has no *intentional* semantic meaning to what you're defining and "
+        "furthermore, some bitwise operations are different for signed and unsigned types."
+    );
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -104,9 +115,13 @@ struct SWAR {
     SWAR_BINARY_OPERATORS_X_LIST
     #undef X
 
+    constexpr static T laneMask(int laneIndex) noexcept {
+        return LeastSignificantLaneMask << (NBits * laneIndex);
+    }
+
     // Returns lane at position with other lanes cleared.
-    constexpr T isolateLane(int position) const noexcept {
-        return m_v & (LeastSignificantLaneMask << (NBits * position));
+    constexpr T isolateLane(int laneIndex) const noexcept {
+        return m_v & laneMask(laneIndex);
     }
 
     // Returns lane value at position, in lane 0, rest of SWAR cleared.
@@ -254,7 +269,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     static constexpr auto MaskNonLSB = ~MaskLSB;
     static constexpr auto MaskNonMSB = ~MaskMSB;
     constexpr explicit BooleanSWAR(T v): Base(v) {}
-  
+
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
@@ -270,7 +285,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr auto operator ~() const noexcept {
         return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
-  
+
     constexpr auto operator not() const noexcept {
         return BooleanSWAR(MaskMSB ^ *this);
     }
@@ -395,7 +410,7 @@ greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
     using S = swar::SWAR<NBits, T>;
     const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
     const auto z = (x|h) - (y&~h);
-    // bitwise ternary median! 
+    // bitwise ternary median!
     const auto t = h & ~median(x, ~y, z);
     return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
 }

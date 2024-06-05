@@ -1,7 +1,9 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
+#include "zoo/meta/BitmaskMaker.h"
 #include "zoo/swar/SWAR.h"
+#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -260,7 +262,8 @@ template<int NB, typename B>
 constexpr auto makeLaneMaskFromMSB(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
     auto msb = input & S{S::MostSignificantBit};
-    auto msbCopiedToLSB = S{msb.value() >> (NB - 1)};
+    B val = msb.value() >> (NB - 1);
+    auto msbCopiedToLSB = S{val};
     return impl::makeLaneMaskFromMSB_and_LSB(msb, msbCopiedToLSB);
 }
 
@@ -392,8 +395,13 @@ template<
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    Base base,
+    Base neutral,
+    IterationCount count,
+    IterationCount forSquaring,
+    Operator op,
+    unsigned log2Count,
+    CountHalver ch
 ) {
     auto result = neutral;
     if(!log2Count) { return result; }
@@ -419,10 +427,12 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        T res = msbCleared.value() << 1;
+        return S{res};
     };
 
-    multiplier = S{multiplier.value() << (NB - ActualBits)};
+    T val = multiplier.value() << (NB - ActualBits);
+    multiplier = S{val};
     return associativeOperatorIterated_regressive(
         multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
         ActualBits, halver
@@ -482,6 +492,34 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
         ActualBits,
         halver
     );
+}
+
+/** Transforms a binary number into it's unary representation (in binary).
+  * E.g. 0b0011 (3) -> 0b0111
+  * It seems that getting the lane width exactly is overflowy */
+template <typename S>
+constexpr auto binaryToUnary_Plural(S input) {
+    constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
+    constexpr auto one = S::LeastSignificantBit;
+    constexpr auto max_size = S::LeastSignificantLaneMask;
+    typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
+    return S{v};
+}
+
+template <typename S>
+constexpr auto rightShift_Plural(S input, S shifts) {
+    auto minimumMask = ~binaryToUnary_Plural(shifts);
+    auto inputMasked = input.value() & minimumMask.value();
+
+    typename S::type result = 0;
+    for (int i = 0; i < S::Lanes; i++) {
+        auto laneMask = S::laneMask(i);
+        auto currentShiftAmount = shifts.at(i);
+        auto masked = inputMasked & laneMask;
+        auto shifted = masked >> currentShiftAmount;
+        result |= shifted;
+    }
+    return S{result};
 }
 
 template<int NB, typename T>
