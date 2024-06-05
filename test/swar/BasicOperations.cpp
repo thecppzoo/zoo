@@ -42,6 +42,11 @@ constexpr auto PrecisionFixtureTest = 0x89ABCDEF;
 constexpr auto Doubled =
     doublePrecision(SWAR<4, uint32_t>{PrecisionFixtureTest});
 
+static_assert(makeLaneMaskFromMSB(SWAR<4, uint16_t>{
+    0b1000'0000'1000'0000}).value() ==
+    0b1111'0000'1111'0000
+);
+
 static_assert(0x090B0D0F == Doubled.even.value());
 static_assert(0x080A0C0E == Doubled.odd.value());
 static_assert(PrecisionFixtureTest == halvePrecision(Doubled.even, Doubled.odd).value());

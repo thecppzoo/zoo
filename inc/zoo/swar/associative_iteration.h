@@ -257,7 +257,6 @@ constexpr auto makeLaneMaskFromLSB(SWAR<NB, B> input) {
     return impl::makeLaneMaskFromMSB_and_LSB(lsbCopiedToMSB, lsb);
 }
 
-// TODO WRITE TEST FOR THIS
 template<int NB, typename B>
 constexpr auto makeLaneMaskFromMSB(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
