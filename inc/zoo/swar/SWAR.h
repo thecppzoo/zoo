@@ -4,7 +4,6 @@
 
 #include "zoo/meta/log.h"
 
-#include <cstdint>
 #include <type_traits>
 
 #ifdef _MSC_VER
@@ -16,7 +15,7 @@ namespace zoo { namespace swar {
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = uint8_t;
+using u8 = std::uint8_t;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
