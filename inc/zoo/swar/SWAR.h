@@ -13,14 +13,10 @@
 
 namespace zoo { namespace swar {
 
-namespace type_defs {
-using u128 = __uint128_t;
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
 using u8 = uint8_t;
-}
-using namespace type_defs;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
