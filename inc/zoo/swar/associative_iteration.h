@@ -510,8 +510,8 @@ static_assert(base2TallyTransform_Plural(S{0b0000'0000'0000'0001}).value() == 0b
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
     using T = typename S::type;
-    auto minimumMask = ~base2TallyTransform_Plural(shifts); // 1111'1111'1111'1110
-    auto inputMasked = input.value() & minimumMask.value(); // 0000'0000'1111'0000
+    auto minimumMask = ~base2TallyTransform_Plural(shifts);
+    auto inputMasked = input.value() & minimumMask.value();
 
     T result = 0;
     for (int i = 0; i < S::Lanes; i++) {
