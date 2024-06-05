@@ -538,6 +538,22 @@ constexpr auto createShiftMask(S input) {
 static_assert(createShiftMask(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
 static_assert(createShiftMask(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
 
+static_assert(S::LeastSignificantLaneMask == 0x00'00'00'00'FF);
+
+// static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
+
+template <typename S>
+constexpr auto thing (S input, S shifts) {
+    auto minimumMask = createShiftMask(shifts);
+    auto inputMasked = input & minimumMask;
+
+    auto result = 0;
+    for (int i = 0; i < S::Lanes; i++) {
+        auto laneMask
+        auto firstElement = inputMasked
+    }
+}
+
 constexpr auto maskedOperation = [](auto input, auto mask, auto op) {
     auto output = op(input);
     return (output & mask) | (input & ~mask);
