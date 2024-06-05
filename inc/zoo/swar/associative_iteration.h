@@ -3,8 +3,6 @@
 
 #include "zoo/meta/BitmaskMaker.h"
 #include "zoo/swar/SWAR.h"
-#include <cstdint>
-#include <array>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -496,7 +494,6 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     );
 }
 
-using namespace zoo::swar::type_defs;
 using S = SWAR<4, u16>;
 
 /** Transforms a number into a number into a binary tally.
