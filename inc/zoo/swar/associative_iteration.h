@@ -496,38 +496,6 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
 
 using namespace zoo::swar::type_defs;
 using S = SWAR<4, u16>;
-static_assert(SWAR<4, u16>::LeastSignificantBit == 0b0001'0001'0001'0001);
-
-template<typename S>
-constexpr auto labelNumBits(S input) {
-    using T = typename S::type;
-    auto mask = makeLaneMaskFromMSB(input).value();
-    T result = 0;
-    for(auto i = 0; i < S::Lanes; ++i) {
-        result = result + T(mask & 1);
-        mask = mask >> 1;
-    }
-    return S{result};
-}
-// HOLY SHIT THIS IS ALSO ASSOCIATIVE ITERATION!
-using S = SWAR<4, uint16_t>;
-
-template<typename S, typename BS>
-constexpr S shiftLeftAppendOne(S input, BS should) {
-    using T = typename S::type;
-    auto mask = makeLaneMaskFromMSB(should).value();
-    auto inputMsbCleared = input.value() & ~S{S::MostSignificantBit}.value();
-    T shifted = inputMsbCleared << 1;
-    constexpr auto ones = S::LeastSignificantBit;
-    T appendedOnes = shifted | ones;
-    T result = (appendedOnes & mask) | (input.value() & ~mask);
-    return S{result};
-}
-static_assert(shiftLeftAppendOne(
-            S{0b0000'0001'0100'1000},
-            S{0b0000'1000'1000'1000}).value() ==
-              0b0000'0011'1001'0001);
-
 
 /** Transforms a number into a number into a binary tally.
  * E.g. 0b0011 (3) -> 0b0111 */
