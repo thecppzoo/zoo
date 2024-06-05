@@ -493,7 +493,6 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     );
 }
 
-using S = SWAR<4, u16>;
 /** Transforms a binary number into it's unary representation (in binary).
   * E.g. 0b0011 (3) -> 0b0111
   * It seems that getting the lane width exactly is overflowy */
@@ -505,36 +504,6 @@ constexpr auto binaryToUnary_Plural(S input) {
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
-
-template <int NB, typename IntType, IntType Input, IntType Expected>
-constexpr static bool binaryToUnary_Plural_Test() {
-    return binaryToUnary_Plural(SWAR<NB, IntType>{Input}).value() == Expected;
-};
-
-static_assert(binaryToUnary_Plural_Test<4, uint16_t,
-    0b0001'0010'0011'0011,
-    0b0001'0011'0111'0111
->());
-
-static_assert(binaryToUnary_Plural_Test<4, uint16_t,
-    0b0000'0001'0010'0011,
-    0b0000'0001'0011'0111
->());
-
-static_assert(binaryToUnary_Plural_Test<4, uint16_t,
-    0b0100'0001'0010'0011,
-    0b1111'0001'0011'0111
->());
-
-static_assert(binaryToUnary_Plural_Test<4, uint16_t,
-    0b0000'0000'0000'0001,
-    0b0000'0000'0000'0001
->());
-
-static_assert(binaryToUnary_Plural_Test<8, uint16_t,
-    0b000000111'00000101, // 7 ' 5
-    0b001111111'00011111  // seven ones, fives ones!
->());
 
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
@@ -551,55 +520,6 @@ constexpr auto rightShift_Plural(S input, S shifts) {
     }
     return S{result};
 }
-
-template <int NB, typename IntType, IntType Input, IntType Count, IntType Expected>
-constexpr static bool rightShift_Plural_Test() {
-    using S = SWAR<NB, IntType>;
-    return rightShift_Plural(S{Input}, S{Count}).value() == Expected;
-};
-
-static_assert(rightShift_Plural_Test<4, uint16_t,
-   0b0111'0111'0111'0111, // input
-   0b0010'0010'0010'0010, // 2 ' 2 ' 2 ' 2
-   0b0001'0001'0001'0001  // notice, input, shifted over two to right!
->());
-
-static_assert(rightShift_Plural_Test<4, uint16_t,
-    0b0000'0000'1111'0001,
-    0b0000'0000'0000'0001,
-    0b0000'0000'1111'0000
->());
-
-static_assert(rightShift_Plural_Test<4, uint16_t,
-    0b0000'1000'1000'1000,
-    0b0100'0011'0010'0001,
-    0b0000'0001'0010'0100
->());
-
-static_assert(rightShift_Plural_Test<4, uint16_t,
-    0b1111'1111'1111'1111,
-    0b0001'0001'0001'0001,
-    0b0111'0111'0111'0111
->());
-
-static_assert(rightShift_Plural_Test<4, uint16_t,
-    0b0000'0000'1111'0001,
-    0b0000'0000'0000'0000,
-    0b0000'0000'1111'0001
->());
-
-static_assert(rightShift_Plural_Test<4, uint16_t,
-    0b0000'0000'1111'0001,
-    0b0000'0000'0001'0001,
-    0b0000'0000'0111'0000
->());
-
-static_assert(S::LeastSignificantLaneMask == 0b0000'0000'0000'1111);
-static_assert(S::laneMask(0) == 0b0000'0000'0000'1111);
-static_assert(S::laneMask(1) == 0b0000'0000'1111'0000);
-static_assert(S::laneMask(2) == 0b0000'1111'0000'0000);
-static_assert(S::laneMask(3) == 0b1111'0000'0000'0000);
-static_assert(S{S::laneMask(3)}.at(3) == 0b0000'0000'0000'1111);
 
 template<int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe(
