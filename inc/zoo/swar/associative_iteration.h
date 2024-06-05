@@ -430,10 +430,12 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        T res = msbCleared.value() << 1;
+        return S{res};
     };
 
-    multiplier = S{multiplier.value() << (NB - ActualBits)};
+    T val = multiplier.value() << (NB - ActualBits);
+    multiplier = S{val};
     return associativeOperatorIterated_regressive(
         multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
         ActualBits, halver
