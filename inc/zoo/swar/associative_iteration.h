@@ -508,30 +508,54 @@ constexpr auto binaryToUnaryAtMSB(T binary) {
     return unaryNearMSB << 1;
 }
 
-/** Transforms a number into a number into a binary tally.
- * E.g. 0b0011 (3) -> 0b0111
- * It seems that trying to get the lane width as a tally is weird and overflowy.
- * */
+/** Transforms a binary number into it's unary representation (in binary).
+  * E.g. 0b0011 (3) -> 0b0111
+  * It seems that getting the lane width exactly is overflowy */
 template <typename S>
 constexpr auto binaryToUnary_Plural(S input) {
     constexpr auto two = S{meta::BitmaskMaker<typename S::type, 2, S::NBits>::value};
     constexpr auto one = S::LeastSignificantBit;
+    constexpr auto max_size = S::LeastSignificantLaneMask;
     typename S::type v = exponentiation_OverflowUnsafe_SpecificBitCount<S::NBits>(two, input).value() - one;
     return S{v};
 }
-static_assert(binaryToUnary_Plural(S{0b0001'0010'0011'0011}).value() == 0b0001'0011'0111'0111);
-static_assert(binaryToUnary_Plural(S{0b0000'0001'0010'0011}).value() == 0b0000'0001'0011'0111);
-static_assert(binaryToUnary_Plural(S{0b0100'0001'0010'0011}).value() == 0b1111'0001'0011'0111);
-static_assert(binaryToUnary_Plural(S{0b0000'0000'0000'0001}).value() == 0b0000'0000'0000'0001);
-static_assert(binaryToUnary_Plural(SWAR<8, uint16_t>{0b000000111'00000101}).value() == 0b01111111'00011111); // 7 -> 5
+
+template <int NB, typename IntType, IntType Input, IntType Expected>
+constexpr static bool binaryToUnary_Plural_Test() {
+    return binaryToUnary_Plural(SWAR<NB, IntType>{Input}).value() == Expected;
+};
+
+static_assert(binaryToUnary_Plural_Test<4, uint16_t,
+    0b0001'0010'0011'0011,
+    0b0001'0011'0111'0111
+>());
+
+static_assert(binaryToUnary_Plural_Test<4, uint16_t,
+    0b0000'0001'0010'0011,
+    0b0000'0001'0011'0111
+>());
+
+static_assert(binaryToUnary_Plural_Test<4, uint16_t,
+    0b0100'0001'0010'0011,
+    0b1111'0001'0011'0111
+>());
+
+static_assert(binaryToUnary_Plural_Test<4, uint16_t,
+    0b0000'0000'0000'0001,
+    0b0000'0000'0000'0001
+>());
+
+static_assert(binaryToUnary_Plural_Test<8, uint16_t,
+    0b000000111'00000101, // 7 ' 5
+    0b001111111'00011111  // seven ones, fives ones!
+>());
 
 template <typename S>
 constexpr auto rightShift_Plural(S input, S shifts) {
-    using T = typename S::type;
     auto minimumMask = ~binaryToUnary_Plural(shifts);
     auto inputMasked = input.value() & minimumMask.value();
 
-    T result = 0;
+    typename S::type result = 0;
     for (int i = 0; i < S::Lanes; i++) {
         auto laneMask = S::laneMask(i);
         auto currentShiftAmount = shifts.at(i);
@@ -542,12 +566,17 @@ constexpr auto rightShift_Plural(S input, S shifts) {
     return S{result};
 }
 
-static_assert(1 >> 0 == 1);
+template <int NB, typename IntType, IntType Input, IntType Count, IntType Expected>
+constexpr static bool rightShift_Plural_Test() {
+    using S = SWAR<NB, IntType>;
+    return rightShift_Plural(S{Input}, S{Count}).value() == Expected;
+};
 
-static_assert(rightShift_Plural(
-    S{0b0111'0111'0111'0111},
-    S{0b0010'0010'0010'0010}
-).value() == 0b0001'0001'0001'0001);
+static_assert(rightShift_Plural_Test<4, uint16_t,
+   0b0111'0111'0111'0111, // input
+   0b0010'0010'0010'0010, // 2 ' 2 ' 2 ' 2
+   0b0001'0001'0001'0001  // notice, input, shifted over two to right!
+>());
 
 static_assert(rightShift_Plural(
     S{0b0000'0000'1111'0001},
