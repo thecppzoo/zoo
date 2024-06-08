@@ -1,13 +1,9 @@
 #include "zoo/swar/associative_iteration.h"
 
 #include "catch2/catch.hpp"
-#include "math.h"
-#include "zoo/swar/math.h"
 
-// #include <ios>
-// #include <iomanip>
-// #include <iostream>
-// #include <type_traits>
+#include <cstdint>
+#include <type_traits>
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -33,13 +29,217 @@ using S32_32 = SWAR<32, uint32_t>;
 
 using S64_64 = SWAR<64, uint64_t>;
 
+
+namespace math {
+/** Returns the absolute value of x. You shouldn't use this at runtime, use std::abs instead :) */
+template <typename NumericType>
+constexpr NumericType abs(const NumericType x) noexcept {
+    if (x < 0) {
+      return -x;
+    }
+    return x;
+}
+static_assert(math::abs(-1) == 1);
+static_assert(math::abs(1) == 1);
+static_assert(math::abs(-1.0e-17) == 1.0e-17);
+}
+
+template <typename NumericType>
+struct Constants {
+  constexpr static NumericType default_epsilon = static_cast<NumericType>(1.0e-5);
+};
+
+namespace approx {
+
+template <typename NumericType, std::enable_if_t<std::is_floating_point_v<NumericType>, int> = 0>
+struct Approx {
+  // NOLINTNEXTLINE
+  constexpr Approx(NumericType value, NumericType epsilon = Constants<NumericType>::default_epsilon)
+      : v(value), e(epsilon) {}
+  [[nodiscard]] constexpr Approx margin(NumericType epsilon) const noexcept { return Approx(v, epsilon); }
+  NumericType v, e;
+};
+
+template <typename NumericType>
+constexpr static bool approx(
+    const NumericType a,
+    const NumericType b,
+    const NumericType epsilon = Constants<NumericType>::default_epsilon) noexcept {
+  return math::abs(a - b) < epsilon;
+}
+
+template <typename NumericType>
+constexpr bool operator==(const NumericType v, const Approx<NumericType>& rhs) noexcept {
+  return approx(v, rhs.v, rhs.e);
+}
+
+static_assert(1.0 == Approx{1.09}.margin(0.1));
+static_assert(1.0 == Approx{1.0});
+static_assert(1.0f == Approx{1.0000001f});
+static_assert(1.0 == Approx{1.0 + 1.0e6}.margin(1.0e11));
+
+} // namespace approx
+
+
+
+#ifndef FIXED_POINT_H
+#define FIXED_POINT_H
+
+enum class Signed {
+    Yes,
+    No
+};
+
+
+// TODO MAKE THIS associative_iteration
+// you can represent parsing a fixed point number to a "real" floating point number
+// using associative_iteration. that would be easy and fun to do.
+template <typename T, typename FloatType = float>
+constexpr float parse_unsigned_fixed_point(T input, size_t num_fractional_bits) {
+    constexpr auto type_sz = sizeof(T) * 8;
+    constexpr auto msbOn = 1 << (type_sz - 1);
+
+    auto result = FloatType{};
+    auto num_integer_bits = type_sz - num_fractional_bits;
+    FloatType init_f = (1 << (type_sz - 1 - num_fractional_bits));
+
+    for (int i = 0; i < type_sz; ++i) {
+        if (input & msbOn) {
+            result += init_f;
+        }
+        input <<= 1;
+        init_f /= 2;
+    }
+
+    return result;
+}
+
+static_assert(parse_unsigned_fixed_point(0x0000'0000, 16) == approx::Approx{0.0f});
+
+static_assert(parse_unsigned_fixed_point(0x0001'0000, 16) == approx::Approx{1.0f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0001'0000, 4) == approx::Approx{1.0f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0010'0000, 4) == approx::Approx{2.0f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0010'1000, 4) == approx::Approx{2.5f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0010'1001, 4) == approx::Approx{2.5625f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b1010'1001, 4) == approx::Approx{10.5625f}.margin(1.0e-45));
+
+
+template <typename T, int Q, Signed S = Signed::No>
+class FixedPoint {
+public:
+    constexpr FixedPoint() : value(0) {};
+    constexpr static bool is_signed = S == Signed::Yes;
+    constexpr static auto sign_bit_mask = is_signed ? 1 << ((sizeof(T) * 8) - 1) : 0 ;
+
+    constexpr bool is_negative() const {
+        static_assert(is_signed);
+        return (value & sign_bit_mask) == sign_bit_mask;
+    }
+
+    // left shift amount
+    constexpr T shift() const {
+        if constexpr (is_signed) {
+            return Q - 1;
+        } else {
+            return Q;
+        }
+    }
+
+    constexpr static FixedPoint from_literal(T v) {
+        auto fp = FixedPoint<T, Q>{};
+        fp.value = v;
+        return fp;
+    }
+
+    template <typename FloatType>
+    constexpr FixedPoint(FloatType v) {
+        static_assert(std::is_floating_point_v<FloatType>);
+        auto is_negative = v < 0;
+        if (is_negative) {
+            v = -v;
+        }
+
+        auto above_zero = static_cast<T>(v);
+        auto below_zero = static_cast<T>((v - above_zero) * (1 << shift()));
+        value = (above_zero << shift()) + below_zero;
+
+        // set the sign bit
+        if (is_negative) {
+            value |= (1 << (Q - 1));
+        }
+
+        auto fp = FixedPoint<T, Q>{};
+        fp.value = v;
+    }
+
+    constexpr static FixedPoint new_with_value(T v) {
+        auto fp =  FixedPoint<T, Q>{};
+        fp.value = v;
+        return fp;
+    }
+
+    constexpr auto above_zero() const {
+        return value >> shift();
+    }
+
+    constexpr auto below_zero() const {
+        return value & ((1 << shift()) - 1);
+    }
+
+    constexpr FixedPoint operator+(const FixedPoint& other) const {
+        auto sum = above_zero() + other.above_zero();
+        auto carry = (below_zero() + other.below_zero()) >> Q;
+        return {(sum + carry) << Q};
+    }
+
+    template <typename FloatType>
+    std::enable_if_t<std::is_floating_point_v<FloatType>, FloatType>
+    constexpr to() {
+        auto v = value & ~sign_bit_mask;
+        auto above_zero = v >> shift();
+        auto below_zero = v & ((1 << shift()) - 1);
+        return static_cast<FloatType>(above_zero) + static_cast<FloatType>(below_zero) / (1 << shift());
+    }
+
+    T value;
+};
+
+#endif // FIXED_POINT_H
+
+using F = FixedPoint<uint8_t, 6>;
+using FS = FixedPoint<uint8_t, 6, Signed::Yes>;
+
+// static_assert(FixedPoint<uint8_t, 4, Signed::Yes>::from_literal(0b1000'0000).is_negative());
+
+static_assert(FS{1.0}.above_zero() == 1);
+static_assert(not FS{1.0}.is_negative());
+
+static_assert(FS{2.0}.above_zero() == 2);
+
+static_assert(F{1.0}.above_zero() == 1);
+static_assert(F{1.0}.below_zero() == 0);
+static_assert(F::from_literal(0b0100'0000).above_zero() == 1.0);
+
+static_assert(F::from_literal(0b0110'0000).to<float>() == 1.5);
+
+static_assert(FixedPoint<uint8_t, 4, Signed::Yes>::sign_bit_mask == 0b1000'0000);
+static_assert(FixedPoint<uint8_t, 4, Signed::No>::sign_bit_mask == 0b0000'0000);
+
+// static_assert(FixedPoint<uint8_t, 4, Signed::Yes>::from_literal(0b1001'0100).to<float>() == -1.25);
+static_assert(F::from_literal(0b0111'0000).to<float>() == 1.75);
+static_assert(F::from_literal(0b0111'1000).to<float>() == 1.875);
+static_assert(F::from_literal(0b1111'1000).to<float>() == 3.875);
+static_assert(F::from_literal(0b1111'1100).to<float>() == 3.875 + (0.125 / 2));
+static_assert(F::from_literal(0b1111'1110).to<float>() == 3.875 + (0.125 / 2) + (0.125 / 4));
+static_assert(F::from_literal(0b1111'1111).to<float>() == 3.875 + (0.125 / 2) + (0.125 / 4) + (0.125 / 8));
+
 static_assert(SWAR<16, u64>::MaxUnsignedLaneValue == 65535);
 static_assert(SWAR<16, u32>::MaxUnsignedLaneValue == 65535);
 static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
 static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
 static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
-static_assert(SWAR{zoo::swar::Literals<32, zoo::swar::u64>, {2, 1}}.value() == 0x00000002'00000001);
+static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
 static_assert(SWAR{Literals<32, u64>, {1, 2}}.value() == 0x00000001'00000002);
 
 static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
@@ -55,12 +255,19 @@ static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
 static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
 static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
 
+
 static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
 static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
 
 // Little-endian
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
 static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
+
+// Non-power of two
+static_assert(SWAR<5, u16>::Lanes == 3);
+static_assert(SWAR{Literals<5, u16>, {1, 1, 1}}.value() == 0b0'00001'00001'00001);
+static_assert(SWAR{Literals<5, u16>, {31, 31, 31}}.value() == 0b0'11111'11111'11111);
+static_assert(SWAR{Literals<5, u16>, {1, 7, 17}}.value() == 0b0'00001'00111'10001);
 
 // Macro required because initializer lists are not constexpr
 #define ARRAY_TEST(SwarType, ...)                                              \
@@ -86,63 +293,17 @@ ARRAY_TEST(S8_64, 255, 255, 255, 255, 255, 255, 255, 255);
 ARRAY_TEST(S16_32, 65534, 65534);
 ARRAY_TEST(S16_64, 65534, 65534, 65534, 65534);
 
+#define F false
+#define T true
 using BS = BooleanSWAR<4, u16>;
-static_assert(BS{Literals<4, u16>, {0, 0, 0, 0}}.value() == 0b0000'0000'0000'0000);
-static_assert(BS{Literals<4, u16>, {1, 0, 0, 0}}.value() == 0b1000'0000'0000'0000);
-static_assert(BS{Literals<4, u16>, {0, 1, 0, 0}}.value() == 0b0000'1000'0000'0000);
-static_assert(BS{Literals<4, u16>, {0, 0, 1, 0}}.value() == 0b0000'0000'1000'0000);
-static_assert(BS{Literals<4, u16>, {0, 0, 0, 1}}.value() == 0b0000'0000'0000'1000);
-static_assert(BS{Literals<4, u16>, {1, 0, 0, 0}}.value() == 0b1000'0000'0000'0000);
-
-
-namespace equality {
-using S = SWAR<8, u32>;
-using BS = BooleanSWAR<8, u32>;
-template <typename S = S, typename BS = BS>
-constexpr auto laneWiseEqualsTest(
-        const typename S::type (&left)[S::Lanes],
-        const typename S::type (&right)[S::Lanes],
-        const bool (&expected)[S::Lanes]) {
-    return  equals(S{S::Literal, left}, S{S::Literal, right}).value()
-            == BS{BS::Literal, expected}.value();
-}
-static_assert(laneWiseEqualsTest({1, 2, 3, 4}, {1, 2, 3, 4}, {1, 1, 1, 1}));
-static_assert(laneWiseEqualsTest({1, 2, 3, 4}, {5, 6, 7, 8}, {0, 0, 0, 0}));
-static_assert(laneWiseEqualsTest({1, 2, 3, 4}, {5, 2, 7, 4}, {0, 1, 0, 1}));
-}
-
-namespace math_test {
-static_assert(math::isPowerOfTwo<int, 4>());
-static_assert(math::moduloPowerOfTwo<4>(0) == 0);
-static_assert(math::moduloPowerOfTwo<8>(9) == 1);
-static_assert(math::moduloPowerOfTwo<4096>(4097) == 1);
-
-using S = SWAR<8, u32>;
-using BS = BooleanSWAR<8, u32>;
-template <typename S, typename BS>
-constexpr auto powerOfTwoTest(
-        const typename S::type (&input)[S::Lanes],
-        const bool (&expected)[S::Lanes]) {
-    return isPowerOfTwo(S{S::Literal, input}).value() == BS{BS::Literal, expected}.value();
-}
-static_assert(powerOfTwoTest<S, BS>({1, 2, 3, 4}, {1, 1, 0, 1}));
-static_assert(powerOfTwoTest<S, BS>({2, 3, 64, 77}, {1, 0, 1, 0}));
-static_assert(powerOfTwoTest<S, BS>({3, 65, 128, 0}, {0, 0, 1, 1}));
-static_assert(powerOfTwoTest<S, BS>({256, 7, 11, 101}, {1, 0, 0, 0}));
-static_assert(powerOfTwoTest<S, BS>({2, 64, 128, 7}, {1, 1, 1, 0}));
-
-template <size_t N, typename S = S, typename BS = BS>
-constexpr auto moduloSwarTest(
-        const typename S::type (&input)[S::Lanes],
-        const typename S::type (&expected)[S::Lanes]) {
-    return moduloPowerOfTwo<N>(S{S::Literal, input}).value() == S{S::Literal, expected}.value();
-}
-static_assert(moduloPowerOfTwo<4>(S{0}).value() == 0);
-static_assert(moduloSwarTest<4>({0, 2, 4, 6}, {0, 2, 0, 2}));
-static_assert(moduloSwarTest<4>({1, 3, 5, 7}, {1, 3, 1, 3}));
-static_assert(moduloSwarTest<8>({9, 8, 16, 7}, {1, 0, 0, 7}));
-static_assert(moduloSwarTest<16>({17, 32, 64, 127}, {1, 0, 0, 15}));
-}
+static_assert(BS{Literals<4, u16>, {F, F, F, F}}.value() == 0b0000'0000'0000'0000);
+static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+static_assert(BS{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
+static_assert(BS{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
+static_assert(BS{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
+static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+#undef F
+#undef T
 
 namespace Multiplication {
 
