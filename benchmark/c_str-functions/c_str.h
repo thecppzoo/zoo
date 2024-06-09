@@ -23,7 +23,10 @@ int32_t c_strToI(const char *) noexcept;
 int64_t c_strToL(const char *) noexcept;
 int64_t c_strToL128(const char *) noexcept;
 
-template<int64_t (*FUN)(const char *s), int64_t (*BASE)(const char *) = atoll>
+template<typename F, F f>
+int64_t wrapper(const char *s) noexcept { return f(s); }
+
+template<int64_t (*FUN)(const char *s), int64_t (*BASE)(const char *) = wrapper<decltype(atoll), atoll>>
 inline int64_t compareAtol(const char *s) {
     int64_t
         from_stdlib = atoll(s),
