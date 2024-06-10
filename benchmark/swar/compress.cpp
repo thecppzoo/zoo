@@ -87,9 +87,15 @@ void runCompressions(benchmark::State &s) {
 
 #define BIT_SIZE_X_LIST X(4) X(8) X(16) X(32) X(64)
 
+#if ZOO_CONFIGURED_TO_USE_BMI()
+    #define EXTENSION_LIST(nb) \
+        BENCHMARK(runCompressions<nb, UseBuiltin>); \
+        BENCHMARK(runCompressions<nb, CompareBuiltinAndSWAR>);
+#else
+    #define EXTENSION_LIST(_)
+#endif
 #define X(nb) \
-    BENCHMARK(runCompressions<nb, UseBuiltin>); \
     BENCHMARK(runCompressions<nb, UseSWAR>); \
-    BENCHMARK(runCompressions<nb, CompareBuiltinAndSWAR>);
+    EXTENSION_LIST(nb)
 
 BIT_SIZE_X_LIST
