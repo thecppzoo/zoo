@@ -1,8 +1,5 @@
 cmake_minimum_required (VERSION 3.8)
 
-set(CMAKE_BUILD_TYPE Debug)
-
-
 project(ZooTest VERSION 1.0 LANGUAGES CXX)
 
 configure_file (
@@ -33,6 +30,7 @@ if(MSVC)
     set(
         ZOO_TEST_SOURCES
         catch_main.cpp
+        demoTightPolicy.cpp
         any.cpp AlignedStorage.cpp AnyCallable.cpp AnyCallSignature.cpp
         AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp
         swar/BasicOperations.cpp
@@ -124,7 +122,7 @@ else()
     set(
         ZOO_TEST_SOURCES
         ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
-        ${SWAR_SOURCES} 
+        ${SWAR_SOURCES}
         ${MISCELLANEA_SOURCES}
     )
 

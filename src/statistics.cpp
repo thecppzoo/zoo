@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include "TightPolicy.h"
 
 std::vector<std::string> constructionTrace;
 
