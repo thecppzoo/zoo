@@ -2,9 +2,6 @@
 
 #include "catch2/catch.hpp"
 
-#include <ios>
-#include <iomanip>
-#include <iostream>
 #include <type_traits>
 
 using namespace zoo;
@@ -38,6 +35,18 @@ static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
 static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
 static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
+
+#define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
+#define X(TYPE, av, expected) \
+static_assert(\
+    SWAR{\
+        Literals<ZOO_PP_UNPARENTHESIZE TYPE>,\
+        {ZOO_PP_UNPARENTHESIZE av}\
+    }.value() ==\
+    expected\
+);
+
+/* Preserved to illustrate a technique, remove in a few revisions
 static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
 static_assert(SWAR{Literals<32, u64>, {1, 2}}.value() == 0x00000001'00000002);
 
@@ -52,18 +61,92 @@ static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
 
 static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
 static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
+*/
+#define LITERALS_TESTS \
+X(\
+    (32, u64),\
+    (2, 1),\
+    0x00000002'00000001\
+);\
+X(\
+    (32, u64),\
+    (1, 2),\
+    0x00000001'00000002\
+);\
+X(\
+    (16, u64),\
+    (4, 3, 2, 1),\
+    0x0004'0003'0002'0001\
+);\
+X(\
+    (16, u64),\
+    (1, 2, 3, 4),\
+    0x0001'0002'0003'0004\
+)\
+X(\
+    (16, u32),\
+    (2, 1),\
+    0x0002'0001\
+)\
+X(\
+    (16, u32),\
+    (1, 2),\
+    0x0001'0002\
+)\
+X(\
+    (8, u32),\
+    (4, 3, 2, 1),\
+    0x04'03'02'01\
+)\
+X(\
+    (8, u32),\
+    (1, 2, 3, 4),\
+    0x01'02'03'04\
+)\
+X(\
+    (8, u16),\
+    (2, 1),\
+    0x0201\
+)\
+X(\
+    (8, u16),\
+    (1, 2),\
+    0x0102\
+)\
+X(\
+    (4, u8),\
+    (2, 1),\
+    0x21\
+)\
+X(\
+    (4, u8),\
+    (1, 2),\
+    0x12\
+)
 
-static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
-static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
+LITERALS_TESTS
+
 
 #define F false
 #define T true
-static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, F}}.value() == 0b0000'0000'0000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
-static_assert(BooleanSWAR{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
-static_assert(BooleanSWAR{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, F, F, F}}.value() ==
+    0b0000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {T, F, F, F}}.value() ==
+    0b1000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, T, F, F}}.value() ==
+    0b0000'1000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, F, T, F}}.value() ==
+    0b0000'0000'1000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, F, F, T}}.value() ==
+    0b0000'0000'0000'1000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {T, F, F, F}}.value() ==
+    0b1000'0000'0000'0000);
 #undef F
 #undef T
 

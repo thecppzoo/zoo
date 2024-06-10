@@ -5,6 +5,7 @@
 #include "zoo/meta/log.h"
 
 #include <type_traits>
+#include <assert.h>
 
 #ifdef _MSC_VER
 #include <iso646.h>
@@ -79,6 +80,7 @@ struct SWAR {
         LowerBits = MostSignificantBit - LeastSignificantBit,
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
+    /// \note breaks the camel case since other libraries have from_array
     template <typename U>
     constexpr static auto from_array(const U (&values)[Lanes]) noexcept {
         auto result = T{0};
@@ -88,9 +90,16 @@ struct SWAR {
         return result;
     }
 
-    template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
+    template<
+        typename Arg,
+        std::size_t N,
+        // Reject via SFINAE plain arrays with non-matching number of elements
+        typename = std::enable_if_t<N == Lanes>
+    >
     constexpr
-    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{from_array(values)} {}
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]):
+        m_v{from_array(values)}
+    {}
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -256,9 +265,10 @@ template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
-    template <std::size_t N>
-    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N])
-    : Base(Literals<NBits, T>, values) { this->m_v <<= (NBits - 1); }
+    template<std::size_t N, typename = std::enable_if_t<Base::Lanes == N>>
+    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]):
+        Base(Literals<NBits, T>, values)
+    { this->m_v <<= (NBits - 1); }
 
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
