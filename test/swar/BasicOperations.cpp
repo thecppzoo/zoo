@@ -2,11 +2,7 @@
 
 #include "catch2/catch.hpp"
 
-#include <ios>
-#include <iomanip>
-#include <iostream>
 #include <type_traits>
-
 
 using namespace zoo;
 using namespace zoo::swar;
@@ -32,6 +28,127 @@ using S16_16 = SWAR<16, uint16_t>;
 using S32_32 = SWAR<32, uint32_t>;
 
 using S64_64 = SWAR<64, uint64_t>;
+
+static_assert(SWAR<16, u64>::MaxUnsignedLaneValue == 65535);
+static_assert(SWAR<16, u32>::MaxUnsignedLaneValue == 65535);
+static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
+static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
+static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
+
+
+#define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
+#define X(TYPE, av, expected) \
+static_assert(\
+    SWAR{\
+        Literals<ZOO_PP_UNPARENTHESIZE TYPE>,\
+        {ZOO_PP_UNPARENTHESIZE av}\
+    }.value() ==\
+    expected\
+);
+
+/* Preserved to illustrate a technique, remove in a few revisions
+static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
+static_assert(SWAR{Literals<32, u64>, {1, 2}}.value() == 0x00000001'00000002);
+
+static_assert(SWAR{Literals<16, u64>, {4, 3, 2, 1}}.value() == 0x0004'0003'0002'0001);
+static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.value() == 0x0001'0002'0003'0004);
+
+static_assert(SWAR{Literals<16, u32>, {2, 1}}.value() == 0x0002'0001);
+static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
+
+static_assert(SWAR{Literals<8, u32>, {4, 3, 2, 1}}.value() == 0x04'03'02'01);
+static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
+
+static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
+static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
+*/
+#define LITERALS_TESTS \
+X(\
+    (32, u64),\
+    (2, 1),\
+    0x00000002'00000001\
+);\
+X(\
+    (32, u64),\
+    (1, 2),\
+    0x00000001'00000002\
+);\
+X(\
+    (16, u64),\
+    (4, 3, 2, 1),\
+    0x0004'0003'0002'0001\
+);\
+X(\
+    (16, u64),\
+    (1, 2, 3, 4),\
+    0x0001'0002'0003'0004\
+)\
+X(\
+    (16, u32),\
+    (2, 1),\
+    0x0002'0001\
+)\
+X(\
+    (16, u32),\
+    (1, 2),\
+    0x0001'0002\
+)\
+X(\
+    (8, u32),\
+    (4, 3, 2, 1),\
+    0x04'03'02'01\
+)\
+X(\
+    (8, u32),\
+    (1, 2, 3, 4),\
+    0x01'02'03'04\
+)\
+X(\
+    (8, u16),\
+    (2, 1),\
+    0x0201\
+)\
+X(\
+    (8, u16),\
+    (1, 2),\
+    0x0102\
+)\
+X(\
+    (4, u8),\
+    (2, 1),\
+    0x21\
+)\
+X(\
+    (4, u8),\
+    (1, 2),\
+    0x12\
+)
+
+LITERALS_TESTS
+
+
+#define F false
+#define T true
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, F, F, F}}.value() ==
+    0b0000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {T, F, F, F}}.value() ==
+    0b1000'0000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, T, F, F}}.value() ==
+    0b0000'1000'0000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, F, T, F}}.value() ==
+    0b0000'0000'1000'0000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {F, F, F, T}}.value() ==
+    0b0000'0000'0000'1000);
+static_assert(BooleanSWAR{Literals<4, u16>,
+    {T, F, F, F}}.value() ==
+    0b1000'0000'0000'0000);
+#undef F
+#undef T
 
 namespace Multiplication {
 
@@ -357,7 +474,7 @@ TEST_CASE(
             const auto left = S2_16{0}.blitElement(1,  i);
             const auto right = S2_16{S2_16::AllOnes}.blitElement(1, i-1);
             const auto test = S2_16{0}.blitElement(1, 2);
-            CHECK(test.value() == greaterEqual<2, u16>(left, right).value()); 
+            CHECK(test.value() == greaterEqual<2, u16>(left, right).value());
         }
     }
     SECTION("single") {
@@ -365,7 +482,7 @@ TEST_CASE(
             const auto large = S4_32{0}.blitElement(1,  i+1);
             const auto small = S4_32{S4_32::AllOnes}.blitElement(1, i-1);
             const auto test = S4_32{0}.blitElement(1, 8);
-            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
     SECTION("allLanes") {
@@ -373,7 +490,7 @@ TEST_CASE(
             const auto small = S4_32(S4_32::LeastSignificantBit * (i-1));
             const auto large = S4_32(S4_32::LeastSignificantBit * (i+1));
             const auto test = S4_32(S4_32::LeastSignificantBit * 8);
-            CHECK(test.value() == greaterEqual<4, u32>(large, small).value()); 
+            CHECK(test.value() == greaterEqual<4, u32>(large, small).value());
         }
     }
 }
@@ -425,7 +542,7 @@ TEST_CASE(
     "BooleanSWAR MSBtoLaneMask",
     "[swar]"
 ) {
-    // BooleanSWAR as a mask: 
+    // BooleanSWAR as a mask:
     auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
     auto mask = S4_32(0x0F0F'0000);
     CHECK(bswar.MSBtoLaneMask().value() == mask.value());
@@ -452,6 +569,6 @@ TEST_CASE(
     CHECK(SWAR<4, u16>(0x0400).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0100), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0B00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0300)).value());
     CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0700)).value());
-    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(SWAR<4, u16>(0x0F00).value() == saturatingUnsignedAddition(SWAR<4, u16>(0x0800), SWAR<4, u16>(0x0800)).value());
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
 }
