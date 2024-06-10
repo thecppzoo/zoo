@@ -73,8 +73,9 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
-        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
+        AllOnes = ~type{0} >> PaddingBitsCount,
+            // Also constructed in RobinHood utils: possible bug?
+        LeastSignificantBit = meta::BitmaskMaker<T, type{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask =
             sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
