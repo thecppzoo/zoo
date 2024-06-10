@@ -386,14 +386,21 @@ constexpr auto negate(SWAR<NB, B> input) {
 /// \param log2Count is to potentially reduce the number of iterations if the caller a-priori knows
 /// there are fewer iterations than what the type of exponent would allow
 template<
-    typename Base, typename IterationCount, typename Operator,
+    typename Base,
+    typename IterationCount,
+    typename Operator,
     // the critical use of associativity is that it allows halving the
     // iteration count
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    Base base,
+    Base neutral,
+    IterationCount count,
+    IterationCount forSquaring,
+    Operator op,
+    unsigned log2Count,
+    CountHalver halver
 ) {
     auto result = neutral;
     if(!log2Count) { return result; }
@@ -401,7 +408,7 @@ constexpr auto associativeOperatorIterated_regressive(
         result = op(result, base, count);
         if(!--log2Count) { break; }
         result = op(result, result, forSquaring);
-        count = ch(count);
+        count = halver(count);
     }
     return result;
 }
@@ -424,8 +431,13 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
 
     multiplier = S{multiplier.value() << (NB - ActualBits)};
     return associativeOperatorIterated_regressive(
-        multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
-        ActualBits, halver
+        multiplicand,             // base
+        S{0},                     // neutral
+        multiplier,               // count
+        S{S::MostSignificantBit}, // forSquaring
+        operation,                // operator
+        ActualBits,               // log2Count
+        halver                    // countHalver
     );
 }
 

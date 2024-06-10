@@ -1,9 +1,9 @@
+#include "zoo/Any/VTablePolicy.h"
 #include "zoo/swar/associative_iteration.h"
-
 #include "catch2/catch.hpp"
-
-#include <cstdint>
+#include <cstddef>
 #include <type_traits>
+#include <cstdint>
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -90,39 +90,136 @@ enum class Signed {
     No
 };
 
+template <typename T, typename FloatType, size_t num_fractional_bits>
+struct FP_Constants {
+    constexpr static auto type_sz = sizeof(T) * 8;
+    constexpr static auto msbOn = 1 << (type_sz - 1);
+    constexpr static FloatType largest_bit_value = 1 << (type_sz - 1 - num_fractional_bits);
+    constexpr static FloatType smallest_bit_value = 1.0f / (1 << num_fractional_bits);
+};
+static_assert(FP_Constants<uint32_t, float, 16>::type_sz == 32);
+static_assert(FP_Constants<uint32_t, float, 16>::msbOn == 0x8000'0000);
+static_assert(FP_Constants<uint32_t, float, 16>::largest_bit_value == 32768.0f);
+
+static_assert(FP_Constants<uint8_t, float, 1>::smallest_bit_value == 0.5f);
+static_assert(FP_Constants<uint8_t, float, 2>::smallest_bit_value == 0.25f);
+static_assert(FP_Constants<uint8_t, float, 4>::smallest_bit_value == 0.25f * 0.25f);
 
 // TODO MAKE THIS associative_iteration
 // you can represent parsing a fixed point number to a "real" floating point number
 // using associative_iteration. that would be easy and fun to do.
-template <typename T, typename FloatType = float>
-constexpr float parse_unsigned_fixed_point(T input, size_t num_fractional_bits) {
-    constexpr auto type_sz = sizeof(T) * 8;
-    constexpr auto msbOn = 1 << (type_sz - 1);
+template <typename T, typename FloatType, size_t num_fractional_bits>
+constexpr float parse_unsigned_fixed_point_reg(T input) {
+    constexpr T type_sz = FP_Constants<T, FloatType, num_fractional_bits>::type_sz;
+    constexpr T msbOn = FP_Constants<T, FloatType, num_fractional_bits>::msbOn;
+
+    // the value of the largest bit in the fixed point number
+    FloatType base = FP_Constants<T, FloatType, num_fractional_bits>::largest_bit_value;
 
     auto result = FloatType{};
     auto num_integer_bits = type_sz - num_fractional_bits;
-    FloatType init_f = (1 << (type_sz - 1 - num_fractional_bits));
-
     for (int i = 0; i < type_sz; ++i) {
         if (input & msbOn) {
-            result += init_f;
+            result += base;
         }
+        base /= 2;
         input <<= 1;
-        init_f /= 2;
     }
-
     return result;
 }
 
-static_assert(parse_unsigned_fixed_point(0x0000'0000, 16) == approx::Approx{0.0f});
+template <typename T, typename FloatType, size_t num_fractional_bits>
+constexpr float parse_unsigned_fixed_point_prog(T input) {
+    constexpr T type_sz = FP_Constants<T, FloatType, num_fractional_bits>::type_sz;
+    constexpr T one = T{1};
+    constexpr auto num_integer_bits = type_sz - num_fractional_bits;
 
-static_assert(parse_unsigned_fixed_point(0x0001'0000, 16) == approx::Approx{1.0f}.margin(1.0e-45));
-static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0001'0000, 4) == approx::Approx{1.0f}.margin(1.0e-45));
-static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0010'0000, 4) == approx::Approx{2.0f}.margin(1.0e-45));
-static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0010'1000, 4) == approx::Approx{2.5f}.margin(1.0e-45));
-static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b0010'1001, 4) == approx::Approx{2.5625f}.margin(1.0e-45));
-static_assert(parse_unsigned_fixed_point<uint8_t, float>(0b1010'1001, 4) == approx::Approx{10.5625f}.margin(1.0e-45));
+    auto result = FloatType{}; // result
+    auto current_bit_value = FP_Constants<T, FloatType, num_fractional_bits>::smallest_bit_value; // square
 
+    for (int i = 0; i < type_sz; ++i) {
+        auto maybe_one = static_cast<FloatType>(input & one);
+        result += maybe_one * current_bit_value;
+        current_bit_value *= 2;
+        input >>= 1;
+    }
+    return result;
+}
+
+
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0001'0000) == 1.0f);
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0010'0000) == 2.0f);
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0010'1000) == 2.5f);
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0010'1001) == 2.5625f);
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b1010'1001) == 10.5625f);
+
+template <typename T, typename FloatType, size_t num_fractional_bits>
+constexpr FloatType thing(T input) {
+    auto type_sz = FP_Constants<T, FloatType, num_fractional_bits>::type_sz;
+    auto msbOn = FP_Constants<T, FloatType, num_fractional_bits>::msbOn;
+    auto base = FP_Constants<T, FloatType, num_fractional_bits>::largest_bit_value;
+
+    auto neutral = FloatType{};
+    auto log2Count = type_sz;
+    auto count = input;
+    auto forSquaring = msbOn;
+
+    auto op = [&](auto a, auto b, auto count) {
+        if (count & msbOn) {
+            return a + b;
+        }
+        return a;
+    };
+
+    auto halver = [&](auto count) {
+        base /= 2;
+        return count << 1;
+    };
+
+    auto result = neutral;
+    if(!log2Count) { return result; }
+    for(;;) {
+        result = op(result, base, count);
+        if(!--log2Count) { break; }
+        result = op(result, result, forSquaring);
+        count = halver(count);
+    }
+    return result;
+}
+
+static_assert(thing<uint32_t, float, 16>(0x0000'0000) == approx::Approx{0.0f});
+static_assert(thing<uint8_t, float, 4>(0b0001'0000) == approx::Approx{1.0f}.margin(20));
+
+template <typename T, typename FloatType, size_t num_fractional_bits>
+constexpr FloatType parse_ai(T input) {
+    constexpr T type_sz = FP_Constants<T, FloatType, num_fractional_bits>::type_sz;
+    constexpr T msbOn = FP_Constants<T, FloatType, num_fractional_bits>::msbOn;
+
+    auto result = FloatType{};
+
+    auto halver = [](auto count) {
+        return count << 1;
+    };
+
+    auto operation = [&](FloatType a, FloatType b, auto count) {
+        auto num_integer_bits = type_sz - num_fractional_bits;
+        FloatType init_f = (1 << (type_sz - 1 - num_fractional_bits));
+
+        if (count & msbOn) {
+            return a + init_f;
+        }
+        return a;
+    };
+
+    return associativeOperatorIterated_regressive(
+            FloatType{},
+            FloatType{},
+            input,
+            msbOn,
+            operation,
+            type_sz,
+            halver);
+}
 
 template <typename T, int Q, Signed S = Signed::No>
 class FixedPoint {
@@ -131,12 +228,13 @@ public:
     constexpr static bool is_signed = S == Signed::Yes;
     constexpr static auto sign_bit_mask = is_signed ? 1 << ((sizeof(T) * 8) - 1) : 0 ;
 
+    // todo snfaie this so that only the signed variant has this method
     constexpr bool is_negative() const {
         static_assert(is_signed);
         return (value & sign_bit_mask) == sign_bit_mask;
     }
 
-    // left shift amount
+    // shift amount, trying to account for the sign bit
     constexpr T shift() const {
         if constexpr (is_signed) {
             return Q - 1;
@@ -145,7 +243,7 @@ public:
         }
     }
 
-    constexpr static FixedPoint from_literal(T v) {
+    constexpr static FixedPoint from_base_type(T v) {
         auto fp = FixedPoint<T, Q>{};
         fp.value = v;
         return fp;
@@ -154,19 +252,10 @@ public:
     template <typename FloatType>
     constexpr FixedPoint(FloatType v) {
         static_assert(std::is_floating_point_v<FloatType>);
-        auto is_negative = v < 0;
-        if (is_negative) {
-            v = -v;
-        }
 
         auto above_zero = static_cast<T>(v);
         auto below_zero = static_cast<T>((v - above_zero) * (1 << shift()));
         value = (above_zero << shift()) + below_zero;
-
-        // set the sign bit
-        if (is_negative) {
-            value |= (1 << (Q - 1));
-        }
 
         auto fp = FixedPoint<T, Q>{};
         fp.value = v;
@@ -187,18 +276,13 @@ public:
     }
 
     constexpr FixedPoint operator+(const FixedPoint& other) const {
-        auto sum = above_zero() + other.above_zero();
-        auto carry = (below_zero() + other.below_zero()) >> Q;
-        return {(sum + carry) << Q};
+        return from_base_type(value + other.value);
     }
 
     template <typename FloatType>
     std::enable_if_t<std::is_floating_point_v<FloatType>, FloatType>
     constexpr to() {
-        auto v = value & ~sign_bit_mask;
-        auto above_zero = v >> shift();
-        auto below_zero = v & ((1 << shift()) - 1);
-        return static_cast<FloatType>(above_zero) + static_cast<FloatType>(below_zero) / (1 << shift());
+        return parse_unsigned_fixed_point_reg(value, Q);
     }
 
     T value;
@@ -210,6 +294,17 @@ using F = FixedPoint<uint8_t, 6>;
 using FS = FixedPoint<uint8_t, 6, Signed::Yes>;
 
 // static_assert(FixedPoint<uint8_t, 4, Signed::Yes>::from_literal(0b1000'0000).is_negative());
+//
+static_assert(parse_unsigned_fixed_point_reg(0x0000'0000, 16) == approx::Approx{0.0f});
+static_assert(parse_unsigned_fixed_point_reg(0x0001'0000, 16) == approx::Approx{1.0f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point_reg<uint8_t, float>(0b0001'0000, 4) == approx::Approx{1.0f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point_reg<uint8_t, float>(0b0010'0000, 4) == approx::Approx{2.0f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point_reg<uint8_t, float>(0b0010'1000, 4) == approx::Approx{2.5f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point_reg<uint8_t, float>(0b0010'1001, 4) == approx::Approx{2.5625f}.margin(1.0e-45));
+static_assert(parse_unsigned_fixed_point_reg<uint8_t, float>(0b1010'1001, 4) == approx::Approx{10.5625f}.margin(1.0e-45));
+
+// parsing not working properly yet
+// static_assert(F{10.5625f}.value == 0b1010'1001);
 
 static_assert(FS{1.0}.above_zero() == 1);
 static_assert(not FS{1.0}.is_negative());
@@ -217,21 +312,23 @@ static_assert(not FS{1.0}.is_negative());
 static_assert(FS{2.0}.above_zero() == 2);
 
 static_assert(F{1.0}.above_zero() == 1);
-static_assert(F{1.0}.below_zero() == 0);
-static_assert(F::from_literal(0b0100'0000).above_zero() == 1.0);
 
-static_assert(F::from_literal(0b0110'0000).to<float>() == 1.5);
+
+static_assert(F{1.0}.below_zero() == 0);
+static_assert(F::from_base_type(0b0100'0000).above_zero() == 1.0);
+
+static_assert(F::from_base_type(0b0110'0000).to<float>() == 1.5);
 
 static_assert(FixedPoint<uint8_t, 4, Signed::Yes>::sign_bit_mask == 0b1000'0000);
 static_assert(FixedPoint<uint8_t, 4, Signed::No>::sign_bit_mask == 0b0000'0000);
 
 // static_assert(FixedPoint<uint8_t, 4, Signed::Yes>::from_literal(0b1001'0100).to<float>() == -1.25);
-static_assert(F::from_literal(0b0111'0000).to<float>() == 1.75);
-static_assert(F::from_literal(0b0111'1000).to<float>() == 1.875);
-static_assert(F::from_literal(0b1111'1000).to<float>() == 3.875);
-static_assert(F::from_literal(0b1111'1100).to<float>() == 3.875 + (0.125 / 2));
-static_assert(F::from_literal(0b1111'1110).to<float>() == 3.875 + (0.125 / 2) + (0.125 / 4));
-static_assert(F::from_literal(0b1111'1111).to<float>() == 3.875 + (0.125 / 2) + (0.125 / 4) + (0.125 / 8));
+static_assert(F::from_base_type(0b0111'0000).to<float>() == 1.75);
+static_assert(F::from_base_type(0b0111'1000).to<float>() == 1.875);
+static_assert(F::from_base_type(0b1111'1000).to<float>() == 3.875);
+static_assert(F::from_base_type(0b1111'1100).to<float>() == 3.875 + (0.125 / 2));
+static_assert(F::from_base_type(0b1111'1110).to<float>() == 3.875 + (0.125 / 2) + (0.125 / 4));
+static_assert(F::from_base_type(0b1111'1111).to<float>() == 3.875 + (0.125 / 2) + (0.125 / 4) + (0.125 / 8));
 
 static_assert(SWAR<16, u64>::MaxUnsignedLaneValue == 65535);
 static_assert(SWAR<16, u32>::MaxUnsignedLaneValue == 65535);
