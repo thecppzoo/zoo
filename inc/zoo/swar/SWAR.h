@@ -70,21 +70,6 @@ constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
 }
 #endif
 
-// This is placed ahead of other bare manipulation functions to reduce integer
-// promotion weirdness in the constant creation of SWAR and related.
-template<int NBits, typename T>
-constexpr auto leastNBitsMask() {
-    // It was integer promotion screwing this up at equal sizes all along, special casing unblocks.
-    constexpr auto type_bits = sizeof(T) * 8;
-    if constexpr(NBits < type_bits) {
-        return (T{1}<<NBits)-1;
-    } else if constexpr(type_bits < 32) {
-        return (T{1}<<NBits)-1;
-    } else if constexpr(type_bits >= 32) {
-        return ~T{0};
-    }
-}
-
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
 /// of NBits width against a type T, and provides an abstraction for performing
 /// SIMD operations against that primitive type T treated as a SIMD register.
@@ -101,11 +86,14 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
-        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull}, NBits>::value,
-        // Simply shifting over Least causes problems with lanes that don't fit the SWAR exactly.
-        MostSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull<<(NBits - 1)}, NBits>::value,
-        LeastSignificantLaneMask = leastNBitsMask<NBits, T>(),
+        AllOnes = ~type{0} >> PaddingBitsCount,
+            // Also constructed in RobinHood utils: possible bug?
+        LeastSignificantBit = meta::BitmaskMaker<T, type{1}, NBits>::value,
+        MostSignificantBit = LeastSignificantBit << (NBits - 1),
+        LeastSignificantLaneMask =
+            sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
+                ~T(0) :
+                ~(~T(0) << T{NBits}),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit,
