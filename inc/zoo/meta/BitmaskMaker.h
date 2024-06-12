@@ -43,6 +43,8 @@ struct BitmaskMaker {
 static_assert(0xF0F0 == BitmaskMaker<uint16_t, 0xF0, 8>::value);
 static_assert(0xEDFEDFED == BitmaskMaker<uint32_t, 0xFED, 12>::value);
 
+
+
 }} // zoo::meta
 
 #endif

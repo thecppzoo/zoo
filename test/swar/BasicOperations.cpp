@@ -1,11 +1,13 @@
 #include "zoo/swar/associative_iteration.h"
 
 #include "catch2/catch.hpp"
+#include "math.h"
+#include "zoo/swar/math.h"
 
-#include <ios>
-#include <iomanip>
-#include <iostream>
-#include <type_traits>
+// #include <ios>
+// #include <iomanip>
+// #include <iostream>
+// #include <type_traits>
 using namespace zoo;
 using namespace zoo::swar;
 
@@ -91,17 +93,63 @@ ARRAY_TEST(S8_64, 255, 255, 255, 255, 255, 255, 255, 255);
 ARRAY_TEST(S16_32, 65534, 65534);
 ARRAY_TEST(S16_64, 65534, 65534, 65534, 65534);
 
-#define F false
-#define T true
 using BS = BooleanSWAR<4, u16>;
-static_assert(BS{Literals<4, u16>, {F, F, F, F}}.value() == 0b0000'0000'0000'0000);
-static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
-static_assert(BS{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
-static_assert(BS{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
-static_assert(BS{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
-static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
-#undef F
-#undef T
+static_assert(BS{Literals<4, u16>, {0, 0, 0, 0}}.value() == 0b0000'0000'0000'0000);
+static_assert(BS{Literals<4, u16>, {1, 0, 0, 0}}.value() == 0b1000'0000'0000'0000);
+static_assert(BS{Literals<4, u16>, {0, 1, 0, 0}}.value() == 0b0000'1000'0000'0000);
+static_assert(BS{Literals<4, u16>, {0, 0, 1, 0}}.value() == 0b0000'0000'1000'0000);
+static_assert(BS{Literals<4, u16>, {0, 0, 0, 1}}.value() == 0b0000'0000'0000'1000);
+static_assert(BS{Literals<4, u16>, {1, 0, 0, 0}}.value() == 0b1000'0000'0000'0000);
+
+
+namespace equality {
+using S = SWAR<8, u32>;
+using BS = BooleanSWAR<8, u32>;
+template <typename S = S, typename BS = BS>
+constexpr auto laneWiseEqualsTest(
+        const typename S::type (&left)[S::Lanes],
+        const typename S::type (&right)[S::Lanes],
+        const bool (&expected)[S::Lanes]) {
+    return  equals(S{S::Literal, left}, S{S::Literal, right}).value()
+            == BS{BS::Literal, expected}.value();
+}
+static_assert(laneWiseEqualsTest({1, 2, 3, 4}, {1, 2, 3, 4}, {1, 1, 1, 1}));
+static_assert(laneWiseEqualsTest({1, 2, 3, 4}, {5, 6, 7, 8}, {0, 0, 0, 0}));
+static_assert(laneWiseEqualsTest({1, 2, 3, 4}, {5, 2, 7, 4}, {0, 1, 0, 1}));
+}
+
+namespace math_test {
+static_assert(math::isPowerOfTwo<int, 4>());
+static_assert(math::moduloPowerOfTwo<4>(0) == 0);
+static_assert(math::moduloPowerOfTwo<8>(9) == 1);
+static_assert(math::moduloPowerOfTwo<4096>(4097) == 1);
+
+using S = SWAR<8, u32>;
+using BS = BooleanSWAR<8, u32>;
+template <typename S, typename BS>
+constexpr auto powerOfTwoTest(
+        const typename S::type (&input)[S::Lanes],
+        const bool (&expected)[S::Lanes]) {
+    return isPowerOfTwo(S{S::Literal, input}).value() == BS{BS::Literal, expected}.value();
+}
+static_assert(powerOfTwoTest<S, BS>({1, 2, 3, 4}, {1, 1, 0, 1}));
+static_assert(powerOfTwoTest<S, BS>({2, 3, 64, 77}, {1, 0, 1, 0}));
+static_assert(powerOfTwoTest<S, BS>({3, 65, 128, 0}, {0, 0, 1, 1}));
+static_assert(powerOfTwoTest<S, BS>({256, 7, 11, 101}, {1, 0, 0, 0}));
+static_assert(powerOfTwoTest<S, BS>({2, 64, 128, 7}, {1, 1, 1, 0}));
+
+template <size_t N, typename S = S, typename BS = BS>
+constexpr auto moduloSwarTest(
+        const typename S::type (&input)[S::Lanes],
+        const typename S::type (&expected)[S::Lanes]) {
+    return moduloPowerOfTwo<N>(S{S::Literal, input}).value() == S{S::Literal, expected}.value();
+}
+static_assert(moduloPowerOfTwo<4>(S{0}).value() == 0);
+static_assert(moduloSwarTest<4>({0, 2, 4, 6}, {0, 2, 0, 2}));
+static_assert(moduloSwarTest<4>({1, 3, 5, 7}, {1, 3, 1, 3}));
+static_assert(moduloSwarTest<8>({9, 8, 16, 7}, {1, 0, 0, 7}));
+static_assert(moduloSwarTest<16>({17, 32, 64, 127}, {1, 0, 0, 15}));
+}
 
 namespace Multiplication {
 
