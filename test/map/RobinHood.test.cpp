@@ -86,7 +86,6 @@ auto showMetadata(std::size_t index, MD *md) {
 //WARN(__VA_ARGS__)
 
 using SMap = zoo::rh::RH_Frontend_WithSkarupkeTail<std::string, int, 255, 5, 3>;
-
 auto valueInvoker(void *p, std::size_t index) {
     return static_cast<SMap *>(p)->values_[index].value();
 }
