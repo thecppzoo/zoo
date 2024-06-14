@@ -107,7 +107,9 @@ Curiously enough, our SWAR library gives that capability directly; in the `strle
 
 I think our colleagues in GLIBC that are so fond of assembler (we have proven this since our equivalents are more than 90% just C++ with very topical use of intrinsics, but theirs are through and through assembler code) would have identified the architectural primitive that would have spared them to have to use general purpose computation to identify the index into the block where the first null occurs.  Since they need to create a "mask" of booleans, it seems that those horizontal primitives are missing from AVX2 and Arm Neon.
 
-In our Robin Hood Hash Table implementation there are many examples of our generation of a SIMD of boolean results and the immediate use of those booleans as SIMD inputs for further computation. I believe this helps our SWAR, ["software SIMD"](https://github.com/thecppzoo/zoo/blob/em/essay-swar-latency.md/glossary.md#software-simd) implementations to be competitive with the software that uses "hardware SIMD".
+In our Robin Hood Hash Table implementation there are many examples of our generation of a SIMD of boolean results, querying for the first "match" (or the least significant lane that matched) and the immediate use of those booleans as SIMD inputs for further computation. I believe this helps our SWAR, ["software SIMD"](https://github.com/thecppzoo/zoo/blob/em/essay-swar-latency.md/glossary.md#software-simd) implementations to be competitive with the software that uses "hardware SIMD".
+
+I think SIMD ISAs do not offer the way to identify the "first" or least significant lane that matched a condition, typically, one must convert a SIMD register that contains the result of the comparison in some way (typically all bits in the either set or reset) to a "mask" scalar value.
 
 This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" values of types that are bitfields of the results of comparisons, an "scalar" to be used in the non-vector "General Purpose Registers", GPRs, not SIMD type values [^3].  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this "back and forth SIMD-scalar" conversions would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document. Wait for us to write an essay that contains the phrase "cuckoo-bananas".
 
@@ -177,34 +179,39 @@ multiply128_to128_bits(unsigned __int128, unsigned __int128):           # @multi
 
 [^3]: See: [SIMD-GPR round trips](#round-trips-between-simd-and-gpr)
 
-In AVX/AVX2 (of x86-64) typically a SIMD comparison such as "greater than" would generate a mask: for inputs `a` and `b`, the assembler would look like this (ChatGPT generated):
-```asm
-_start:
-    ; Load vectors a and b into ymm registers
-    vmovdqa ymm0, [a]
-    vmovdqa ymm1, [b]
-    
-    ; Step 1: Generate the mask using a comparison
-    vpcmpgtd ymm2, ymm0, ymm1
-    
-    ; Step 2: Extract the mask bits into an integer
-    vpmovmskb eax, ymm2
-    
-    ; Step 3: Broadcast the mask bits into a SIMD register
-    vmovd xmm3, eax
-    vpbroadcastd ymm3, xmm3
-```
-See the inefficiency?
-For ARM Neon and the RISC-V ISAs, it is more complicated, because their ISAs do not have an instruction for broadcasting one bit from a mask to every lane.
+The SIMD architectures I know all turn lane-wise comparisons such as "greater than" into SIMD registers with each lane full of 1s or 0s depending on the comparison.  This can be used for further SIMD computation.  The problem arises when you want to apply a "horizontal" operation on the SIMD, for example, "what is the first, or least significant lane in which the condition is true?", as in `strlen`, "what is the index of the lane with the first null byte?"  Typically, the SIMD ISA does **not** have an instruction for this, forcing you to create a "mask" extracting bits from each lane, as in x86_64 "vpmovmskb", then process the mask using GPRs, scalar, registers.  If you then want to convert your scalar result back to a SIMD value/register, for further branchless SIMD processing, you are very much like going up a creek without a paddle.
+
 I'm confident that this design mistake might not be solved any time soon, here's why:
-Take AVX512, for example, the latest and best of x86_64 SIMD:  in AVX512, there are mask registers, of 64 bits, so they can map one bit to every byte-lane of a `ZMM`register.  It recognizes the need to prevent computation on certain lanes, the ones that are "masked out" by the mask register.  However, this is not the same thing as having a bit in the lane itself that you can use in computation.  To do that, you need to go to the GPRs moving a mask, back to the `ZMM` registers via a move followed by a bit-broadcast, just like in AVX/AVX2.  The reason why apparently nobody else has "felt" this pain might be, I speculate, because SIMD is mostly used with floating point numbers.  It wouldn't make sense to turn on a bit in lanes.
-Our SWAR work demonstrates that there are plentiful opportunities to turn normally serial computation into ad-hoc parallelism, for this we use integers always, and we can really benefit from the lanes themselves having a bit in them, as opposed to predicating each lane by a mask.  Our implementation of saturated addition is one example: we detect overflow (carry) as a `BooleanSWAR`, we know that is the most significant bit of each lane, we can copy down that bit by subtracting the MSB as the LSB of each lane.
+
+Take AVX512, for example, the latest and best of x86_64 SIMD:  in AVX512, there are mask registers, of 64 bits, so they can map one bit to every byte-lane of a `ZMM`register.  It recognizes the need to prevent computation on certain lanes, the ones that are "masked out" by the mask register, the operation in that lane is a no-op.  However, this is not the same thing as having a bit in the lane itself that you can use in computation.  To do that, you need to go to the GPRs moving a mask, do the processing of the mask with scalar instructions and back to the `ZMM` registers via a move followed by a complicated sequence of instructions to achieve the equivalent of a missing instruction of scattering the bits of the mask into the lanes of a register, just like in AVX/AVX2.  The reason why apparently nobody else has "felt" this pain might be, I speculate, because SIMD is mostly used with floating point numbers.  It wouldn't make sense to turn on a bit in lanes.
+
+Our SWAR work demonstrates that there are plentiful opportunities to turn normally serial computation into ad-hoc parallelism, for this we use integers always, and we can really benefit from the lanes themselves having a bit in them, as opposed to predicating each lane by a mask.  Our implementation of saturated addition is one example: we detect overflow (carry) as a `BooleanSWAR`, we know that is the most significant bit of each lane, we can copy down that bit by subtracting the MSB as the LSB of each lane; it is true that SIMD ISAs have saturation instructions, the point is that SIMD ISAs are seldom complete, actually not even consistent, so, you might need to modify slightly an instruction with additional processing, and if at any step you need a missing horizontal instruction, you then have to do the round trip SIMD to moving the mask to GPR to then back to SIMD from a mask: generally, a performance crater.
 
 ### Future Proofing
 
 [^4]: See ["Future Proof"](#future-proofing)
 
-When we mean "future proof" we mean that the discernible tendencies agree with our approach:  Fundamental physics is impeding further miniaturization of transistors, I speculate that, for example, the excution units dedicated to SIMD and "scalar" or General Purpose operations would have to be physically separated in the chip, moving data from one side to the other would be ever more expensive.  Actually, In x86-64 similar penalties existed such as having the result of a floating point operation being an input to an integer operation, changing the "type" of value held, back when AVX and AVX2 were relatively new, exhibited a penalty that was not negligible.  Because the execution units for FP and Integers were different.  This changed, nowadays they use the same execution units, as evidenced in the port allocations for the microarchitectures, but I conjecture that "something has to give", I see that operations on 64 bit "scalar" integers and 512 bit `ZMM` values with internal structure of lanes are so different that "one type fits all" execution units would be less effective.  We can foresee ever wider SIMD computation, ARM's design has an extension that would allow immense widths of 2048 bits of SIMD, it is called "Scalable Vector Extensions", RISC-V has widening baked into the very design, they call it "Vector Length Agnostic" with its acronym VLA, so that you program in a way that is not specific to a width... Just thinking about the extreme challenge of merely propagating signals in buses of 2048, that the wider they are they also have to be longer, that the speed of signal propagation, the speed of light, the maxium speed in the universe, has been a limiting factor that is ever more limiting; I really think that the round trip of SIMD boolean lane-wise test to mask in SIMD register to GPR and back to SIMD will be more significant, our SWAR library already avoids this.  Yet, it is crucial to work with the result of boolean tests in a SIMD way, this is the key to branchless programming techniques, the only way to avoid control dependencies.
+When we mean "future proof" we mean that the discernible tendencies agree with our approach:
+
+Fundamental physics is impeding further miniaturization of transistors, I speculate that, among other things, the excution units dedicated to SIMD and "scalar" or General Purpose operations would have to be physically separated in the chip, moving data from one side to the other would be ever more expensive.  Actually, In x86_64 similar penalties existed such as having the result of a floating point operation being an input to an integer operation, or viceversa.  I used to do this: I would have 64 bit or 32 bit lanes of integer processing, and to retrieve the most significant bit, the one that I cared about, I would use `MOVMSKPD` and `MOVMSKPS`, instructions that would extract the sign bit, the MSB of the corresponding "D" double-precision floating point (the 64-bit MSB) or the "S" single precision.  I had to use the "floating point" gathering of mask bits because there was no integer equivalent for 32 or 64 bit lane size.  The only "integer" operation is `movmskb` (with either/both `v` and `p` prefixes) that gathers the MSB of each byte... for further aggravation, x86_64, did not have 16-bit lane size gathering of MSB...
+
+ARM Neon is even worse: you don't have a cheap way to process the results of a SIMD boolean test.  After careful analysis for why our portable, 64-bit-bound implementaiton of `strlen` is so close in performance to the "proper" SIMD using ARM Neon, that processes 128 bits of input, I conclude that it is that the translation of the SIMD comparison result to "scalar", which we need to count the trailing bits and thus identify the first null, is about as expensive as never using Neon but doing all in "pure" SWAR, emulating SIMD with integers.  The doubling of the width, consuming 16 bytes at a time instead of 8, does not significantly reduce latencies or increase throughput, because it still requires some heavy lifting in the "scalar" side.  By the way, there is a universe of "horizontal" operations that can be emulated with multiplication, for example, summing the values in all lanes:
+```
+{     A    |   B    |    C    |    D   }:  we want A+B+C+D.
+    Let's say we have *scalar* multiplication by very large integers and we can "cast" all lanes into a single scalar:
+    Then, we can craft a number of
+{     1    |    1   |    1     |    1  }: a scalar that encodes the number 1 every N bits where N is the lane width.
+Let's use the typical multiplication algorithm:
+     A          B        C         D +
+     B          C        D         0 +
+     C          D        0         0 +
+     D          0        0         0 =
+A+B+C+D       B+C+D     C+D        D
+The summation is in the most significant lane.
+```
+The issue with emulating missing SIMD horizontal operations is that you have to combine simple operations that diminish the gain factor of parallelism and require sophisticated mathematics, or what other people would call tricks.
+
+Up to when AVX and AVX2 were relatively new, changing the "type" of value had a non negligible penalty.  Because the execution units for FP and Integers were different.  This changed, nowadays they use the same execution units, as evidenced in the port allocations for the microarchitectures.  Apparently SIMD ALUs could be made that worke well with both scalar and SIMD values; but I conjecture that "something has got to give", I see that operations on 64 bit "scalar" integers and 512 bit `ZMM` values with internal structure of lanes are so different that "one type fits all" execution units would be less effective.  We can foresee ever wider SIMD computation, ARM's design has an extension that would allow immense widths of 2048 bits of SIMD, it is called "Scalable Vector Extensions", RISC-V has widening baked into the very design, they call it "Vector Length Agnostic" with its acronym VLA, so that you program in a way that is not specific to a width... Just thinking about the extreme challenge of merely propagating signals in buses of 2048, that the wider they are they also have to be longer, that the speed of signal propagation, the speed of light, the maxium speed in the universe, has been a limiting factor that is ever more limiting; I really think that the round trip of SIMD boolean lane-wise test to mask in SIMD register to GPR and back to SIMD will be more significant, our SWAR library already avoids this.  Yet, it is crucial to work with the result of boolean tests in a SIMD way, this is the key to branchless programming techniques, the only way to avoid control dependencies that more than nullify the performance advantage of SIMD parallelism.
 
 ## Appendix, multiplication codegen for x86-64
 
