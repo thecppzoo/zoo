@@ -305,6 +305,8 @@ std::size_t c_strLength(const char *s) {
         // subtracting one (if their value is greater than 0x80).
         // This provides a way to detect the first null: It is the first lane
         // in firstNullTurnsOnMSB that "flipped on" its MSB
+        // According to The Art of Computer Programming, Knuth 4A pg 152,
+        // credit due to Alan Mycroft
         auto cheapestInversionOfMSBs = ~bytes;
         auto firstMSBsOnIsFirstNull =
             firstNullTurnsOnMSB & cheapestInversionOfMSBs;

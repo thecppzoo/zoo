@@ -83,8 +83,12 @@ struct SWAR {
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
         AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
-        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
-        MostSignificantBit = LeastSignificantBit << (NBits - 1),
+        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull}, NBits>::value,
+        // Simply shifting over Least causes problems with lanes that don't fit the SWAR exactly.
+        MostSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull<<(NBits - 1)}, NBits>::value,
+        // Computing LeastSignificantLaneMask with uint16_t results in an
+        // unknown narrowing or type conversion that causes use of .at() and
+        // similar with 16bit sized SWARS to fail.
         LeastSignificantLaneMask =
             sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
                 ~T(0) :
@@ -287,6 +291,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
         broadcast<NBits, T>(Base(T(1) << (NBits -1)));
+    static constexpr auto AllTrue = MaskMSB;
     static constexpr auto MaskLSB =
          broadcast<NBits, T>(Base(T(1)));
     // Turns off LSB of each lane
@@ -332,6 +337,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr BooleanSWAR(Base initializer) noexcept:
         SWAR<NBits, T>(initializer)
     {}
+
+    template<int NB, typename TT>
+    friend constexpr auto
+    equals(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
 
     template<int N, int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
@@ -472,13 +481,59 @@ booleans(SWAR<NB, T> arg) noexcept {
 template<int NBits, typename T>
 constexpr auto
 differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    return booleans(a1 ^ a2);
+    return ~equals(a1, a2);
 }
 
+/**
+ * @return BooleanSWAR that contains a true value in each lane where the two
+ * input SWARs match.
+ */ 
 template<int NBits, typename T>
 constexpr auto
-equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    return ~differents(a1, a2);
+equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) noexcept {
+    // Knuth, TAOCP 4A pg 152
+    using S = swar::SWAR<NBits, T>;
+    constexpr auto TAOCP_H{S{S::MostSignificantBit}}, TAOCP_L{S{S::LeastSignificantBit}};
+    auto
+        nullLaneIfEqual = a1 ^ a2,
+        allowSubtractionByOneTurningOnMSB = nullLaneIfEqual | TAOCP_H,
+        nullDetectorViaFlippingMSB_low = allowSubtractionByOneTurningOnMSB - TAOCP_L,
+        equalLanesHaveMSB_off = nullLaneIfEqual | nullDetectorViaFlippingMSB_low,
+        flipMSB = ~equalLanesHaveMSB_off,
+        rv = TAOCP_H & flipMSB;
+    return rv;
+}
+
+/**
+ * \brief finds the first null (least significant lane zero) using less compute than finding the first in greaterEqual(S{0}, x) or equals(x, S{0})
+ * @return psuedoBooleanSWAR. If there are no null lanes present, will be all
+ * zeros.  If there is a null lane present, that lane will be all 1s, and any
+ * less significant lane will be all zeros. Anything more significant than the
+ * least significant null lane will be unspecified.
+ */
+template<int NBits, typename T>
+constexpr auto
+firstZeroLane(SWAR<NBits, T> x) {
+    // Knuth, TAOCP 4A pg 152
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S{S::MostSignificantBit}, l = S{S::LeastSignificantBit};
+    return h & ( x - l) & ~x;
+}
+
+/**
+ * \brief finds the first matching lane (least significant) using less compute than calling equals(a1, a2)
+ * As firstZeroLane, except we test against a given swar, lanewise.
+ * Less operations than equals(), but costs 1 more xor than firstZeroLane.
+ * @return psuedoBooleanSWAR. No matches: all zero. Matching lane: all 1s, and
+ * any less significant lane will be all zeros. Anything more significant will
+ * be unspecified.
+ */ 
+template<int NBits, typename T>
+constexpr auto
+firstMatchingLane(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S{S::MostSignificantBit}, l = S{S::LeastSignificantBit};
+    return h & ( (a1^a2) - l) & ~(a1^a2);
 }
 
 /*
