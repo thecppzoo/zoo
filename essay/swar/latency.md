@@ -67,18 +67,33 @@ The essence of parallel algorithms is the "mapping" of an operation that is asso
 The combination of the partial results induce a tree structure, whose height is in the order of the logarithm of the number of elements N.
 For a binary operation, the minimum height for this tree is the logarithm base 2 of the number of initial elements: for a binary operation, the minimum latency is achieved when at each pass we can reduce the data elements by half.
 
-This is what happens in Lemire's method:  There are enough execution resources to halve 8 byte elements into 4.  The second stage reduces 4 partial results into 2.
+See this diagram, not explaining Lemire's technique itself but the process of mapping parallel computation and collecting partial results halving their quantity each step:
+
+```
+[ a | b | c | d | e | f | g | h ] <-- input bytes containing decimal digits (the most significant digit is a
+    |       |       |       |     <- multiplication "mapped" in parallel, generating half as many partial results
+    v       v       v       v
+[a*10+b | c*10+d| e*10+f| g*10+h] ==
+[  P1   |   P2  |   P3  |   P4  ]      <- partial results renamed
+[ P1*10^2 + P2  |  P3*10^2 + P4 ]      <- halving of the number of partial results
+[(P1*10^2 + P2)*10^4 + (P3*10^2 + P4)] <- final halving: one result
+Summary: the operation mapped in parallel, each combination or reduction step halves the number of partial results
+Repeated halving: log2(N) steps.
+```
+
+This is what happens in Lemire's method:  There are enough execution resources to halve 8 byte elements into 4, or fully supporting a width of 8 [^1].  The second stage reduces 4 partial results into 2, the final step combines two partial results into one.
+
 It is clear that with the mathematical technique of squaring the base, **this mechanism is optimal with regards to latency** compared to anything else that uses this numeric base progression scheme.
 
-A comparison with a fundamentally different technique is to revert to the linear, serial mechanism of "multiplying by 10 the previous result and adding the current digit".  That obviously leads to a latency of 7 partial results, multiplication is present in the stages of both schemes, and multiplication is the dominant latency[^1], 7 is worse than 3, so, Lemire's mechanism has, relatively, much lower, not higher, latency.
+A comparison with a fundamentally different technique is to revert to the linear, serial mechanism of "multiplying by 10 the previous result and adding the current digit".  That obviously leads to a latency of 7 partial results, multiplication is present in the stages of both schemes, and multiplication is the dominant latency[^2], 7 is worse than 3, so, Lemire's mechanism has, relatively, much lower, not higher, latency.
 
-Then Lemire is comparing his mechanism to some unknown mechanism that might have smaller latency that can not be the normal mathematics of multiplication by a base.  The mathematical need is to convert numbers in base 10 into base 2.  There may be exotic mathematics for base conversions that use other methods, perhaps something based on fourier transform as the best multiplication algorithms, but for sure would be practical only for immense numbers of digits.
+Then Lemire's comment must mean he might be speculating that there might be some unknown mechanism that might have smaller latency that can not be the normal mathematics of multiplication by a base.  The mathematical need is to convert numbers in base 10 into base 2.  There may be exotic mathematics for base conversions that use other methods, perhaps something based on fourier transform as the best multiplication algorithms, but for sure would be practical only for immense numbers of digits.
 
-No, Lemire's is, for practical applications, the minimum latency.  At each stage of gathering results, the multiplication is the dominant latency.  Can we devise processing stages of smaller latencies?
+No, Lemire's has, for practical applications, the minimum number of stages.  If we can not improve the stages themselves, then the technique as it is could be optimal.  What dominates the latency at each stage?: multiplication.  Can we devise processing stages of smaller latencies?
 
-I strongly suspect not, since the cheapest instructions such as bitwise operations and additions have latencies in the order of 1 cycle.  This method requires 1 multiplication, 1 mask, and 1 shift per stage, not more than 6 cycles, let's say that all of the register renaming, constant loading take one cycle.  That's 7 cycles per stage, and the number of stages is minimal.  See that multiplying by 10 as an addition chain requires 5 steps, so, that's a dead end.  Even the trick of using "Load Effective Address" in x86-64 using its very complex addressing modes could calculate the necessary things for base 10 conversion, but with instruction counts that won't outperform the 64 bit multiplication in each Lemire's stage.  We can see this in the [compiler explorer](https://godbolt.org/z/PjMoGzbPa), multiplying by 10 might be implemented with just 2 instructions of minimal latency (adding and `LEA`), but the compiler optimizer would not multiply by 100 without using the actual multiplication instruction.
+I strongly suspect not, since the cheapest instructions such as bitwise operations and additions have latencies in the order of 1 cycle.  This method requires 1 multiplication, 1 mask, and 1 shift per stage, not more than 6 cycles, let's say that all of the register renaming, constant loading take one cycle.  That's 7 cycles per stage, and the number of stages is minimal.  See that multiplying by 10 as an addition chain requires 5 steps, so, that's a dead end.  Even the trick of using "Load Effective Address" in x86-64 using its very complex addressing modes could calculate the necessary things for base 10 conversion, but with instruction counts that won't outperform the 64 bit multiplication in each Lemire's stage.  We can see this in the [compiler explorer](https://godbolt.org/z/PjMoGzbPa), multiplying by 10 might be implemented with just 2 instructions of minimal latency (shifting, adding and `LEA`), but the compiler optimizer would not multiply by 100 without using the actual multiplication instruction.
 
-See the appendix where we list the generated code in x86-64 for multiplications of factors up to 100, you'll see that the optimizer seems to "give up" on addition chains using the `LEA` instruction and the indexed addressing modes at a rate of four instructions of addition chains for one multiplication.  Since other architectures can at most give the complexity that x86-64 `LEA` and addressing modes, we can be **certain that there isn't a "budget" of non-multiplication operations that would outperform the base conversion that relies on multiplcation.
+See the appendix where we list the generated code in x86-64 for multiplications of factors up to 100, you'll see that the optimizer seems to "give up" on addition chains using the `LEA` instruction and the indexed addressing modes at a rate of four instructions of addition chains for one multiplication.  Since other architectures can at most give the complexity that x86-64 `LEA` and addressing modes has, we can be **certain that there isn't a "budget" of non-multiplication operations that would outperform** the base conversion that relies on multiplcation.
 
 Lemire's point of view that his mechanism has high latency seems to be just wrong.
 
@@ -86,7 +101,7 @@ This example goes to show why SWAR mechanisms also have good latencies:  If the 
 
 ## How [hardware SIMD](../../glossary.md#hardware-simd) leads to inefficiences due to design mistakes
 
-Sometimes there is no need to combine partial results, for example, in `strlen`, we don't need to, for example, calculate the number of bytes that are null, we just want the first null; any good SIMD programming interface would give you "horizontal" operations to extract the desired result directly.
+Sometimes there is no need to combine partial results, for example, in `strlen`, we don't need to calculate the number of bytes that are null, we just want the first null; any good SIMD programming interface would give you "horizontal" operations to extract the desired result directly.
 
 Curiously enough, our SWAR library gives that capability directly; in the `strlen` case, the operation is "count trailing zeros", however, most SIMD architectures, what we call "hardware SIMD", do not!
 
@@ -94,7 +109,7 @@ I think our colleagues in GLIBC that are so fond of assembler (we have proven th
 
 In our Robin Hood implementation there are many examples of our generation of a SIMD of boolean results and the immediate use of those booleans as SIMD values for further computation. I believe this helps our SWAR, ["software SIMD"](https://github.com/thecppzoo/zoo/blob/em/essay-swar-latency.md/glossary.md#software-simd) implementations to be competitive with the software that uses "hardware SIMD".
 
-This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" values of types that are bitfields of the results of comparisons, not SIMD type values.  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this "back and forth SIMD-scalar" conversions would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document, wait for us to write an essay that contains the phrase "cuckoo-bananas".
+This also shows a notorious deficiency in the efforts to standardize in C++ the interfaces for hardware SIMD: The results of lane-wise processing (vertical processing) that generate booleans would generate "mask" values of types that are bitfields of the results of comparisons, an "scalar" to be used in [ the non-vector "General Purpose Registers", GPRs, not SIMD type values [^3].  So, if you were to consume these results in further SIMD processing, you'd need to convert and adjust the bitfields in general purpose registers into SIMD registers, this "back and forth SIMD-scalar" conversions would add further performance penalties that compiler optimizers might not be able to eliminate, for a variety of reasons that are out of the scope of this document. Wait for us to write an essay that contains the phrase "cuckoo-bananas".
 
 Our SWAR library, in this regard, is "future proof": boolean results are just an specific form of SIMD values.  We use this already for SIMD operations such as saturated addition: unsigned overflow (carry) is detected lane wise and lane-wise propagated to the whole lane, without conversion to scalar.  Saturation is implemented seamlessly as after-processing of computation, without having to convert to "scalar" (the result mask) and back.
 
@@ -102,14 +117,64 @@ In the early planning stages for support of "hardware" SIMD (architectures that 
 
 ## A hard challenge
 
-As with much of what superficially looks bad in our SWAR library, upon closer examination, we determine fairly rigorously that these are the best choices, the essential costs.  In that regard, it meets the primary mission of serving as a way to express in software all that we know about performance so that users can benefit the most from our expertise.
+As with much of what superficially may look bad in our SWAR library, upon closer examination, we determine fairly rigorously that these are the best choices, the essential costs.  In that regard, it meets the primary mission of serving as a way to express in software all that we know about performance so that users can benefit the most from our expertise
 
 
 -ed
 
 ## Footnotes
 
-[^1] We're beginning to work on explaining the basics of processor instructions and operations costs.
+[^1] We say "there are enough execution resources to consume 8 bytes of inputs at a time", we mean that multiplication of 64 bits seems to be as performant as 32 bits in most architectures we have used.  One possible exception might be GPUs: they might double the latency for 64 bit multiplications compared to 32.  We implemented Lemire's technique for 128 bits relatively unsuccessfully: 64 bit processors generally have instructions to help with 128 bits multiplies, for example, x86_64 gives you the result in the pair of registers `rDX:rAX` each of 64 bits.  We use this in the best 128 bit calque of the technique.  The straightforward use of full 128 bit multiplication requires three multiplications: two 64-to-64 bit, and one 64 bit factors to 128 bit result, this is better than the otherwise 2<sup>2</sup> (the usual multiplication algorihtm requires N<sup>2</sup> products), but most importantly, greater than 2, so, doubling the width performs worse because the critical operation takes 3 times as much, that's what we mean by having or not having execution resources for a given width:
+```c++
+auto multiply64_to128_bits(uint64_t f1, uint64_t f2) {
+    return __uint128_t(f1) * f2;
+}
+
+auto multiply128_to128_bits(__uint128_t f1, __uint128_t f2) {
+    return f1 * f2;
+}
+```
+translates to, via the [Compiler Explorer](https://godbolt.org/z/ofP71xzj9)
+```asm
+multiply64_to128_bits(unsigned long, unsigned long):            # @multiply64_to128_bits(unsigned long, unsigned long)
+        mov     rdx, rsi
+        mulx    rdx, rax, rdi
+        ret
+multiply128_to128_bits(unsigned __int128, unsigned __int128):           # @multiply128_to128_bits(unsigned __int128, unsigned __int128)
+        imul    rsi, rdx
+        mulx    rdx, rax, rdi
+        imul    rcx, rdi
+        add     rcx, rsi
+        add     rdx, rcx
+        ret
+```
+
+[^2] We're beginning to work on explaining the basics of processor instructions and operations costs.
+
+[^3] In AVX/AVX2 (of x86-64) typically a SIMD comparison such as "greater than" would generate a mask: for inputs `a` and `b`, the assembler would look like this (ChatGPT generated):
+```asm
+_start:
+    ; Load vectors a and b into ymm registers
+    vmovdqa ymm0, [a]
+    vmovdqa ymm1, [b]
+    
+    ; Step 1: Generate the mask using a comparison
+    vpcmpgtd ymm2, ymm0, ymm1
+    
+    ; Step 2: Extract the mask bits into an integer
+    vpmovmskb eax, ymm2
+    
+    ; Step 3: Broadcast the mask bits into a SIMD register
+    vmovd xmm3, eax
+    vpbroadcastd ymm3, xmm3
+```
+See the inefficiency?
+For ARM Neon and the RISC-V ISAs, it is more complicated, because their ISAs do not have an instruction for broadcasting one bit from a mask to every lane.
+I'm confident that this design mistake might not be solved any time soon, here's why:
+Take AVX512, for example, the latest and best of x86_64 SIMD:  in AVX512, there are mask registers, of 64 bits, so they can map one bit to every byte-lane of a `ZMM`register.  It recognizes the need to prevent computation on certain lanes, the ones that are "masked out" by the mask register.  However, this is not the same thing as having a bit in the lane itself that you can use in computation.  To do that, you need to go to the GPRs moving a mask, back to the `ZMM` registers via a move followed by a bit-broadcast, just like in AVX/AVX2.  The reason why apparently nobody else has "felt" this pain might be, I speculate, because SIMD is mostly used with floating point numbers.  It wouldn't make sense to turn on a bit in lanes.
+Our SWAR work demonstrates that there are plentiful opportunities to turn normally serial computation into ad-hoc parallelism, for this we use integers always, and we can really benefit from the lanes themselves having a bit in them, as opposed to predicating each lane by a mask.  Our implementation of saturated addition is one example: we detect overflow (carry) as a `BooleanSWAR`, we know that is the most significant bit of each lane, we can copy down that bit by subtracting the MSB as the LSB of each lane.
+
+[^4] When we mean "future proof" we mean that the discernible tendencies agree with our approach:  Fundamental physics is impeding further miniaturization of transistors, I speculate that, for example, the excution units dedicated to SIMD and "scalar" or General Purpose operations would have to be physically separated in the chip, moving data from one side to the other would be ever more expensive.  Actually, In x86-64 similar penalties existed such as having the result of a floating point operation being an input to an integer operation, changing the "type" of value held, back when AVX and AVX2 were relatively new, exhibited a penalty that was not negligible.  Because the execution units for FP and Integers were different.  This changed, nowadays they use the same execution units, as evidenced in the port allocations for the microarchitectures, but I conjecture that "something has to give", I see that operations on 64 bit "scalar" integers and 512 bit `ZMM` values with internal structure of lanes are so different that "one type fits all" execution units would be less effective.  We can foresee ever wider SIMD computation, ARM's design has an extension that would allow immense widths of 2048 bits of SIMD, it is called "Scalable Vector Extensions", RISC-V has widening baked into the very design, they call it "Vector Length Agnostic" with its acronym VLA, so that you program in a way that is not specific to a width... Just thinking about the extreme challenge of merely propagating signals in buses of 2048, that the wider they are they also have to be longer, that the speed of signal propagation, the speed of light, the maxium speed in the universe, has been a limiting factor that is ever more limiting; I really think that the round trip of SIMD boolean lane-wise test to mask in SIMD register to GPR and back to SIMD will be more significant, our SWAR library already avoids this.  Yet, it is crucial to work with the result of boolean tests in a SIMD way, this is the key to branchless programming techniques, the only way to avoid control dependencies.
 
 ## Appendix, multiplication codegen for x86-64
 
