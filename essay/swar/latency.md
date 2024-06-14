@@ -126,7 +126,7 @@ As with much of what superficially may look bad in our SWAR library, upon closer
 
 ### Execution Resources
 
-[^1]: Go to ["Execution Resources"](execution-resources)
+[^1]: Go to ["Execution Resources"](#execution-resources)
 
 We say "there are enough execution resources to consume 8 bytes of inputs at a time", we mean that multiplication of 64 bits seems to be as performant as 32 bits in most architectures we have used.  One possible exception might be GPUs: they might double the latency for 64 bit multiplications compared to 32.  We implemented Lemire's technique for 128 bits relatively unsuccessfully: 64 bit processors generally have instructions to help with 128 bits multiplies, for example, x86_64 gives you the result in the pair of registers `rDX:rAX` each of 64 bits.  We use this in the best 128 bit calque of the technique.  The straightforward use of full 128 bit multiplication requires three multiplications: two 64-to-64 bit, and one 64 bit factors to 128 bit result, this is better than the otherwise 2<sup>2</sup> (the usual multiplication algorihtm requires N<sup>2</sup> products), but most importantly, greater than 2, so, doubling the width performs worse because the critical operation takes 3 times as much, that's what we mean by having or not having execution resources for a given width:
 ```c++
@@ -157,7 +157,7 @@ multiply128_to128_bits(unsigned __int128, unsigned __int128):           # @multi
 
 ### Round trips between SIMD and GPR
 
-[^3]: See: [SIMD-GPR round trips](round-trips-between-simd-and-gpr)
+[^3]: See: [SIMD-GPR round trips](#round-trips-between-simd-and-gpr)
 
 In AVX/AVX2 (of x86-64) typically a SIMD comparison such as "greater than" would generate a mask: for inputs `a` and `b`, the assembler would look like this (ChatGPT generated):
 ```asm
@@ -184,7 +184,7 @@ Our SWAR work demonstrates that there are plentiful opportunities to turn normal
 
 ### Future Proofing
 
-[^4]: See ["Future Proof"](future-proofing)
+[^4]: See ["Future Proof"](#future-proofing)
 
 When we mean "future proof" we mean that the discernible tendencies agree with our approach:  Fundamental physics is impeding further miniaturization of transistors, I speculate that, for example, the excution units dedicated to SIMD and "scalar" or General Purpose operations would have to be physically separated in the chip, moving data from one side to the other would be ever more expensive.  Actually, In x86-64 similar penalties existed such as having the result of a floating point operation being an input to an integer operation, changing the "type" of value held, back when AVX and AVX2 were relatively new, exhibited a penalty that was not negligible.  Because the execution units for FP and Integers were different.  This changed, nowadays they use the same execution units, as evidenced in the port allocations for the microarchitectures, but I conjecture that "something has to give", I see that operations on 64 bit "scalar" integers and 512 bit `ZMM` values with internal structure of lanes are so different that "one type fits all" execution units would be less effective.  We can foresee ever wider SIMD computation, ARM's design has an extension that would allow immense widths of 2048 bits of SIMD, it is called "Scalable Vector Extensions", RISC-V has widening baked into the very design, they call it "Vector Length Agnostic" with its acronym VLA, so that you program in a way that is not specific to a width... Just thinking about the extreme challenge of merely propagating signals in buses of 2048, that the wider they are they also have to be longer, that the speed of signal propagation, the speed of light, the maxium speed in the universe, has been a limiting factor that is ever more limiting; I really think that the round trip of SIMD boolean lane-wise test to mask in SIMD register to GPR and back to SIMD will be more significant, our SWAR library already avoids this.  Yet, it is crucial to work with the result of boolean tests in a SIMD way, this is the key to branchless programming techniques, the only way to avoid control dependencies.
 
