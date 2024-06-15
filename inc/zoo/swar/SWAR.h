@@ -253,7 +253,6 @@ constexpr T mostNBitsMask() {
     return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
 }
 
-
 /// Clears the block of N bits anchored at the LSB.
 /// clearLSBits<3> applied to binary 00111100 is binary 00100000
 template<int NBits, typename T = uint64_t>
@@ -487,7 +486,7 @@ differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
 /**
  * @return BooleanSWAR that contains a true value in each lane where the two
  * input SWARs match.
- */ 
+ */
 template<int NBits, typename T>
 constexpr auto
 equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) noexcept {
@@ -527,7 +526,7 @@ firstZeroLane(SWAR<NBits, T> x) {
  * @return psuedoBooleanSWAR. No matches: all zero. Matching lane: all 1s, and
  * any less significant lane will be all zeros. Anything more significant will
  * be unspecified.
- */ 
+ */
 template<int NBits, typename T>
 constexpr auto
 firstMatchingLane(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
