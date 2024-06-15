@@ -451,6 +451,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     return product;
 }
 
+// TODO(Jamie): Add tests from other PR.
 template<int ActualBits, int NB, typename T>
 constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     SWAR<NB, T> x,
