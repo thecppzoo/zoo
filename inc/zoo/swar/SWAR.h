@@ -67,6 +67,21 @@ constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
 }
 #endif
 
+// This is placed ahead of other bare manipulation functions to reduce integer
+// promotion weirdness in the constant creation of SWAR and related.
+template<int NBits, typename T>
+constexpr auto leastNBitsMask() {
+    // It was integer promotion screwing this up at equal sizes all along, special casing unblocks.
+    constexpr auto type_bits = sizeof(T) * 8;
+    if constexpr(NBits < type_bits) {
+        return (T{1}<<NBits)-1;
+    } else if constexpr(type_bits < 32) {
+        return (T{1}<<NBits)-1;
+    } else if constexpr(type_bits >= 32) {
+        return ~T{0};
+    }
+}
+
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
 /// of NBits width against a type T, and provides an abstraction for performing
 /// SIMD operations against that primitive type T treated as a SIMD register.
@@ -86,13 +101,7 @@ struct SWAR {
         LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull}, NBits>::value,
         // Simply shifting over Least causes problems with lanes that don't fit the SWAR exactly.
         MostSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull<<(NBits - 1)}, NBits>::value,
-        // Computing LeastSignificantLaneMask with uint16_t results in an
-        // unknown narrowing or type conversion that causes use of .at() and
-        // similar with 16bit sized SWARS to fail.
-        LeastSignificantLaneMask =
-            sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
-                ~T(0) :
-                ~(~T(0) << NBits),
+        LeastSignificantLaneMask = leastNBitsMask<NBits, T>(),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit,
@@ -223,7 +232,7 @@ constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
 // TODO(scottbruceheart) Attempting to use binary not (~) results in negative shift warnings.
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
-    return pattern & ((T(1)<<NBits)-1);
+    return pattern & leastNBitsMask<NBits, T>();
 }
 
 /// Clears the least bit set in type T
@@ -236,16 +245,6 @@ constexpr auto clearLSB(T v) {
 template<typename T = uint64_t>
 constexpr auto isolateLSB(T v) {
     return v & ~clearLSB(v);
-}
-
-template<int NBits, typename T>
-constexpr auto leastNBitsMask() {
-    return (T{1}<<NBits)-1;
-}
-
-template<int NBits, uint64_t T>
-constexpr auto leastNBitsMask() {
-    return ~((0ull)<<NBits);
 }
 
 template<int NBits, typename T = uint64_t>
