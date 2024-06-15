@@ -57,8 +57,12 @@ struct Approx {
   constexpr Approx(NumericType value, NumericType epsilon = Constants<NumericType>::default_epsilon)
       : v(value), e(epsilon) {}
   [[nodiscard]] constexpr Approx margin(NumericType epsilon) const noexcept { return Approx(v, epsilon); }
+  [[nodiscard]] constexpr Approx percent_error(NumericType percent) const noexcept { return Approx(v, v * percent * NumericType{0.01}); }
   NumericType v, e;
 };
+
+static_assert(Approx{1.0}.margin(0.1).e == 0.1);
+static_assert(Approx{100.0}.percent_error(2.0).e == 2.0);
 
 template <typename NumericType>
 constexpr static bool approx(
@@ -134,24 +138,24 @@ constexpr float parse_unsigned_fixed_point_prog(T input) {
     constexpr T one = T{1};
     constexpr auto num_integer_bits = type_sz - num_fractional_bits;
 
-    auto result = FloatType{}; // result
+    auto result = FloatType{}; // neutral element
     auto current_bit_value = FP_Constants<T, FloatType, num_fractional_bits>::smallest_bit_value; // square
 
     for (int i = 0; i < type_sz; ++i) {
+        result *= 2;
         auto maybe_one = static_cast<FloatType>(input & one);
         result += maybe_one * current_bit_value;
-        current_bit_value *= 2;
         input >>= 1;
     }
     return result;
 }
 
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, double, 4>(0b1010'1001) == approx::Approx(9.5625f).percent_error(2.62));
+static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0001'0000) == approx::Approx{0.5f}.margin(0.00000001));
 
-static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0001'0000) == 1.0f);
 static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0010'0000) == 2.0f);
 static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0010'1000) == 2.5f);
 static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b0010'1001) == 2.5625f);
-static_assert(parse_unsigned_fixed_point_prog<uint8_t, float, 4>(0b1010'1001) == 10.5625f);
 
 template <typename T, typename FloatType, size_t num_fractional_bits>
 constexpr FloatType thing(T input) {
