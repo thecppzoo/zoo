@@ -201,7 +201,7 @@ HE(3, u8, 0xFF, 0x7);
 HE(2, u8, 0xAA, 0x2);
 #undef HE
 
-TEST_CASE("Old version", "[deprecated][swar]") {
+TEST_CASE("Old multiply version", "[deprecated][swar]") {
     SWAR<8, u32> Micand{0x5030201};
     SWAR<8, u32> Mplier{0xA050301};
     auto Expected = 0x320F0601;
@@ -216,12 +216,18 @@ TEST_CASE("Parity", "[swar]") {
     // For each nibble, E indicates (E)ven and O (O)dd parities
     //                EEOEEOOO
     auto Examples = 0xFF13A7E4;
+    SWAR<2, u32> casesBy2{Examples};
     SWAR<4, u32> casesBy4{Examples};
     SWAR<8, u32> casesBy8{Examples};
+    SWAR<16, u32> casesBy16{Examples};
+    auto by2 = parity(casesBy2);
     auto by4 = parity(casesBy4);
     auto by8 = parity(casesBy8);
-    CHECK(by4.value() == 0x00800888);
-    CHECK(by8.value() == 0x00808000);
+    auto by16 = parity(casesBy16);
+    CHECK(by2.value() == 0x0020'a828);
+    CHECK(by4.value() == 0x0080'0888);
+    CHECK(by8.value() == 0x0080'8000);
+    CHECK(by16.value() == 0x8000'8000);
 }
 
 TEST_CASE(
@@ -242,6 +248,26 @@ TEST_CASE(
         CHECK(i == isolate<11>(i));
         CHECK(i == isolate<11>(0xF800+i));
         CHECK(i == isolate<11>(0xFFF800+i));
+    }
+    {
+        u8 allones = ~u8{0};  // Avoid integer promotion.
+        CHECK(0x00u == isolate<0, u8>(allones));
+        CHECK(0xFFu == isolate<8, u8>(allones));
+    }
+    {
+        u16 allones = ~u16{0};  // Avoid integer promotion.
+        CHECK(0x0000u == isolate<0, u16>(allones));
+        CHECK(0xFFFFu == isolate<16, u16>(allones));
+    }
+    {
+        u32 allones = ~u32{0};
+        CHECK(0x0000u == isolate<0, u32>(allones));
+        //CHECK(0xFFFF'FFFFu == isolate<32, u32>(allones));  // Broken until PR/93 goes in.
+    }
+    {
+        u64 allones = ~u64{0};
+        CHECK(0x0000u == isolate<0, u64>(allones));
+        //CHECK(0xFFFF'FFFF'FFFF'FFFFull == isolate<64, u64>(allones));  // Broken until PR/93 goes in.
     }
 }
 
@@ -388,16 +414,6 @@ static_assert(8 == lsbIndex(1<<8));
 static_assert(17 == lsbIndex(1<<17));
 static_assert(30 == lsbIndex(1<<30));
 
-
-/*These tests were not catching errors known to have been present
-static_assert(0x80880008 == greaterEqual<3>(SWAR<4, uint32_t>(0x3245'1027)).value());
-static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x0123'4567)).value());
-static_assert(0x88888888 == greaterEqual<0>(SWAR<4, uint32_t>(0x7654'3210)).value());
-static_assert(0x00000008 == greaterEqual<7>(SWAR<4, uint32_t>(0x0123'4567)).value());
-static_assert(0x80000000 == greaterEqual<7>(SWAR<4, uint32_t>(0x7654'3210)).value());
-*/
-
-
 #define GE_MSB_TEST(left, right, result) static_assert(result == greaterEqual_MSB_off<4, u32>(SWAR<4, u32>(left), SWAR<4, u32>(right)).value());
 
 GE_MSB_TEST(
@@ -507,7 +523,7 @@ TEST_CASE(
             const auto left = S3_16{0}.blitElement(1,  i);
             const auto right = S3_16{S3_16::AllOnes}.blitElement(1, i-1);
             const auto test = S3_16{0}.blitElement(1, 2);
-            CHECK(test.value() == greaterEqual<3, u16>(left, right).value()); 
+            CHECK(test.value() == greaterEqual<3, u16>(left, right).value());
         }
     }
 */
@@ -564,6 +580,7 @@ TEST_CASE(
     auto bswar =BooleanSWAR<4, u32>(0x0808'0000);
     auto mask = S4_32(0x0F0F'0000);
     CHECK(bswar.MSBtoLaneMask().value() == mask.value());
+    // TODO(sbruce) add non power 2 lane width verifications of this (made easer by literals)
 }
 
 constexpr auto fullAddSumTest = fullAddition(S4_32(0x0111'1101), S4_32(0x1000'0010));
@@ -587,8 +604,8 @@ TEST_CASE(
     CHECK(S4_16(0x0400).value() == saturatingUnsignedAddition(S4_16(0x0100), S4_16(0x0300)).value());
     CHECK(S4_16(0x0B00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0300)).value());
     CHECK(S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0700)).value());
-    CHECK(S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0800)).value()); 
-    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value()); 
+    CHECK(S4_16(0x0F00).value() == saturatingUnsignedAddition(S4_16(0x0800), S4_16(0x0800)).value());
+    CHECK(S4_32(0x0F0C'F000).value() == saturatingUnsignedAddition(S4_32(0x0804'F000), S4_32(0x0808'F000)).value());
 }
 
 TEST_CASE(
@@ -662,7 +679,7 @@ TEST_CASE(
       uint16_t s = 0;
       for (int j = 0; j < i; j++) {
           s +=  v.value();
-      } 
+      }
       auto gen = S4_16{s};
       {
       auto right = incr_lane_zero(gen, i);
@@ -700,7 +717,7 @@ TEST_CASE(
     auto v = S4_32{0x1357'acef};
     for (size_t lane = 0; lane < 8; lane++) {
         for (uint32_t i = 1; i < 15; i++) {
-            auto gen = v.multiply(i);  
+            auto gen = v.multiply(i);
             auto right = incr_lane(gen, lane, i);
             auto expected = expectedf(gen, lane, i).value();
             CHECK(expected == cmp(gen, right, i).value());
@@ -721,7 +738,7 @@ TEST_CASE(
     auto v = S3_32{0x1357'acef};
     for (size_t lane = 0; lane < 10; lane++) {
         for (uint32_t i = 1; i < 15; i++) {
-            auto gen = v.multiply(i);  
+            auto gen = v.multiply(i);
             auto right = incr_lane(gen, lane, i);
             auto expected = expectedf(gen, lane, i).value();
             CHECK(expected == cmp(gen, right, i).value());
@@ -744,7 +761,7 @@ TEST_CASE(
         for (uint32_t i = 1; i < 15; i++) {
             // We want to ensure we check GE and we are incrementing a lane to do it, so all 15s must go
             constexpr auto destroy_fifteen = S4_32{0xeeee'eeee};
-            auto gen = v.multiply(i) & destroy_fifteen;  
+            auto gen = v.multiply(i) & destroy_fifteen;
             auto right = incr_lane(gen, lane, i);
             auto expected = expectedf(gen, lane, i).value();
             CHECK(expected == cmp(gen, right, i).value());
@@ -769,7 +786,7 @@ TEST_CASE(
             // (use the literals library!!)
             // 11011011'01101101'10110110'110110xx
             constexpr auto destroy_seven = S3_32{0xdb6d'b6d8};
-            auto gen = v.multiply(i) & destroy_seven;  
+            auto gen = v.multiply(i) & destroy_seven;
             auto right = incr_lane(gen, lane, i);
             auto expected = expectedf(gen, lane, i).value();
             CHECK(expected == cmp(gen, right, i).value());
