@@ -6,7 +6,6 @@
 
 #include <array>
 #include <type_traits>
-#include <assert.h>
 
 #ifdef _MSC_VER
 #include <iso646.h>
@@ -140,9 +139,16 @@ struct SWAR {
 
     constexpr SWAR(const std::array<T, Lanes> &array) : m_v{from(array.begin(), array.end())} {}
 
-    template <typename Arg, std::size_t N, typename = std::enable_if_t<N == Lanes, int>>
+    template<
+        typename Arg,
+        std::size_t N,
+        // Reject via SFINAE plain arrays with non-matching number of elements
+        typename = std::enable_if_t<N == Lanes>
+    >
     constexpr
-    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]) : m_v{from(values)} {}
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]):
+        m_v{from(values)}
+    {}
 
     constexpr std::array<T, Lanes> to_array() const noexcept {
         std::array<T, Lanes> result = {};
@@ -251,7 +257,10 @@ SWAR(
 ) -> SWAR<NBits, T>;
 
 template <int NBits, typename T>
-SWAR(Literals_t<NBits, T>, const std::array<T, SWAR<NBits, T>::Lanes>&) -> SWAR<NBits, T>;
+SWAR(
+    Literals_t<NBits, T>,
+    const std::array<T, SWAR<NBits, T>::Lanes>&
+) -> SWAR<NBits, T>;
 
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
