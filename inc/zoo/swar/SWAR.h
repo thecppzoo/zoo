@@ -519,7 +519,7 @@ differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
  * input SWARs match.
  */
 template<int NBits, typename T>
-constexpr auto
+constexpr BooleanSWAR<NB, TT>
 equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) noexcept {
     // Knuth, TAOCP 4A pg 152
     using S = swar::SWAR<NBits, T>;
