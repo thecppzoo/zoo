@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <array>
-#include <tuple>
 
 static_assert(~uint32_t(0) == zoo::swar::SWAR<32, uint32_t>::LeastSignificantLaneMask);
 
@@ -78,7 +77,7 @@ uint32_t lemire_as_zoo_swar(const char *chars) noexcept {
     using S8_64 = zoo::swar::SWAR<8, uint64_t>;
     S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
     auto rv = calculateBase10(convertedToIntegers);
-    return rv;    
+    return rv;
 }
 
 std::size_t spaces_glibc(const char *ptr) {
@@ -116,7 +115,7 @@ std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     auto otherWhiteSpace = belowEqualCarriageReturn & ~belowTab;
     auto whiteSpace = space | otherWhiteSpace;
     auto notWhiteSpace = ~whiteSpace;
-    auto rv = notWhiteSpace ? notWhiteSpace.lsbIndex() : S::Lanes;
+    auto rv = notWhiteSpace.value() ? notWhiteSpace.lsbIndex() : S::Lanes;
     return rv;
 }
 
@@ -326,7 +325,7 @@ std::size_t c_strLength_natural(const char *s) {
     auto bytes = adjustMisalignmentFor_strlen(initialBytes, misalignment);
     for(;;) {
         auto nulls = zoo::swar::equals(bytes, S{0});
-        if(nulls) { // there is a null!
+        if(nulls.value()) { // there is a null!
             auto firstNullIndex = nulls.lsbIndex();
             return firstNullIndex + base - s;
         }

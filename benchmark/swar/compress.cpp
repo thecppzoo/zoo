@@ -21,6 +21,7 @@ enum ExtractionPrimitive {
     CompareBuiltinAndSWAR
 };
 
+#if ZOO_CONFIGURED_TO_USE_AVX()
 template<int NB, ExtractionPrimitive P>
 S<NB> parallelExtraction(S<NB> i, S<NB> m) {
     if constexpr(UseSWAR == P) {
@@ -93,3 +94,5 @@ void runCompressions(benchmark::State &s) {
     BENCHMARK(runCompressions<nb, CompareBuiltinAndSWAR>);
 
 BIT_SIZE_X_LIST
+
+#endif
