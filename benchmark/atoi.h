@@ -5,6 +5,7 @@
 #include "zoo/pp/platform.h"
 
 #include <cstdlib>
+#include <iostream>
 
 uint32_t parse_eight_digits_swar(const char *chars);
 uint32_t lemire_as_zoo_swar(const char *chars) noexcept;
@@ -24,7 +25,10 @@ inline int compareAtoi(const char *s) {
     auto
         from_stdlib = atoi(s),
         from_zoo = c_strToI(s);
-    if(from_stdlib != from_zoo) { throw 0; }
+    if(from_stdlib != from_zoo) {
+        std::cout << s << '\n' << from_stdlib << '\n' << from_zoo << '\n';
+        throw std::runtime_error("atoi function mismatch.");
+    }
     return from_stdlib;
 }
 
@@ -34,7 +38,9 @@ inline int compareAtol(const char *s) {
         from_zoo = c_strToL(s);
     if(from_stdlib != from_zoo) {
         auto recalc = c_strToL(s);
-        throw 0; }
+        std::cout << s << '\n' << from_stdlib << '\n' << from_zoo << '\n' << recalc << '\n';
+        throw std::runtime_error("atol function mismatch.");
+    }
     return from_stdlib;
 }
 
