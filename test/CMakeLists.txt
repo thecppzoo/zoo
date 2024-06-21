@@ -42,7 +42,7 @@ if(MSVC)
         algorithm/cfs.cpp
         algorithm/quicksort.cpp
         egyptian.cpp var.cpp
-        # variant.cpp investigate why this is failing
+        variant.cpp # investigate why this is failing
         CopyMoveAbilities.cpp
     )
 
