@@ -4,8 +4,8 @@
 
 #include "zoo/meta/log.h"
 
+#include <array>
 #include <type_traits>
-#include <assert.h>
 
 #ifdef _MSC_VER
 #include <iso646.h>
@@ -16,15 +16,18 @@ namespace zoo { namespace swar {
 template <int NBits, typename T>
 struct SWAR;
 
-template <int NumBits, typename BaseType> struct Literals_t {};
+template <int NumBits, typename BaseType>
+struct Literals_t {};
 
 template <int NumBits, typename BaseType>
-constexpr Literals_t<NumBits, BaseType> Literals{};
+constexpr Literals_t<NumBits, BaseType>
+Literals{};
+
 
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = std::uint8_t;
+using u8 = uint8_t;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
@@ -90,6 +93,7 @@ constexpr auto leastNBitsMask() {
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
     using type = std::make_unsigned_t<T>;
+    constexpr static auto Literal = Literals<NBits_, T>;
     constexpr static inline type
         NBits = NBits_,
         BitWidth = sizeof(T) * 8,
@@ -107,15 +111,22 @@ struct SWAR {
         LowerBits = MostSignificantBit - LeastSignificantBit,
         MaxUnsignedLaneValue = LeastSignificantLaneMask;
 
-    /// \note breaks the camel case since other libraries have from_array
-    template <typename U>
-    constexpr static auto from_array(const U (&values)[Lanes]) noexcept {
+    template <typename InputIt>
+    constexpr static auto fromRange(InputIt first, InputIt last) noexcept {
         auto result = T{0};
-        for (auto value : values) {
-            result = (result << NBits) | value;
+        for (; first != last; ++first) {
+            result = (result << NBits) | *first;
         }
         return result;
     }
+
+    template <typename Range>
+    constexpr static auto from(const Range &values) noexcept {
+        using std::begin; using std::end;
+        return SWAR{fromRange(begin(values), end(values))};
+    }
+
+    constexpr SWAR(const std::array<T, Lanes> &array) : m_v{from(array.begin(), array.end())} {}
 
     template<
         typename Arg,
@@ -125,8 +136,17 @@ struct SWAR {
     >
     constexpr
     SWAR(Literals_t<NBits, T>, const Arg (&values)[N]):
-        m_v{from_array(values)}
+        m_v{from(values)}
     {}
+
+    constexpr std::array<T, Lanes> to_array() const noexcept {
+        std::array<T, Lanes> result = {};
+        for (int i = 0; i < Lanes; ++i) {
+            auto otherEnd = Lanes - i - 1;
+            result[otherEnd] = at(i);
+        }
+        return result;
+    }
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -220,7 +240,16 @@ struct SWAR {
 };
 
 template <int NBits, typename T, typename Arg>
-SWAR(Literals_t<NBits, T>, const Arg (&values)[SWAR<NBits, T>::Lanes]) -> SWAR<NBits, T>;
+SWAR(
+    Literals_t<NBits, T>,
+    const Arg (&values)[SWAR<NBits, T>::Lanes]
+) -> SWAR<NBits, T>;
+
+template <int NBits, typename T>
+SWAR(
+    Literals_t<NBits, T>,
+    const std::array<T, SWAR<NBits, T>::Lanes>&
+) -> SWAR<NBits, T>;
 
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
@@ -366,7 +395,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
 };
 
 template <int NBits, typename T>
-BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[BooleanSWAR<NBits, T>::Lanes]) -> BooleanSWAR<NBits, T>;
+BooleanSWAR(
+    Literals_t<NBits, T>,
+    const bool (&values)[BooleanSWAR<NBits, T>::Lanes]
+) -> BooleanSWAR<NBits, T>;
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>

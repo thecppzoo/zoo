@@ -124,7 +124,7 @@ else()
     set(
         ZOO_TEST_SOURCES
         ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
-        ${SWAR_SOURCES} 
+        ${SWAR_SOURCES}
         ${MISCELLANEA_SOURCES}
     )
 

@@ -62,6 +62,58 @@ static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
 
 static_assert(SWAR{Literals<8, u32>, {4, 3, 2, 1}}.value() == 0x04'03'02'01);
 static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
+static_assert(SWAR{Literals<8, u32>, {1, 2, 3, 4}}.value() == 0x01'02'03'04);
+
+static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
+static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
+
+
+static_assert(SWAR{Literals<4, u8>, {2, 1}}.value() == 0x21);
+static_assert(SWAR{Literals<4, u8>, {1, 2}}.value() == 0x12);
+
+// Little-endian
+static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(0) == 4);
+static_assert(SWAR{Literals<16, u64>, {1, 2, 3, 4}}.at(1) == 3);
+
+// Non-power of two
+static_assert(SWAR<5, u16>::Lanes == 3);
+static_assert(SWAR{Literals<5, u16>, {1, 1, 1}}.value() == 0b0'00001'00001'00001);
+static_assert(SWAR{Literals<5, u16>, {31, 31, 31}}.value() == 0b0'11111'11111'11111);
+static_assert(SWAR{Literals<5, u16>, {1, 7, 17}}.value() == 0b0'00001'00111'10001);
+
+// Macro required because initializer lists are not constexpr
+#define ARRAY_TEST(SwarType, ...)                                              \
+    static_assert([]() {                                                       \
+        using S = SwarType;                                                    \
+        constexpr auto arry = std::array{__VA_ARGS__};                         \
+        constexpr auto test_array = S{S::Literal, {__VA_ARGS__}}.to_array();   \
+        static_assert(arry.size() == S::Lanes);                                \
+        for (auto i = 0; i < S::Lanes; ++i) {                                  \
+            if (arry[i] != test_array.at(i)) {                                 \
+                return false;                                                  \
+            }                                                                  \
+        }                                                                      \
+        return true;                                                           \
+    }());                                                                      \
+
+ARRAY_TEST(S16_64, 1, 2, 3, 4);
+ARRAY_TEST(S16_64, 4, 3, 2, 1);
+
+ARRAY_TEST(S8_32, 255, 255, 255, 255);
+ARRAY_TEST(S8_64, 255, 255, 255, 255, 255, 255, 255, 255);
+
+ARRAY_TEST(S16_32, 65534, 65534);
+ARRAY_TEST(S16_64, 65534, 65534, 65534, 65534);
+
+#define F false
+#define T true
+using BS = BooleanSWAR<4, u16>;
+static_assert(BS{Literals<4, u16>, {F, F, F, F}}.value() == 0b0000'0000'0000'0000);
+static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
+static_assert(BS{Literals<4, u16>, {F, T, F, F}}.value() == 0b0000'1000'0000'0000);
+static_assert(BS{Literals<4, u16>, {F, F, T, F}}.value() == 0b0000'0000'1000'0000);
+static_assert(BS{Literals<4, u16>, {F, F, F, T}}.value() == 0b0000'0000'0000'1000);
+static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'0000);
 
 static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
 static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
@@ -831,3 +883,4 @@ TEST_CASE(
         }
     }
 }
+
