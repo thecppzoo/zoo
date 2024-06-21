@@ -366,7 +366,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     {}
 
     template<int NB, typename TT>
-    friend constexpr auto
+    friend constexpr BooleanSWAR<NB, TT>
     equals(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
 
     template<int N, int NB, typename TT>
@@ -531,7 +531,7 @@ equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) noexcept {
         equalLanesHaveMSB_off = nullLaneIfEqual | nullDetectorViaFlippingMSB_low,
         flipMSB = ~equalLanesHaveMSB_off,
         rv = TAOCP_H & flipMSB;
-    return rv;
+    return BooleanSWAR<NBits, T>{rv};
 }
 
 /**
