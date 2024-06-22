@@ -266,7 +266,7 @@ struct CorpusAtoi {
                 allCharacters.append(1, '0');
             }
             int number = exp(logBase10 * M_LN10);
-            auto n = sprintf(conversionBuffer, "%d%c", number, postNumber(generator));
+            auto n = snprintf(conversionBuffer, sizeof(conversionBuffer), "%d%c", number, postNumber(generator));
             if(n < 0) {
                 throw 0;
             }

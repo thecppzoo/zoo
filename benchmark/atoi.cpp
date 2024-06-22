@@ -1,6 +1,7 @@
 #include "atoi.h"
 #include "atoi_impl.h"
 
+#include "zoo/swar/SWAR.h"
 #include "zoo/swar/associative_iteration.h"
 
 #if ZOO_CONFIGURED_TO_USE_AVX()
@@ -78,7 +79,7 @@ uint32_t lemire_as_zoo_swar(const char *chars) noexcept {
     using S8_64 = zoo::swar::SWAR<8, uint64_t>;
     S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
     auto rv = calculateBase10(convertedToIntegers);
-    return rv;    
+    return rv;
 }
 
 std::size_t spaces_glibc(const char *ptr) {

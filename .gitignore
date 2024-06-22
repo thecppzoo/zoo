@@ -5,3 +5,5 @@
 test/.vscode
 build
 .cache
+
+**.idea**

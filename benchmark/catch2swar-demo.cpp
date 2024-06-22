@@ -79,7 +79,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     #if ZOO_CONFIGURED_TO_USE_AVX()
         REQUIRE(fromZOO_AVX == fromZOO_STRLEN);
     #endif
-    
+
     REQUIRE(fromZooSpaces == fromGLIB_Spaces);
 
     REQUIRE(fromGLIBC_atoi == fromZOO_ATOI);
@@ -109,8 +109,11 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
 TEST_CASE("Atoi correctness", "[pure-test][swar][atoi]") {
     auto empty = "";
     REQUIRE(0 == zoo::c_strToI(empty));
+    constexpr auto alignment = 9;
     alignas(8) constexpr char EmptyMisaligned[8] = { 'Q', '\0', '0', '1', '2', '3', '9', '\0' };
+#if defined(__GNUC__) && !defined(__clang__)
     static_assert(8 == alignof(EmptyMisaligned));
+#endif
     REQUIRE(0 == zoo::c_strToI(EmptyMisaligned + 1));
     auto justSpaces = "    \t\t\v  ";
     REQUIRE(0 == zoo::c_strToI(justSpaces));
@@ -122,15 +125,15 @@ TEST_CASE("Atoi correctness", "[pure-test][swar][atoi]") {
     auto excessiveZeroesCloseToIntMax = "+00000000000001987654321";
     REQUIRE(1'987'654'321 == zoo::c_strToI(excessiveZeroesCloseToIntMax));
     char buffer[20];
-    sprintf(buffer, "%d", INT_MAX);
+    snprintf(buffer, sizeof(buffer), "%d", INT_MAX);
     REQUIRE(INT_MAX == zoo::c_strToI(buffer));
-    sprintf(buffer, "%d", INT_MIN);
+    snprintf(buffer, sizeof(buffer), "%d", INT_MIN);
     REQUIRE(INT_MIN == zoo::c_strToI(buffer));
     std::random_device rd;
     std::mt19937 g(rd());
     std::uniform_int_distribution rnd(INT_MIN, INT_MAX);
     auto randomNumber = rnd(g);
-    sprintf(buffer, "    %d", randomNumber);
+    snprintf(buffer, sizeof(buffer), "    %d", randomNumber);
     auto glibc = atoi(buffer);
     REQUIRE(zoo::c_strToI(buffer) == glibc);
 }

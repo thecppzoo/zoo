@@ -1,25 +1,23 @@
+#pragma once
 #include "zoo/pp/platform.h"
 
-#include "zoo/swar/associative_iteration.h"
-
+#if ZOO_CONFIGURED_TO_USE_BMI()
 #include "benchmark/benchmark.h"
-
 #include <random>
 #include <vector>
-
 #include <iostream>
 #include <bitset>
 
-uint64_t sideEffect = 0;
-
 template<int NB>
 using S = zoo::swar::SWAR<NB, uint64_t>;
+uint64_t sideEffect = 0;
 
 enum ExtractionPrimitive {
     UseBuiltin,
     UseSWAR,
     CompareBuiltinAndSWAR
 };
+
 
 template<int NB, ExtractionPrimitive P>
 S<NB> parallelExtraction(S<NB> i, S<NB> m) {
@@ -93,3 +91,5 @@ void runCompressions(benchmark::State &s) {
     BENCHMARK(runCompressions<nb, CompareBuiltinAndSWAR>);
 
 BIT_SIZE_X_LIST
+
+#endif
