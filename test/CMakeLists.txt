@@ -119,7 +119,7 @@ else()
         MAP_SOURCES
         map/BasicMap.cpp map/RobinHood.test.cpp map/RobinHood.hybrid.test.cpp
     )
-    set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
+set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp StrCmp.cpp)
     set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
     set(
         ZOO_TEST_SOURCES
