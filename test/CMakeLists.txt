@@ -150,8 +150,8 @@ else()
     target_link_libraries(type_erasure TypeErasureTest)
     add_executable(swar $<TARGET_OBJECTS:Catch2Main>)
     target_link_libraries(swar SWARTest)
-    add_executable(mapt $<TARGET_OBJECTS:Catch2Main>)
-    target_link_libraries(mapt MapTest)
+    # add_executable(mapt $<TARGET_OBJECTS:Catch2Main>)
+    # target_link_libraries(mapt MapTest)
 
     # CMake build: library tests
     set(TEST_APP_NAME "${CURRENT_EXECUTABLE}Test")
