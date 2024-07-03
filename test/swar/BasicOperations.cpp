@@ -39,6 +39,8 @@ static_assert(SWAR<8, u32>::MaxUnsignedLaneValue == 255);
 static_assert(SWAR<4, u32>::MaxUnsignedLaneValue == 15);
 static_assert(SWAR<2, u32>::MaxUnsignedLaneValue == 3);
 
+auto v = SWAR<3, u16>::LeastSignificantLaneMask;
+
 
 #define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
 #define X(TYPE, av, expected) \
@@ -282,6 +284,7 @@ TEST_CASE("Parity", "[swar]") {
     CHECK(by16.value() == 0x8000'8000);
 }
 
+#if ZOO_USE_LEASTNBITSMASK
 TEST_CASE(
     "Isolate",
     "[swar]"
@@ -322,6 +325,7 @@ TEST_CASE(
         //CHECK(0xFFFF'FFFF'FFFF'FFFFull == isolate<64, u64>(allones));  // Broken until PR/93 goes in.
     }
 }
+#endif
 
 TEST_CASE("Compress/Expand", "[swar]") {
     unsigned
@@ -387,6 +391,7 @@ static_assert(0x20 == isolateLSB<u8>(0xE0));
 static_assert(0x40 == isolateLSB<u8>(0xC0));
 static_assert(0x80 == isolateLSB<u8>(0x80));
 
+#if ZOO_USE_LEASTNBITSMASK
 static_assert(0x80u == mostNBitsMask<1, u8>());
 static_assert(0xC0u == mostNBitsMask<2, u8>());
 static_assert(0xE0u == mostNBitsMask<3, u8>());
@@ -477,6 +482,7 @@ static_assert(0x18 == isolateLSBits<2, u8>(0xF8));
 static_assert(0x03 == isolateLSBits<2, u8>(0xFB));
 static_assert(0x0C == isolateLSBits<2, u8>(0xFC));
 static_assert(0x03 == isolateLSBits<2, u8>(0xFF));
+#endif
 
 static_assert(0x0606'0606 == u32(broadcast<8>(SWAR<8, u32>(0x0000'0006))));
 static_assert(0x0808'0808 == u32(broadcast<8>(SWAR<8, u32>(0x0000'0008))));

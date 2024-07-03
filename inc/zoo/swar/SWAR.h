@@ -92,8 +92,8 @@ struct SWAR {
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask =
             sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
-                ~T(0) :
-                ~(~T(0) << T{NBits}),
+                type(~T(0)) :
+                ~(type(~type(0)) << type{NBits}),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit,
@@ -158,12 +158,12 @@ struct SWAR {
 
     // Returns lane at position with other lanes cleared.
     constexpr T isolateLane(int position) const noexcept {
-        return m_v & (LeastSignificantLaneMask << (NBits * position));
+        return m_v & (LeastSignificantLaneMask << T(NBits * position));
     }
 
     // Returns lane value at position, in lane 0, rest of SWAR cleared.
     constexpr T at(int position) const noexcept {
-        return LeastSignificantLaneMask & (m_v >> (NBits * position));
+        return LeastSignificantLaneMask & (m_v >> T(NBits * position));
     }
 
     constexpr SWAR clear(int position) const noexcept {
