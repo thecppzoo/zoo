@@ -422,9 +422,9 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
         return S{msbCleared.value() << 1};
     };
 
-    multiplier = S{multiplier.value() << (NB - ActualBits)};
+    auto shifted = S{multiplier.value() << (NB - ActualBits)};
     return associativeOperatorIterated_regressive(
-        multiplicand, S{0}, multiplier, S{S::MostSignificantBit}, operation,
+        multiplicand, S{0}, shifted, S{S::MostSignificantBit}, operation,
         ActualBits, halver
     );
 }

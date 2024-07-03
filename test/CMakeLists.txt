@@ -44,6 +44,7 @@ if(MSVC)
         egyptian.cpp var.cpp
         # variant.cpp investigate why this is failing
         CopyMoveAbilities.cpp
+        root/mem.cpp
     )
 
     add_subdirectory(third_party EXCLUDE_FROM_ALL)
@@ -120,7 +121,10 @@ else()
         map/BasicMap.cpp map/RobinHood.test.cpp map/RobinHood.hybrid.test.cpp
     )
     set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
-    set(MISCELLANEA_SOURCES egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp)
+    set(
+        MISCELLANEA_SOURCES
+        egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp root/mem.cpp
+    )
     set(
         ZOO_TEST_SOURCES
         ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
@@ -132,7 +136,7 @@ else()
     add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
     add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
     add_library(SWARTest OBJECT ${SWAR_SOURCES})
-    add_library(MapTest OBJECT ${MAP_SOURCES})
+    #add_library(MapTest OBJECT ${MAP_SOURCES})
     add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
     add_executable(
@@ -146,8 +150,8 @@ else()
     target_link_libraries(type_erasure TypeErasureTest)
     add_executable(swar $<TARGET_OBJECTS:Catch2Main>)
     target_link_libraries(swar SWARTest)
-    add_executable(mapt $<TARGET_OBJECTS:Catch2Main>)
-    target_link_libraries(mapt MapTest)
+    # add_executable(mapt $<TARGET_OBJECTS:Catch2Main>)
+    # target_link_libraries(mapt MapTest)
 
     # CMake build: library tests
     set(TEST_APP_NAME "${CURRENT_EXECUTABLE}Test")

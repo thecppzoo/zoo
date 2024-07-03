@@ -1,15 +1,14 @@
-#include "zoo/swar/SWAR.h"
+#ifndef ZOO_ROOT_MEM_H
+#define ZOO_ROOT_MEM_H
 
+/// \file zoo/root/mem.h Memory utilities
+
+// used for multiple return values in blockAlignedLoad
 #include <tuple>
+// memcpy
 #include <string.h>
-
-uint64_t calculateBase10(
-    zoo::swar::SWAR<8, __uint128_t> convertedToIntegers
-) noexcept;
-
-uint32_t calculateBase10(
-    zoo::swar::SWAR<8, uint64_t> convertedToIntegers
-) noexcept;
+// for uintptr_t, there are differences between C and C++
+#include <cstdint>
 
 namespace zoo {
 
@@ -24,8 +23,12 @@ namespace zoo {
 template<typename PtrT, typename Block>
 std::tuple<PtrT *, int>
 blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
-    uintptr_t asUint = reinterpret_cast<uintptr_t>(pointerInsideBlock);
+    // conversion (casting) to use modulo arithmetic to detect misalignment
+    // Surprisingly, intptr_t is optional, let alone uintptr_t
+    using UPtr = std::make_unsigned_t<std::intptr_t>;
+    auto asUint = reinterpret_cast<UPtr>(pointerInsideBlock);
     constexpr auto Alignment = alignof(Block), Size = sizeof(Block);
+    // It is preferable to have this hard error than to SFINAE it away
     static_assert(Alignment == Size);
     auto misalignment = asUint % Alignment;
     auto *base = reinterpret_cast<PtrT *>(asUint - misalignment);
@@ -34,3 +37,5 @@ blockAlignedLoad(PtrT *pointerInsideBlock, Block *b) {
 }
 
 }
+
+#endif

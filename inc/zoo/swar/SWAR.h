@@ -70,21 +70,6 @@ constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
 }
 #endif
 
-// This is placed ahead of other bare manipulation functions to reduce integer
-// promotion weirdness in the constant creation of SWAR and related.
-template<int NBits, typename T>
-constexpr auto leastNBitsMask() {
-    // It was integer promotion screwing this up at equal sizes all along, special casing unblocks.
-    constexpr auto type_bits = sizeof(T) * 8;
-    if constexpr(NBits < type_bits) {
-        return (T{1}<<NBits)-1;
-    } else if constexpr(type_bits < 32) {
-        return (T{1}<<NBits)-1;
-    } else if constexpr(type_bits >= 32) {
-        return ~T{0};
-    }
-}
-
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
 /// of NBits width against a type T, and provides an abstraction for performing
 /// SIMD operations against that primitive type T treated as a SIMD register.
@@ -101,11 +86,14 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
-        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull}, NBits>::value,
-        // Simply shifting over Least causes problems with lanes that don't fit the SWAR exactly.
-        MostSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1ull<<(NBits - 1)}, NBits>::value,
-        LeastSignificantLaneMask = leastNBitsMask<NBits, T>(),
+        AllOnes = ~type{0} >> PaddingBitsCount,
+            // Also constructed in RobinHood utils: possible bug?
+        LeastSignificantBit = meta::BitmaskMaker<T, type{1}, NBits>::value,
+        MostSignificantBit = LeastSignificantBit << (NBits - 1),
+        LeastSignificantLaneMask =
+            sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
+                type(~T(0u)) :
+                ~(type(~type(0u)) << type{NBits}),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
         LowerBits = MostSignificantBit - LeastSignificantBit,
@@ -170,12 +158,12 @@ struct SWAR {
 
     // Returns lane at position with other lanes cleared.
     constexpr T isolateLane(int position) const noexcept {
-        return m_v & (LeastSignificantLaneMask << (NBits * position));
+        return m_v & (LeastSignificantLaneMask << T(NBits * position));
     }
 
     // Returns lane value at position, in lane 0, rest of SWAR cleared.
     constexpr T at(int position) const noexcept {
-        return LeastSignificantLaneMask & (m_v >> (NBits * position));
+        return LeastSignificantLaneMask & (m_v >> T(NBits * position));
     }
 
     constexpr SWAR clear(int position) const noexcept {
@@ -257,12 +245,14 @@ constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
     return left.m_v == right.m_v;
 }
 
-/// Isolating >= NBits in underlying integer type currently results in disaster.
-// TODO(scottbruceheart) Attempting to use binary not (~) results in negative shift warnings.
+
+
+#if ZOO_USE_LEASTNBITSMASK
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
     return pattern & leastNBitsMask<NBits, T>();
 }
+#endif
 
 /// Clears the least bit set in type T
 template<typename T = uint64_t>
@@ -276,6 +266,7 @@ constexpr auto isolateLSB(T v) {
     return v & ~clearLSB(v);
 }
 
+#if ZOO_USE_LEASTNBITSMASK
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
     return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
@@ -296,6 +287,7 @@ constexpr auto isolateLSBits(T v) {
     constexpr auto lowMask = leastNBitsMask<NBits, T>();
     return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
 }
+#endif
 
 /// Broadcasts the value in the 0th lane of the SWAR to the entire SWAR.
 /// Precondition: 0th lane of |v| contains a value to broadcast, remainder of input SWAR zero.

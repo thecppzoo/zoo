@@ -44,7 +44,7 @@ add_subdirectory(dependencies/google_benchmark)
 add_executable(
   catch2Benchmark
     catch2BenchmarkMain.cpp catch2Functions.cpp catch2swar-demo.cpp
-    atoi.cpp atoi-catch2-tests.cpp
+    c_str-functions/c_str.cpp c_str-functions/catch2.cpp
     egyptian.cpp
     # RobinHood.benchmark.cpp
 )
@@ -56,19 +56,20 @@ add_executable(
 set_xcode_properties(zoo-google-benchmark)
 
 add_executable(
-    zoo-atoi-benchmark benchmark_main.cpp bm-swar.cpp atoi.cpp swar/compress.cpp
+    zoo-demo-benchmark
+    benchmark_main.cpp bm-swar.cpp c_str-functions/c_str.cpp swar/compress.cpp
 )
-set_xcode_properties(zoo-atoi-benchmark)
+set_xcode_properties(zoo-demo-benchmark)
 
 target_link_libraries(zoo-google-benchmark benchmark::benchmark)
-target_link_libraries(zoo-atoi-benchmark benchmark::benchmark)
+target_link_libraries(zoo-demo-benchmark benchmark::benchmark)
 
-add_library(zoo-atoi-implementations SHARED atoi.cpp)
+add_library(zoo-c_str-implementations SHARED c_str-functions/c_str.cpp)
 add_executable(
-    zoo-atoi-benchmark-from-dynamic-library benchmark_main.cpp bm-swar.cpp
+    zoo-c_str-benchmark-from-dynamic-library benchmark_main.cpp bm-swar.cpp
 )
 target_link_libraries(
-    zoo-atoi-benchmark-from-dynamic-library
-    zoo-atoi-implementations
+    zoo-c_str-benchmark-from-dynamic-library
+    zoo-c_str-implementations
     benchmark::benchmark
 )
