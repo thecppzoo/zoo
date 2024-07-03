@@ -245,12 +245,14 @@ constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
     return left.m_v == right.m_v;
 }
 
-/// Isolating >= NBits in underlying integer type currently results in disaster.
-// TODO(scottbruceheart) Attempting to use binary not (~) results in negative shift warnings.
+
+
+#if ZOO_USE_LEASTNBITSMASK
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
     return pattern & leastNBitsMask<NBits, T>();
 }
+#endif
 
 /// Clears the least bit set in type T
 template<typename T = uint64_t>
@@ -264,6 +266,7 @@ constexpr auto isolateLSB(T v) {
     return v & ~clearLSB(v);
 }
 
+#if ZOO_USE_LEASTNBITSMASK
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
     return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
@@ -284,6 +287,7 @@ constexpr auto isolateLSBits(T v) {
     constexpr auto lowMask = leastNBitsMask<NBits, T>();
     return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
 }
+#endif
 
 /// Broadcasts the value in the 0th lane of the SWAR to the entire SWAR.
 /// Precondition: 0th lane of |v| contains a value to broadcast, remainder of input SWAR zero.
