@@ -284,11 +284,11 @@ TEST_CASE("Parity", "[swar]") {
     CHECK(by16.value() == 0x8000'8000);
 }
 
-#if ZOO_USE_LEASTNBITSMASK
 TEST_CASE(
     "Isolate",
     "[swar]"
 ) {
+    #if ZOO_USE_LEASTNBITSMASK
     for (auto i = 0; i < 63; ++i) {
         CHECK(i == isolate<8>(i));
         CHECK(i == isolate<8>(0xFF00+i));
@@ -324,8 +324,10 @@ TEST_CASE(
         CHECK(0x0000u == isolate<0, u64>(allones));
         //CHECK(0xFFFF'FFFF'FFFF'FFFFull == isolate<64, u64>(allones));  // Broken until PR/93 goes in.
     }
+    #else
+    REQUIRE(true);
+    #endif
 }
-#endif
 
 TEST_CASE("Compress/Expand", "[swar]") {
     unsigned
