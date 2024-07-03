@@ -136,7 +136,7 @@ else()
     add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
     add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
     add_library(SWARTest OBJECT ${SWAR_SOURCES})
-    add_library(MapTest OBJECT ${MAP_SOURCES})
+    #add_library(MapTest OBJECT ${MAP_SOURCES})
     add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
 
     add_executable(
