@@ -644,9 +644,11 @@ int c_strCmp(const char *a, const char *b) {
             auto returner =
                 [&](S s) {
                     auto firstNullIndex = s.lsbIndex();
-                    return returnMultiplier * (
-                            mmaBytes - lmaBytes
-                        ).shiftLanesRight(firstNullIndex).value();
+                    auto
+                        comparison = mmaBytes - lmaBytes,
+                        inLeast = comparison.shiftLanesRight(firstNullIndex),
+                        onlyLeast = inLeast & S{S::LeastSignificantLaneMask};
+                    return returnMultiplier * int8_t(onlyLeast.value());
                 };
             if(thereIsANull) {
                 return returner(thereIsANull);
