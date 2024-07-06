@@ -39,9 +39,34 @@ constexpr uint64_t popcount(uint64_t a) noexcept {
         >::execute(a);
 }
 
+template<typename T, typename = void>
+struct ToUnsigned_impl {
+    using type = T;
+};
+
+template<typename T>
+struct ToUnsigned_impl<T, std::void_t<std::make_unsigned_t<T>>> {
+    using type = std::make_unsigned_t<T>;
+};
+
+template<>
+struct ToUnsigned_impl<__int128_t, void> {
+    using type = __uint128_t;
+};
+
+template<>
+struct ToUnsigned_impl<__uint128_t, void> {
+    using type = __uint128_t;
+};
+
+static_assert(std::is_same_v<ToUnsigned_impl<int>::type, unsigned>);
+
+template<typename T>
+using ToUnsigned = typename ToUnsigned_impl<T>::type;
+
 /// Index into the bits of the type T that contains the MSB.
 template<typename T>
-constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
+constexpr ToUnsigned<T> msbIndex(T v) noexcept {
     return meta::logFloor(v);
 }
 
@@ -49,7 +74,7 @@ constexpr std::make_unsigned_t<T> msbIndex(T v) noexcept {
 ///
 /// \todo incorporate __builtin_ctzg when it is more widely available
 template<typename T>
-constexpr std::make_unsigned_t<T> lsbIndex(T v) noexcept {
+constexpr ToUnsigned<T> lsbIndex(T v) noexcept {
     // This check should be SFINAE, but supporting all sorts
     // of base types is an ongoing task, we put a bare-minimum
     // temporary preventive measure with static_assert
@@ -77,7 +102,9 @@ constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
 /// Certain computational workloads can be materially sped up using SWAR techniques.
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
-    using type = std::make_unsigned_t<T>;
+    using type =
+        // std::make_unsigned_t<T>;
+        ToUnsigned<T>;
     constexpr static auto Literal = Literals<NBits_, T>;
     constexpr static inline type
         NBits = NBits_,
