@@ -3,6 +3,7 @@
 /// \file Swar.h SWAR operations
 
 #include "zoo/meta/log.h"
+#include "zoo/pp/platform.h"
 
 #include <array>
 #include <type_traits>
@@ -49,6 +50,7 @@ struct ToUnsigned_impl<T, std::void_t<std::make_unsigned_t<T>>> {
     using type = std::make_unsigned_t<T>;
 };
 
+#if !ZOO_WINDOWS_BUILD()
 template<>
 struct ToUnsigned_impl<__int128_t, void> {
     using type = __uint128_t;
@@ -58,6 +60,7 @@ template<>
 struct ToUnsigned_impl<__uint128_t, void> {
     using type = __uint128_t;
 };
+#endif
 
 static_assert(std::is_same_v<ToUnsigned_impl<int>::type, unsigned>);
 
@@ -79,7 +82,7 @@ constexpr ToUnsigned<T> lsbIndex(T v) noexcept {
     // of base types is an ongoing task, we put a bare-minimum
     // temporary preventive measure with static_assert
     static_assert(sizeof(T) <= 8, "Unsupported");
-    #ifdef _MSC_VER
+    #if ZOO_WINDOWS_BUILD()
         // ~v & (v - 1) turns on all trailing zeroes, zeroes the rest
         return meta::logFloor(1 + (~v & (v - 1)));
     #else
@@ -87,7 +90,7 @@ constexpr ToUnsigned<T> lsbIndex(T v) noexcept {
     #endif
 }
 
-#ifndef _MSC_VER
+#if !ZOO_WINDOWS_BUILD()
 constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
     auto low = (v << 64) >> 64;
     if(low) { return __builtin_ctzll(low); }
