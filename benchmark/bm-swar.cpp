@@ -1,5 +1,5 @@
-#include "c_str-functions/c_str.h"
-#include "c_str-functions/corpus.h"
+#include "zoo/c_str/c_str.h"
+#include "zoo/c_str/corpus.h"
 
 #include <benchmark/benchmark.h>
 

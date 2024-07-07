@@ -1,5 +1,5 @@
-#include "c_str-functions/c_str.h"
-#include "c_str-functions/corpus.h"
+#include "zoo/c_str/c_str.h"
+#include "zoo/c_str/corpus.h"
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include "catch2/catch.hpp"
@@ -79,7 +79,7 @@ TEST_CASE("Atoi benchmarks", "[atoi][swar]") {
     #if ZOO_CONFIGURED_TO_USE_AVX()
         REQUIRE(fromZOO_AVX == fromZOO_STRLEN);
     #endif
-    
+
     REQUIRE(fromZooSpaces == fromGLIB_Spaces);
 
     REQUIRE(fromGLIBC_atoi == fromZOO_c_strToI);

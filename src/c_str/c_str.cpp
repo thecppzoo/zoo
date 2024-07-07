@@ -1,5 +1,5 @@
-#include "c_str.h"
-#include "c_str-impl.h"
+#include "zoo/c_str/c_str.h"
+#include "zoo/c_str/c_str-impl.h"
 
 #include "zoo/swar/associative_iteration.h"
 #include "zoo/root/mem.h"
@@ -89,7 +89,7 @@ uint32_t lemire_as_zoo_swar(const char *chars) noexcept {
     using S8_64 = zoo::swar::SWAR<8, uint64_t>;
     S8_64 convertedToIntegers = S8_64{bytes - allCharacterZero};
     auto rv = calculateBase10(convertedToIntegers);
-    return rv;    
+    return rv;
 }
 
 std::size_t spaces_glibc(const char *ptr) {

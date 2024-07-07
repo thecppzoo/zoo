@@ -1,7 +1,5 @@
 cmake_minimum_required (VERSION 3.8)
-
 project(ZooBenchmark)
-
 
 set(CMAKE_CXX_FLAGS "-fno-unroll-loops")
 
@@ -35,6 +33,8 @@ include_directories(
     ../test/third_party/Catch2/single_include
 )
 
+set(ZOO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
 # build google benchmark (target: benchmark)
 # do not build tests of benchmarking lib
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Suppressing benchmark's tests" FORCE)
@@ -44,7 +44,7 @@ add_subdirectory(dependencies/google_benchmark)
 add_executable(
   catch2Benchmark
     catch2BenchmarkMain.cpp catch2Functions.cpp catch2swar-demo.cpp
-    c_str-functions/c_str.cpp c_str-functions/catch2.cpp
+    ${ZOO_SRC_DIR}/c_str/c_str.cpp ${ZOO_SRC_DIR}/c_str/c_str_tests.cpp
     egyptian.cpp
     # RobinHood.benchmark.cpp
 )
@@ -57,14 +57,14 @@ set_xcode_properties(zoo-google-benchmark)
 
 add_executable(
     zoo-demo-benchmark
-    benchmark_main.cpp bm-swar.cpp c_str-functions/c_str.cpp swar/compress.cpp
+    benchmark_main.cpp bm-swar.cpp ${ZOO_SRC_DIR}/c_str/c_str.cpp swar/compress.cpp
 )
 set_xcode_properties(zoo-demo-benchmark)
 
 target_link_libraries(zoo-google-benchmark benchmark::benchmark)
 target_link_libraries(zoo-demo-benchmark benchmark::benchmark)
 
-add_library(zoo-c_str-implementations SHARED c_str-functions/c_str.cpp)
+add_library(zoo-c_str-implementations SHARED ${ZOO_SRC_DIR}/c_str/c_str.cpp)
 add_executable(
     zoo-c_str-benchmark-from-dynamic-library benchmark_main.cpp bm-swar.cpp
 )
