@@ -1,7 +1,8 @@
-#include "atoi.h"
-#include "atoi_impl.h"
+#include "c_str.h"
+#include "c_str-impl.h"
 
 #include "zoo/swar/associative_iteration.h"
+#include "zoo/root/mem.h"
 
 #if ZOO_CONFIGURED_TO_USE_AVX()
 #include <immintrin.h>
@@ -12,9 +13,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <array>
-#include <tuple>
-
-static_assert(~uint32_t(0) == zoo::swar::SWAR<32, uint32_t>::LeastSignificantLaneMask);
 
 // Copied from Daniel Lemire's GitHub at
 // https://lemire.me/blog/2018/10/03/quickly-parsing-eight-digits/
@@ -54,7 +52,7 @@ uint32_t calculateBase10(zoo::swar::SWAR<8, uint64_t> convertedToIntegers) noexc
     return uint32_t(by10001base2to32.value() >> 32);
 }
 
-uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
+uint64_t calculateBase10_128(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
     auto by11base256 = convertedToIntegers.multiply(256*10 + 1);
     auto bytePairs = zoo::swar::doublePrecision(by11base256).odd;
     auto by101base2to16 = bytePairs.multiply(1 + (100 << 16));
@@ -67,6 +65,19 @@ uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) no
     auto byHundredMillionBase2to64 =
         byteOcts.multiply(1 + (__uint128_t(100'000'000) << 64));
     return uint64_t(byHundredMillionBase2to64.value() >> 64);
+}
+
+uint64_t calculateBase10(zoo::swar::SWAR<8, __uint128_t> convertedToIntegers) noexcept {
+    auto v = convertedToIntegers.value();
+    using S = zoo::swar::SWAR<8, uint64_t>;
+    uint64_t
+        high = v >> 64,
+        low = (v << 64) >> 64;
+    auto
+        highNumbers = calculateBase10(S{low}),
+        lowNumbers = calculateBase10(S{high});
+    auto combine = highNumbers * __uint128_t(100'000'000) + lowNumbers;
+    return combine;
 }
 
 // Note: eight digits can represent from 0 to (10^9) - 1, the logarithm base 2
@@ -90,7 +101,7 @@ std::size_t spaces_glibc(const char *ptr) {
 namespace zoo {
 
 template<typename S>
-std::size_t leadingSpacesCountAligned(S bytes) noexcept {
+std::size_t leadingSpacesCountInBlock(S bytes) noexcept {
     /*
     space (0x20, ' ')
     form feed (0x0c, '\f')
@@ -109,6 +120,10 @@ std::size_t leadingSpacesCountAligned(S bytes) noexcept {
     ExpressedAsEscapeCodes = { ' ', '\r', '\f', '\v', '\n', '\t' };
     static_assert(SpaceCharacters == ExpressedAsEscapeCodes); */
     static_assert(sizeof(S) == alignof(S));
+    // The strategy to classify bytes is this:
+    // 1. Equal to the space character is "white space"
+    // 2. Or
+    //    1. Above or equal to "tab" and below or equal to "carriage return"
     constexpr S Space{meta::BitmaskMaker<uint64_t, ' ', 8>::value};
     auto space = swar::equals(bytes, Space);
     auto belowEqualCarriageReturn = swar::constantIsGreaterEqual<'\r'>(bytes);
@@ -136,7 +151,7 @@ std::size_t leadingSpacesCount(const char *p) noexcept {
     auto spacesIntroduced = AllSpaces & ~mask;
     bytes = spacesIntroduced | misalignedEliminated;
     for(;;) {
-        auto spacesThisBlock = leadingSpacesCountAligned(bytes);
+        auto spacesThisBlock = leadingSpacesCountInBlock(bytes);
         base += spacesThisBlock;
         if(8 != spacesThisBlock) { return base - p; }
         memcpy(&bytes.m_v, base, 8);
@@ -194,7 +209,17 @@ auto PowersOf10Array() {
     return rv;
 };
 
-template<typename Return>
+
+template<
+    typename Return,
+    std::make_unsigned_t<Return>
+        (*CB10)(
+            zoo::swar::SWAR<
+                8,
+                typename ConversionTraits<Return>::DoublePrecision
+            >
+        )
+>
 Return c_strToIntegral(const char *str) noexcept {
     auto LastFactor = PowersOf10Array<Return>();
     auto leadingSpaces = leadingSpacesCount(str);
@@ -239,14 +264,14 @@ Return c_strToIntegral(const char *str) noexcept {
                 // for a single shift
                 asIntegers.shiftLanesLeft(NBytes - 1 - nonDigitIndex)
                           .shiftLanesLeft(1);
-            auto inBase10 = calculateBase10(integersInHighLanes);
+            auto inBase10 = CB10(integersInHighLanes);
             auto scaledAccumulator = accumulator * LastFactor[nonDigitIndex];
             return Return((scaledAccumulator + inBase10) * sign);
         }
         // all bytes are digits
         auto asIntegers = bytes - AllZeroCharacter;
         accumulator *= LastFactor.back();
-        auto inBase10 = calculateBase10(asIntegers);
+        auto inBase10 = CB10(asIntegers);
         accumulator += inBase10;
         base += NBytes;
         memcpy(&bytes.m_v, base, NBytes);
@@ -256,12 +281,17 @@ Return c_strToIntegral(const char *str) noexcept {
 }
 
 int c_strToI(const char *str) noexcept {
-    return impl::c_strToIntegral<int>(str);
+    return impl::c_strToIntegral<int, calculateBase10>(str);
 }
 
 int64_t c_strToL(const char *str) noexcept {
-    return impl::c_strToIntegral<int64_t>(str);
+    return impl::c_strToIntegral<int64_t, calculateBase10>(str);
 }
+
+int64_t c_strToL128(const char *str) noexcept {
+    return impl::c_strToIntegral<int64_t, calculateBase10_128>(str);
+}
+
 
 /// \brief Helper function to fix the non-string part of block
 template<typename S>
@@ -305,6 +335,8 @@ std::size_t c_strLength(const char *s) {
         // subtracting one (if their value is greater than 0x80).
         // This provides a way to detect the first null: It is the first lane
         // in firstNullTurnsOnMSB that "flipped on" its MSB
+        // According to The Art of Computer Programming, Knuth 4A pg 152,
+        // credit due to Alan Mycroft
         auto cheapestInversionOfMSBs = ~bytes;
         auto firstMSBsOnIsFirstNull =
             firstNullTurnsOnMSB & cheapestInversionOfMSBs;

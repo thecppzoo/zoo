@@ -4,6 +4,7 @@
 
 #include "zoo/meta/log.h"
 
+#include <array>
 #include <type_traits>
 
 #ifdef _MSC_VER
@@ -12,10 +13,21 @@
 
 namespace zoo { namespace swar {
 
+template <int NBits, typename T>
+struct SWAR;
+
+template <int NumBits, typename BaseType>
+struct Literals_t {};
+
+template <int NumBits, typename BaseType>
+constexpr Literals_t<NumBits, BaseType>
+Literals{};
+
+
 using u64 = uint64_t;
 using u32 = uint32_t;
 using u16 = uint16_t;
-using u8 = std::uint8_t;
+using u8 = uint8_t;
 
 template<int LogNBits>
 constexpr uint64_t popcount(uint64_t a) noexcept {
@@ -66,6 +78,7 @@ constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
 template<int NBits_, typename T = uint64_t>
 struct SWAR {
     using type = std::make_unsigned_t<T>;
+    constexpr static auto Literal = Literals<NBits_, T>;
     constexpr static inline type
         NBits = NBits_,
         BitWidth = sizeof(T) * 8,
@@ -73,16 +86,55 @@ struct SWAR {
         NSlots = Lanes,
         PaddingBitsCount = BitWidth % NBits,
         SignificantBitsCount = BitWidth - PaddingBitsCount,
-        AllOnes = ~std::make_unsigned_t<T>{0} >> PaddingBitsCount, // Also constructed in RobinHood utils: possible bug?
-        LeastSignificantBit = meta::BitmaskMaker<T, std::make_unsigned_t<T>{1}, NBits>::value,
+        AllOnes = ~type{0} >> PaddingBitsCount,
+            // Also constructed in RobinHood utils: possible bug?
+        LeastSignificantBit = meta::BitmaskMaker<T, type{1}, NBits>::value,
         MostSignificantBit = LeastSignificantBit << (NBits - 1),
         LeastSignificantLaneMask =
             sizeof(T) * 8 == NBits ? // needed to avoid shifting all bits
-                ~T(0) :
-                ~(~T(0) << NBits),
+                type(~T(0u)) :
+                ~(type(~type(0u)) << type{NBits}),
         // Use LowerBits in favor of ~MostSignificantBit to not pollute
         // "don't care" bits when non-power-of-two bit lane sizes are supported
-        LowerBits = MostSignificantBit - LeastSignificantBit;
+        LowerBits = MostSignificantBit - LeastSignificantBit,
+        MaxUnsignedLaneValue = LeastSignificantLaneMask;
+
+    template <typename InputIt>
+    constexpr static auto fromRange(InputIt first, InputIt last) noexcept {
+        auto result = T{0};
+        for (; first != last; ++first) {
+            result = (result << NBits) | *first;
+        }
+        return result;
+    }
+
+    template <typename Range>
+    constexpr static auto from(const Range &values) noexcept {
+        using std::begin; using std::end;
+        return SWAR{fromRange(begin(values), end(values))};
+    }
+
+    constexpr SWAR(const std::array<T, Lanes> &array) : m_v{from(array.begin(), array.end())} {}
+
+    template<
+        typename Arg,
+        std::size_t N,
+        // Reject via SFINAE plain arrays with non-matching number of elements
+        typename = std::enable_if_t<N == Lanes>
+    >
+    constexpr
+    SWAR(Literals_t<NBits, T>, const Arg (&values)[N]):
+        m_v{from(values)}
+    {}
+
+    constexpr std::array<T, Lanes> to_array() const noexcept {
+        std::array<T, Lanes> result = {};
+        for (int i = 0; i < Lanes; ++i) {
+            auto otherEnd = Lanes - i - 1;
+            result[otherEnd] = at(i);
+        }
+        return result;
+    }
 
     SWAR() = default;
     constexpr explicit SWAR(T v): m_v(v) {}
@@ -106,12 +158,12 @@ struct SWAR {
 
     // Returns lane at position with other lanes cleared.
     constexpr T isolateLane(int position) const noexcept {
-        return m_v & (LeastSignificantLaneMask << (NBits * position));
+        return m_v & (LeastSignificantLaneMask << T(NBits * position));
     }
 
     // Returns lane value at position, in lane 0, rest of SWAR cleared.
     constexpr T at(int position) const noexcept {
-        return LeastSignificantLaneMask & (m_v >> (NBits * position));
+        return LeastSignificantLaneMask & (m_v >> T(NBits * position));
     }
 
     constexpr SWAR clear(int position) const noexcept {
@@ -175,18 +227,32 @@ struct SWAR {
     T m_v;
 };
 
+template <int NBits, typename T, typename Arg>
+SWAR(
+    Literals_t<NBits, T>,
+    const Arg (&values)[SWAR<NBits, T>::Lanes]
+) -> SWAR<NBits, T>;
+
+template <int NBits, typename T>
+SWAR(
+    Literals_t<NBits, T>,
+    const std::array<T, SWAR<NBits, T>::Lanes>&
+) -> SWAR<NBits, T>;
+
 /// Defining operator== on base SWAR types is entirely too error prone. Force a verbose invocation.
 template<int NBits, typename T = uint64_t>
 constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
     return left.m_v == right.m_v;
 }
 
-/// Isolating >= NBits in underlying integer type currently results in disaster.
-// TODO(scottbruceheart) Attempting to use binary not (~) results in negative shift warnings.
+
+
+#if ZOO_USE_LEASTNBITSMASK
 template<int NBits, typename T = uint64_t>
 constexpr auto isolate(T pattern) {
-    return pattern & ((T(1)<<NBits)-1);
+    return pattern & leastNBitsMask<NBits, T>();
 }
+#endif
 
 /// Clears the least bit set in type T
 template<typename T = uint64_t>
@@ -200,21 +266,11 @@ constexpr auto isolateLSB(T v) {
     return v & ~clearLSB(v);
 }
 
-template<int NBits, typename T>
-constexpr auto leastNBitsMask() {
-    return (T{1}<<NBits)-1;
-}
-
-template<int NBits, uint64_t T>
-constexpr auto leastNBitsMask() {
-    return ~((0ull)<<NBits);
-}
-
+#if ZOO_USE_LEASTNBITSMASK
 template<int NBits, typename T = uint64_t>
 constexpr T mostNBitsMask() {
     return ~leastNBitsMask<sizeof(T)*8-NBits, T>();
 }
-
 
 /// Clears the block of N bits anchored at the LSB.
 /// clearLSBits<3> applied to binary 00111100 is binary 00100000
@@ -231,6 +287,7 @@ constexpr auto isolateLSBits(T v) {
     constexpr auto lowMask = leastNBitsMask<NBits, T>();
     return v &(lowMask << meta::logFloor(isolateLSB<T>(v)));
 }
+#endif
 
 /// Broadcasts the value in the 0th lane of the SWAR to the entire SWAR.
 /// Precondition: 0th lane of |v| contains a value to broadcast, remainder of input SWAR zero.
@@ -245,16 +302,22 @@ template<int NBits, typename T>
 struct BooleanSWAR: SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
+    template<std::size_t N, typename = std::enable_if_t<Base::Lanes == N>>
+    constexpr BooleanSWAR(Literals_t<NBits, T>, const bool (&values)[N]):
+        Base(Literals<NBits, T>, values)
+    { this->m_v <<= (NBits - 1); }
+
     // Booleanness is stored in the MSBs
     static constexpr auto MaskMSB =
         broadcast<NBits, T>(Base(T(1) << (NBits -1)));
+    static constexpr auto AllTrue = MaskMSB;
     static constexpr auto MaskLSB =
          broadcast<NBits, T>(Base(T(1)));
     // Turns off LSB of each lane
     static constexpr auto MaskNonLSB = ~MaskLSB;
     static constexpr auto MaskNonMSB = ~MaskMSB;
     constexpr explicit BooleanSWAR(T v): Base(v) {}
-  
+
     constexpr BooleanSWAR clear(int bit) const noexcept {
         constexpr auto Bit = T(1) << (NBits - 1);
         return this->m_v ^ (Bit << (NBits * bit)); }
@@ -270,7 +333,7 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr auto operator ~() const noexcept {
         return BooleanSWAR(Base{Base::MostSignificantBit} ^ *this);
     }
-  
+
     constexpr auto operator not() const noexcept {
         return BooleanSWAR(MaskMSB ^ *this);
     }
@@ -293,6 +356,10 @@ struct BooleanSWAR: SWAR<NBits, T> {
     constexpr BooleanSWAR(Base initializer) noexcept:
         SWAR<NBits, T>(initializer)
     {}
+
+    template<int NB, typename TT>
+    friend constexpr BooleanSWAR<NB, TT>
+    equals(SWAR<NB, TT>, SWAR<NB, TT>) noexcept;
 
     template<int N, int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
@@ -318,6 +385,12 @@ struct BooleanSWAR: SWAR<NBits, T> {
     friend constexpr BooleanSWAR<NB, TT>
     convertToBooleanSWAR(SWAR<NB, TT> arg) noexcept;
 };
+
+template <int NBits, typename T>
+BooleanSWAR(
+    Literals_t<NBits, T>,
+    const bool (&values)[BooleanSWAR<NBits, T>::Lanes]
+) -> BooleanSWAR<NBits, T>;
 
 template<int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
@@ -395,7 +468,7 @@ greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
     using S = swar::SWAR<NBits, T>;
     const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
     const auto z = (x|h) - (y&~h);
-    // bitwise ternary median! 
+    // bitwise ternary median!
     const auto t = h & ~median(x, ~y, z);
     return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
 }
@@ -430,13 +503,59 @@ booleans(SWAR<NB, T> arg) noexcept {
 template<int NBits, typename T>
 constexpr auto
 differents(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    return booleans(a1 ^ a2);
+    return ~equals(a1, a2);
 }
 
+/**
+ * @return BooleanSWAR that contains a true value in each lane where the two
+ * input SWARs match.
+ */
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) noexcept {
+    // Knuth, TAOCP 4A pg 152
+    using S = swar::SWAR<NBits, T>;
+    constexpr auto TAOCP_H{S{S::MostSignificantBit}}, TAOCP_L{S{S::LeastSignificantBit}};
+    auto
+        nullLaneIfEqual = a1 ^ a2,
+        allowSubtractionByOneTurningOnMSB = nullLaneIfEqual | TAOCP_H,
+        nullDetectorViaFlippingMSB_low = allowSubtractionByOneTurningOnMSB - TAOCP_L,
+        equalLanesHaveMSB_off = nullLaneIfEqual | nullDetectorViaFlippingMSB_low,
+        flipMSB = ~equalLanesHaveMSB_off,
+        rv = TAOCP_H & flipMSB;
+    return BooleanSWAR<NBits, T>{rv};
+}
+
+/**
+ * \brief finds the first null (least significant lane zero) using less compute than finding the first in greaterEqual(S{0}, x) or equals(x, S{0})
+ * @return psuedoBooleanSWAR. If there are no null lanes present, will be all
+ * zeros.  If there is a null lane present, that lane will be all 1s, and any
+ * less significant lane will be all zeros. Anything more significant than the
+ * least significant null lane will be unspecified.
+ */
 template<int NBits, typename T>
 constexpr auto
-equals(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
-    return ~differents(a1, a2);
+firstZeroLane(SWAR<NBits, T> x) {
+    // Knuth, TAOCP 4A pg 152
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S{S::MostSignificantBit}, l = S{S::LeastSignificantBit};
+    return h & ( x - l) & ~x;
+}
+
+/**
+ * \brief finds the first matching lane (least significant) using less compute than calling equals(a1, a2)
+ * As firstZeroLane, except we test against a given swar, lanewise.
+ * Less operations than equals(), but costs 1 more xor than firstZeroLane.
+ * @return psuedoBooleanSWAR. No matches: all zero. Matching lane: all 1s, and
+ * any less significant lane will be all zeros. Anything more significant will
+ * be unspecified.
+ */
+template<int NBits, typename T>
+constexpr auto
+firstMatchingLane(SWAR<NBits, T> a1, SWAR<NBits, T> a2) {
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S{S::MostSignificantBit}, l = S{S::LeastSignificantBit};
+    return h & ( (a1^a2) - l) & ~(a1^a2);
 }
 
 /*
