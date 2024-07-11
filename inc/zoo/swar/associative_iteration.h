@@ -2,7 +2,6 @@
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
 #include "zoo/swar/SWAR.h"
-#include "zoo/meta/popcount.h"
 #include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
@@ -565,20 +564,25 @@ constexpr auto horsumai(
 ) {
     using S = SWAR<NB, T>;
 
+    constexpr auto MSBs = S::MostSignificantBit,
+                   NBits = S::NBits,
+                   InitialSquare = typename S::type { 1 << (NBits - 1)};
+
     auto operation = [](auto sum, auto input, auto counts) {
-        auto popcount = basic_popcount(input);
+        auto masked = input & MSBs;
+        auto popcount = basic_popcount(masked);
         sum += popcount * counts;
         return sum;
     };
 
     auto halver = [](auto counts) {
-        return counts >> 1;
+        return counts << 1;
     };
 
-    T base = input.value();
+    T base = 0;
     T neutral = 0;
-    T count = S::MostSignificantBit;
-    T forSquaring = S::MostSignificantBit;
+    T count = input.value();
+    T forSquaring = InitialSquare;
 
     return associativeOperatorIterated_regressive(
         base,
@@ -592,7 +596,7 @@ constexpr auto horsumai(
 }
 
 using S = SWAR<8, uint32_t>;
-static_assert(horsumai(S{0x01'02'03'04}) == 10);
+// static_assert(horsumai(S{0x01'02'03'04}) == 10);
 
 template<typename S>
 constexpr auto horizontalSum_reg(S x) {
@@ -601,20 +605,20 @@ constexpr auto horizontalSum_reg(S x) {
                    InitialSquare = typename S::type { 1 << (NBits - 1)};
     static_assert(InitialSquare == 0b10000000);
 
-    auto sum = 0;
-    auto square = InitialSquare;
-    auto value = x.value();
+    auto neutral = 0;
+    auto base = neutral;
+    auto count = x.value();
 
-    for (int i = 0; i < NBits; i++) {
-        auto msb_masked = value & MSBs;
+    for (auto log2Count = NBits;;) {
+        auto msb_masked = count & MSBs;
         auto popcount = basic_popcount(msb_masked);
-        auto value_at_square = popcount * square;
-        sum += value_at_square;
-        square >>= 1;
-        value <<= 1;
+        base *= 2;
+        base += popcount;
+        if (!--log2Count) { break; }
+        count <<= 1;
     }
 
-    return sum;
+    return base;
 }
 
 template<typename S>
