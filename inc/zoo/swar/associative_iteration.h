@@ -545,7 +545,6 @@ template <typename T>
 constexpr auto basic_popcount(T x) {
     constexpr auto NBits = T{sizeof(x) * 8},
                    One = T{1};
-
     auto total = T{0};
     for (auto i = 0; i < NBits; i++) {
         total += x & One;
@@ -557,6 +556,7 @@ static_assert(basic_popcount<uint64_t>(0b111) == 3);
 static_assert(basic_popcount<uint64_t>(0xFF) == 8);
 static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF) == 32);
 static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF) == 64);
+static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF - 2 - 4 - 8) == 61);
 
 template<int NB, typename T>
 constexpr auto horsumai(
@@ -565,24 +565,24 @@ constexpr auto horsumai(
     using S = SWAR<NB, T>;
 
     constexpr auto MSBs = S::MostSignificantBit,
-                   NBits = S::NBits,
-                   InitialSquare = typename S::type { 1 << (NBits - 1)};
+                   NBits = S::NBits;
 
-    auto operation = [](auto sum, auto input, auto counts) {
-        auto masked = input & MSBs;
+    auto operation = [](auto result, auto base, auto counts) {
+        auto masked = counts & MSBs;
         auto popcount = basic_popcount(masked);
-        sum += popcount * counts;
-        return sum;
+        result <<= 1;
+        result += popcount;
+        return result;
     };
 
     auto halver = [](auto counts) {
         return counts << 1;
     };
 
-    T base = 0;
     T neutral = 0;
+    T base = 0;
     T count = input.value();
-    T forSquaring = InitialSquare;
+    T forSquaring = 1;
 
     return associativeOperatorIterated_regressive(
         base,
@@ -602,23 +602,21 @@ template<typename S>
 constexpr auto horizontalSum_reg(S x) {
     constexpr auto MSBs = S::MostSignificantBit,
                    NBits = S::NBits,
-                   InitialSquare = typename S::type { 1 << (NBits - 1)};
-    static_assert(InitialSquare == 0b10000000);
+                   Neutral = typename S::type {0};
 
-    auto neutral = 0;
-    auto base = neutral;
+    auto result = Neutral;
     auto count = x.value();
 
     for (auto log2Count = NBits;;) {
         auto msb_masked = count & MSBs;
         auto popcount = basic_popcount(msb_masked);
-        base *= 2;
-        base += popcount;
+        result <<= 1;
+        result += popcount;
         if (!--log2Count) { break; }
         count <<= 1;
     }
 
-    return base;
+    return result;
 }
 
 template<typename S>
