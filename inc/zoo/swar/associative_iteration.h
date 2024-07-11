@@ -2,6 +2,8 @@
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
 #include "zoo/swar/SWAR.h"
+#include "zoo/meta/popcount.h"
+#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -392,11 +394,16 @@ template<
     typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    Base base,
+    Base neutral,
+    IterationCount count,
+    IterationCount forSquaring,
+    Operator op,
+    unsigned log2Count,
+    CountHalver ch
 ) {
-    auto result = neutral;
-    if(!log2Count) { return result; }
+    auto result = neutral; // sum = 0
+    if(!log2Count) { return result; } // NBits per lane
     for(;;) {
         result = op(result, base, count);
         if(!--log2Count) { break; }
@@ -534,6 +541,124 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
         oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};
     return evenHalf | oddHalf;
 }
+
+template <typename T>
+constexpr auto basic_popcount(T x) {
+    constexpr auto NBits = T{sizeof(x) * 8},
+                   One = T{1};
+
+    auto total = T{0};
+    for (auto i = 0; i < NBits; i++) {
+        total += x & One;
+        x >>= 1;
+    }
+    return total;
+}
+static_assert(basic_popcount<uint64_t>(0b111) == 3);
+static_assert(basic_popcount<uint64_t>(0xFF) == 8);
+static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF) == 32);
+static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF) == 64);
+
+template<int NB, typename T>
+constexpr auto horsumai(
+    SWAR<NB, T> input
+) {
+    using S = SWAR<NB, T>;
+
+    auto operation = [](auto sum, auto input, auto counts) {
+        auto popcount = basic_popcount(input);
+        sum += popcount * counts;
+        return sum;
+    };
+
+    auto halver = [](auto counts) {
+        return counts >> 1;
+    };
+
+    T base = input.value();
+    T neutral = 0;
+    T count = S::MostSignificantBit;
+    T forSquaring = S::MostSignificantBit;
+
+    return associativeOperatorIterated_regressive(
+        base,
+        neutral,
+        count,
+        forSquaring,
+        operation,
+        S::NBits, // todo make template
+        halver
+    );
+}
+
+using S = SWAR<8, uint32_t>;
+static_assert(horsumai(S{0x01'02'03'04}) == 10);
+
+template<typename S>
+constexpr auto horizontalSum_reg(S x) {
+    constexpr auto MSBs = S::MostSignificantBit,
+                   NBits = S::NBits,
+                   InitialSquare = typename S::type { 1 << (NBits - 1)};
+    static_assert(InitialSquare == 0b10000000);
+
+    auto sum = 0;
+    auto square = InitialSquare;
+    auto value = x.value();
+
+    for (int i = 0; i < NBits; i++) {
+        auto msb_masked = value & MSBs;
+        auto popcount = basic_popcount(msb_masked);
+        auto value_at_square = popcount * square;
+        sum += value_at_square;
+        square >>= 1;
+        value <<= 1;
+    }
+
+    return sum;
+}
+
+template<typename S>
+constexpr auto horizontalSum_prog(S x) {
+    constexpr auto Ones = S::LeastSignificantBit,
+                   NBits = S::NBits,
+                   InitialSquare = typename S::type { 1 };
+
+    auto sum = 0;
+    auto square = InitialSquare;
+    auto value = x.value();
+
+    for (int i = 0; i < NBits; i++) {
+        auto msb_masked = value & Ones;
+        auto popcount = basic_popcount(msb_masked);
+        auto value_at_square = popcount * square;
+        sum += value_at_square;
+        square <<= 1;
+        value >>= 1;
+    }
+
+    return sum;
+}
+
+static_assert(S::Lanes == 4);
+
+
+#define HORSUM_TESTS \
+    HS_FN(0x01'02'03'04, 10) \
+    HS_FN(0x02'02'03'04, 11) \
+    HS_FN(0x04'04'04'03, 15) \
+    HS_FN(0x04'04'04'04, 16) \
+    HS_FN(0x04'03'02'01, 10)
+
+#define HS_FN(a, b) \
+    static_assert(horizontalSum_reg(S{a}) == b); \
+    static_assert(horizontalSum_prog(S{a}) == b); \
+    // static_assert(horsumai(S{a}) == b);
+    HORSUM_TESTS
+
+#undef HS_FN
+#undef HORSUM_TESTS
+
+
 
 }
 
