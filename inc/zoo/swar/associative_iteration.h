@@ -558,20 +558,18 @@ static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF) == 32);
 static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF) == 64);
 static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF - 2 - 4 - 8) == 61);
 
-template<int NB, typename T>
-constexpr auto horsumai(
-    SWAR<NB, T> input
-) {
-    using S = SWAR<NB, T>;
-
+template<typename S>
+constexpr auto horizontalSum_associativeIteration_regressive(S input) {
     constexpr auto MSBs = S::MostSignificantBit,
-                   NBits = S::NBits;
+                   NBits = S::NBits,
+                   Neutral = typename S::type {0},
+                   ForSquaring = Neutral,
+                   Base = Neutral;
 
-    auto operation = [](auto result, auto base, auto counts) {
-        auto masked = counts & MSBs;
-        auto popcount = basic_popcount(masked);
-        result <<= 1;
-        result += popcount;
+    auto operation = [](auto result, auto base, auto count) {
+        auto msb_masked = count & MSBs;
+        auto popcount = basic_popcount(msb_masked);
+        result += popcount + base;
         return result;
     };
 
@@ -579,45 +577,16 @@ constexpr auto horsumai(
         return counts << 1;
     };
 
-    T neutral = 0;
-    T base = 0;
-    T count = input.value();
-    T forSquaring = 1;
-
+    auto count = input.value();
     return associativeOperatorIterated_regressive(
-        base,
-        neutral,
-        count,
-        forSquaring,
-        operation,
-        S::NBits, // todo make template
-        halver
+        Base, Neutral, count, ForSquaring,
+        operation, S::NBits, halver
     );
 }
 
 using S = SWAR<8, uint32_t>;
 // static_assert(horsumai(S{0x01'02'03'04}) == 10);
 
-template<typename S>
-constexpr auto horizontalSum_reg(S x) {
-    constexpr auto MSBs = S::MostSignificantBit,
-                   NBits = S::NBits,
-                   Neutral = typename S::type {0};
-
-    auto result = Neutral;
-    auto count = x.value();
-
-    for (auto log2Count = NBits;;) {
-        auto msb_masked = count & MSBs;
-        auto popcount = basic_popcount(msb_masked);
-        result <<= 1;
-        result += popcount;
-        if (!--log2Count) { break; }
-        count <<= 1;
-    }
-
-    return result;
-}
 
 template<typename S>
 constexpr auto horizontalSum_prog(S x) {
@@ -643,24 +612,74 @@ constexpr auto horizontalSum_prog(S x) {
 
 static_assert(S::Lanes == 4);
 
+template<typename S>
+constexpr auto horizontalSum_reg(S x) {
+    constexpr auto MSBs = S::MostSignificantBit,
+                   NBits = S::NBits,
+                   Neutral = typename S::type {0};
+    auto result = Neutral;
+    auto count = x.value();
+
+    auto operation = [](auto result, auto count) {
+        auto msb_masked = count & MSBs;
+        auto popcount = basic_popcount(msb_masked);
+        result <<= 1;
+        result += popcount;
+        return result;
+    };
+
+    auto halver = [](auto counts) {
+        return counts << 1;
+    };
+
+    for (auto log2Count = NBits;;) {
+        result = operation(result, count);
+        if (!--log2Count) { break; }
+        count = halver(count);
+    }
+
+    return result;
+}
+
+// template<typename S>
+// auto scottVersion(S input) {
+//     SumLanes(Popcount(SWAR<4, int64)) == Popcount(SWAR<64, int64>)
+// }
 
 #define HORSUM_TESTS \
+    HS_FN(0x00'00'00'00, 0) \
+    HS_FN(0x00'00'00'01, 1) \
+    HS_FN(0x00'00'01'00, 1) \
+    HS_FN(0x00'00'10'00, 16) \
     HS_FN(0x01'02'03'04, 10) \
     HS_FN(0x02'02'03'04, 11) \
     HS_FN(0x04'04'04'03, 15) \
     HS_FN(0x04'04'04'04, 16) \
+    HS_FN(0x08'08'08'09, 33) \
+    HS_FN(0xFF'FF'FF'FF, 1020) \
     HS_FN(0x04'03'02'01, 10)
 
 #define HS_FN(a, b) \
     static_assert(horizontalSum_reg(S{a}) == b); \
     static_assert(horizontalSum_prog(S{a}) == b); \
-    // static_assert(horsumai(S{a}) == b);
+    static_assert(horizontalSum_associativeIteration_regressive(S{a}) == b);
     HORSUM_TESTS
 
 #undef HS_FN
 #undef HORSUM_TESTS
 
 
+auto regressive_ai (uint32_t x) {
+    return horizontalSum_associativeIteration_regressive(S{x});
+}
+
+auto progresssive (uint32_t x) {
+    return horizontalSum_prog(S{x});
+}
+
+auto regressive (uint32_t x) {
+    return horizontalSum_reg(S{x});
+}
 
 }
 
