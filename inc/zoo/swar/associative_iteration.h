@@ -561,7 +561,6 @@ static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF - 2 - 4 - 8) ==
 template<typename S>
 constexpr auto horizontalSum_associativeIteration_regressive(S input) {
     constexpr auto MSBs = S::MostSignificantBit,
-                   NBits = S::NBits,
                    Neutral = typename S::type {0},
                    ForSquaring = Neutral,
                    Base = Neutral;
@@ -667,6 +666,29 @@ constexpr auto horizontalSum_reg(S x) {
 
 #undef HS_FN
 #undef HORSUM_TESTS
+
+#define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
+#define X(TYPE, av, expected) \
+static_assert(horizontalSum_associativeIteration_regressive(\
+    SWAR{\
+        Literals<ZOO_PP_UNPARENTHESIZE TYPE>,\
+        {ZOO_PP_UNPARENTHESIZE av}\
+    }) ==\
+    expected\
+);
+
+#define SWAR_TESTS                                                             \
+  X((32, u64), (2, 1), 3);                                                     \
+  X((5, u32), (1, 1, 1, 1, 1, 1), 6);                                          \
+  X((5, u32), (1, 2, 3, 4, 5, 6), 21);                                         \
+  X((5, u32), (6, 5, 4, 3, 2, 1), 21);                                         \
+  X((8, u32), (255, 255, 255, 255), 1020);
+
+SWAR_TESTS
+
+
+
+static_assert(horizontalSum_associativeIteration_regressive(SWAR{Literals<8, u32>, {1, 2, 3, 4}}) == 10);
 
 
 auto regressive_ai (uint32_t x) {

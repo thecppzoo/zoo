@@ -52,6 +52,8 @@ static_assert(\
     expected\
 );
 
+static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
+
 /* Preserved to illustrate a technique, remove in a few revisions
 static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
 static_assert(SWAR{Literals<32, u64>, {1, 2}}.value() == 0x00000001'00000002);
@@ -127,6 +129,11 @@ X(\
     0x00000002'00000001\
 );\
 X(\
+    (8, u32),\
+    (255, 255, 255, 255),\
+    0xFF'FF'FF'FF\
+);\
+X(\
     (32, u64),\
     (1, 2),\
     0x00000001'00000002\
@@ -181,6 +188,7 @@ X(\
     (1, 2),\
     0x12\
 )
+
 
 LITERALS_TESTS
 
