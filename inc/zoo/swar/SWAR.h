@@ -586,6 +586,10 @@ constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
     return SWAR<NBits, T>{popcounts - ones};
 }
 
+
+
+
+
 static_assert(
     logarithmFloor(SWAR<8>{0x8040201008040201ull}).value() ==
     0x0706050403020100ull

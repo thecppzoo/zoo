@@ -1,8 +1,8 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
+#include "zoo/meta/popcount.h"
 #include "zoo/swar/SWAR.h"
-#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -541,25 +541,8 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     return evenHalf | oddHalf;
 }
 
-template <typename T>
-constexpr auto basic_popcount(T x) {
-    constexpr auto NBits = T{sizeof(x) * 8},
-                   One = T{1};
-    auto total = T{0};
-    for (auto i = 0; i < NBits; i++) {
-        total += x & One;
-        x >>= 1;
-    }
-    return total;
-}
-static_assert(basic_popcount<uint64_t>(0b111) == 3);
-static_assert(basic_popcount<uint64_t>(0xFF) == 8);
-static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF) == 32);
-static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF) == 64);
-static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF - 2 - 4 - 8) == 61);
-
 template<typename S>
-constexpr auto horizontalSum_associativeIteration_regressive(S input) {
+constexpr auto horizontalSum(S input) {
     constexpr auto MSBs = S::MostSignificantBit,
                    Neutral = typename S::type {0},
                    ForSquaring = Neutral,
@@ -567,7 +550,7 @@ constexpr auto horizontalSum_associativeIteration_regressive(S input) {
 
     auto operation = [](auto result, auto base, auto count) {
         auto msb_masked = count & MSBs;
-        auto popcount = basic_popcount(msb_masked);
+        auto popcount = meta::basic_popcount(msb_masked);
         result += popcount + base;
         return result;
     };
@@ -582,10 +565,6 @@ constexpr auto horizontalSum_associativeIteration_regressive(S input) {
         operation, S::NBits, halver
     );
 }
-
-using S = SWAR<8, uint32_t>;
-// static_assert(horsumai(S{0x01'02'03'04}) == 10);
-
 
 template<typename S>
 constexpr auto horizontalSum_prog(S x) {
@@ -608,8 +587,6 @@ constexpr auto horizontalSum_prog(S x) {
 
     return sum;
 }
-
-static_assert(S::Lanes == 4);
 
 template<typename S>
 constexpr auto horizontalSum_reg(S x) {
@@ -640,68 +617,28 @@ constexpr auto horizontalSum_reg(S x) {
     return result;
 }
 
-// template<typename S>
-// auto scottVersion(S input) {
-//     SumLanes(Popcount(SWAR<4, int64)) == Popcount(SWAR<64, int64>)
-// }
-
-#define HORSUM_TESTS \
-    HS_FN(0x00'00'00'00, 0) \
-    HS_FN(0x00'00'00'01, 1) \
-    HS_FN(0x00'00'01'00, 1) \
-    HS_FN(0x00'00'10'00, 16) \
-    HS_FN(0x01'02'03'04, 10) \
-    HS_FN(0x02'02'03'04, 11) \
-    HS_FN(0x04'04'04'03, 15) \
-    HS_FN(0x04'04'04'04, 16) \
-    HS_FN(0x08'08'08'09, 33) \
-    HS_FN(0xFF'FF'FF'FF, 1020) \
-    HS_FN(0x04'03'02'01, 10)
-
-#define HS_FN(a, b) \
-    static_assert(horizontalSum_reg(S{a}) == b); \
-    static_assert(horizontalSum_prog(S{a}) == b); \
-    static_assert(horizontalSum_associativeIteration_regressive(S{a}) == b);
-    HORSUM_TESTS
-
-#undef HS_FN
-#undef HORSUM_TESTS
-
 #define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
-#define X(TYPE, av, expected) \
-static_assert(horizontalSum_associativeIteration_regressive(\
-    SWAR{\
-        Literals<ZOO_PP_UNPARENTHESIZE TYPE>,\
-        {ZOO_PP_UNPARENTHESIZE av}\
-    }) ==\
-    expected\
-);
+#define X(TYPE, av, expected)                                                  \
+    static_assert(horizontalSum(                                               \
+        SWAR{                                                                  \
+            Literals<ZOO_PP_UNPARENTHESIZE TYPE>,                              \
+            {ZOO_PP_UNPARENTHESIZE av}                                         \
+        }) ==                                                                  \
+        expected                                                               \
+    );
 
-#define SWAR_TESTS                                                             \
+#define HORIZONTAL_SUM_TESTS                                                   \
   X((32, u64), (2, 1), 3);                                                     \
+  X((31, u64), (1, 2), 3);                                                     \
   X((5, u32), (1, 1, 1, 1, 1, 1), 6);                                          \
   X((5, u32), (1, 2, 3, 4, 5, 6), 21);                                         \
   X((5, u32), (6, 5, 4, 3, 2, 1), 21);                                         \
+  X((5, u32), (6, 5, 4, 3, 2, 1), 21);                                         \
   X((8, u32), (255, 255, 255, 255), 1020);
 
-SWAR_TESTS
+HORIZONTAL_SUM_TESTS
 
-
-
-static_assert(horizontalSum_associativeIteration_regressive(SWAR{Literals<8, u32>, {1, 2, 3, 4}}) == 10);
-
-
-auto regressive_ai (uint32_t x) {
-    return horizontalSum_associativeIteration_regressive(S{x});
-}
-
-auto progresssive (uint32_t x) {
-    return horizontalSum_prog(S{x});
-}
-
-auto regressive (uint32_t x) {
-    return horizontalSum_reg(S{x});
-}
+#undef X
 
 }
 
