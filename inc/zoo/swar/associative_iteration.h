@@ -543,10 +543,14 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
 
 template<typename S>
 constexpr auto horizontalSum(S input) {
-    constexpr auto MSBs = S::MostSignificantBit,
-                   Neutral = typename S::type {0},
-                   ForSquaring = Neutral,
-                   Base = Neutral;
+    constexpr auto
+        MSBs = S::MostSignificantBit,
+        Neutral = typename S::type {0},
+        ForSquaring = Neutral,
+        Base = Neutral,
+        Log2Count = S::NBits;
+
+    auto count = input.value();
 
     auto operation = [](auto result, auto base, auto count) {
         auto msb_masked = count & MSBs;
@@ -559,10 +563,9 @@ constexpr auto horizontalSum(S input) {
         return counts << 1;
     };
 
-    auto count = input.value();
     return associativeOperatorIterated_regressive(
         Base, Neutral, count, ForSquaring,
-        operation, S::NBits, halver
+        operation, Log2Count, halver
     );
 }
 
