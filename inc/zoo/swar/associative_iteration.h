@@ -569,6 +569,8 @@ constexpr auto horizontalSum(S input) {
     );
 }
 
+namespace experimental {
+
 template<typename S>
 constexpr auto horizontalSum_prog(S x) {
     constexpr auto Ones = S::LeastSignificantBit,
@@ -581,7 +583,7 @@ constexpr auto horizontalSum_prog(S x) {
 
     for (int i = 0; i < NBits; i++) {
         auto msb_masked = value & Ones;
-        auto popcount = basic_popcount(msb_masked);
+        auto popcount = meta::basic_popcount(msb_masked);
         auto value_at_square = popcount * square;
         sum += value_at_square;
         square <<= 1;
@@ -601,7 +603,7 @@ constexpr auto horizontalSum_reg(S x) {
 
     auto operation = [](auto result, auto count) {
         auto msb_masked = count & MSBs;
-        auto popcount = basic_popcount(msb_masked);
+        auto popcount = meta::basic_popcount(msb_masked);
         result <<= 1;
         result += popcount;
         return result;
@@ -620,28 +622,41 @@ constexpr auto horizontalSum_reg(S x) {
     return result;
 }
 
+} // namespace experimental
+
+
 #define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
-#define X(TYPE, av, expected)                                                  \
-    static_assert(horizontalSum(                                               \
-        SWAR{                                                                  \
+#define Y(fn, TYPE, values, expected)                                          \
+    static_assert(fn(                                                          \
+        SWAR {                                                                 \
             Literals<ZOO_PP_UNPARENTHESIZE TYPE>,                              \
-            {ZOO_PP_UNPARENTHESIZE av}                                         \
+            {ZOO_PP_UNPARENTHESIZE values}                                     \
         }) ==                                                                  \
         expected                                                               \
     );
 
-#define HORIZONTAL_SUM_TESTS                                                   \
-  X((32, u64), (2, 1), 3);                                                     \
-  X((31, u64), (1, 2), 3);                                                     \
-  X((5, u32), (1, 1, 1, 1, 1, 1), 6);                                          \
-  X((5, u32), (1, 2, 3, 4, 5, 6), 21);                                         \
-  X((5, u32), (6, 5, 4, 3, 2, 1), 21);                                         \
-  X((5, u32), (6, 5, 4, 3, 2, 1), 21);                                         \
-  X((8, u32), (255, 255, 255, 255), 1020);
+#define HORIZONTAL_SUM_TESTS(fn) \
+  Y(fn, (32, u64), (2, 1), 3) \
+  Y(fn, (31, u64), (1, 2), 3) \
+  Y(fn, (5, u32), (1, 1, 1, 1, 1, 1), 6) \
+  Y(fn, (5, u32), (1, 2, 3, 4, 5, 6), 21) \
+  Y(fn, (5, u32), (6, 5, 4, 3, 2, 1), 21) \
+  Y(fn, (8, u32), (255, 255, 255, 255), 1020) \
+  Y(fn, (8, u32), (255, 254, 255, 255), 1019) \
+  Y(fn, (8, u32), (255, 255, 255, 255), 1020)
 
-HORIZONTAL_SUM_TESTS
+
+#define HORIZONTAL_SUM_TESTS_ALL                                               \
+    HORIZONTAL_SUM_TESTS(horizontalSum)                                       \
+    HORIZONTAL_SUM_TESTS(experimental::horizontalSum_prog)                                  \
+    HORIZONTAL_SUM_TESTS(experimental::horizontalSum_reg)
+
+HORIZONTAL_SUM_TESTS_ALL
 
 #undef X
+#undef Y
+#undef HORIZONTAL_SUM_TESTS
+#undef HORIZONTAL_SUM_TESTS_ALL
 
 }
 
