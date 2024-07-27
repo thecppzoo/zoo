@@ -59,7 +59,7 @@ if(MSVC)
         ${CMAKE_BINARY_DIR}/temporary
         SOURCES
             ${CMAKE_SOURCE_DIR}/../compiler_bugs/msvc/sfinae.cpp
-        CMAKE_FLAGS "-DCMAKE_CXX_STANDARD=17"
+        CMAKE_FLAGS "-DCMAKE_CXX_STANDARD=20"
         COMPILE_DEFINITIONS
             -DTRIGGER_MSVC_SFINAE_BUG
         OUTPUT_VARIABLE RESULT
@@ -84,7 +84,7 @@ if(MSVC)
     endif()
 else()
     # Non-MSVC specific configuration (original content)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 20)
     set(CMAKE_CXX_FLAGS_UBSAN "-fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
     set(CMAKE_CXX_FLAGS_ASAN "-fsanitize=address -fno-omit-frame-pointer")
 

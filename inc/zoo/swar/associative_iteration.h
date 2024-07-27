@@ -364,7 +364,7 @@ constexpr auto negate(SWAR<NB, B> input) {
     return fullAddition(~input, Ones).result;
 }
 
-/// \brief Performs a generalized iterated application of an associative operator to a base
+/// \brief Performs a generalized iterated application of an associative operator to a bases
 ///
 /// In algebra, the repeated application of an operator to a "base" has different names depending on the
 /// operator, for example "a + a + a + ... + a" n-times would be called "repeated addition",
@@ -411,6 +411,36 @@ constexpr auto associativeOperatorIterated_regressive(
     }
     return result;
 }
+
+namespace associative_iteration {
+
+template<
+    auto Operator,
+    auto CountHalver,
+    typename Base,
+    typename IterationCount
+>
+constexpr auto regressive(
+    Base base,
+    Base neutral,
+    IterationCount count,
+    IterationCount forSquaring,
+    unsigned log2Count
+) {
+    auto result = neutral; // sum = 0
+    if(!log2Count) { return result; } // NBits per lane
+    for(;;) {
+        result = Operator(result, base, count);
+        if(!--log2Count) { break; }
+        result = Operator(result, result, forSquaring);
+        count = CountHalver(count);
+    }
+    return result;
+}
+
+}
+
+namespace ai = associative_iteration;
 
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
@@ -541,31 +571,64 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     return evenHalf | oddHalf;
 }
 
+namespace associative {
+
+constexpr auto sum_via_popcount = [](auto result, auto base, auto count, auto msbs) {
+};
+
+
+
+}
+
+namespace count_halving {
+
+constexpr auto ConsumeMsb = [](auto counts) {
+    return counts << 1;
+};
+
+constexpr auto ConsumeLsb = [](auto counts) {
+    return counts << 1;
+};
+
+}
+
+template <typename S>
+auto multiply_and_double_p(S a, S b) {
+    auto product = a * b;
+    return doublePrecision(product);
+}
+
 template<typename S>
-constexpr auto horizontalSum(S input) {
+constexpr auto horizontalSum_lanes(S input) {
+    auto result = typename S::type {0};
+    for (int i = 0; i < S::Lanes; i++) {
+    }
+}
+
+template<typename S>
+constexpr auto horizontalSum_bits(S input) {
     constexpr auto
         MSBs = S::MostSignificantBit,
-        Neutral = typename S::type {0},
+        Neutral =  typename S::type {0},
         ForSquaring = Neutral,
         Base = Neutral,
         Log2Count = S::NBits;
 
     auto count = input.value();
 
-    auto operation = [](auto result, auto base, auto count) {
+    constexpr auto Operation = [](auto result, auto base, auto count) {
         auto msb_masked = count & MSBs;
         auto popcount = meta::basic_popcount(msb_masked);
         result += popcount + base;
         return result;
     };
 
-    auto halver = [](auto counts) {
-        return counts << 1;
-    };
-
-    return associativeOperatorIterated_regressive(
-        Base, Neutral, count, ForSquaring,
-        operation, Log2Count, halver
+    return ai::regressive<Operation, count_halving::ConsumeMsb> (
+        Base,
+        Neutral,
+        count,
+        ForSquaring,
+        Log2Count
     );
 }
 
@@ -626,13 +689,13 @@ constexpr auto horizontalSum_reg(S x) {
 
 
 #define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
-#define Y(fn, TYPE, values, expected)                                          \
-    static_assert(fn(                                                          \
-        SWAR {                                                                 \
-            Literals<ZOO_PP_UNPARENTHESIZE TYPE>,                              \
-            {ZOO_PP_UNPARENTHESIZE values}                                     \
-        }) ==                                                                  \
-        expected                                                               \
+#define Y(fn, TYPE, values, expected)              \
+    static_assert(fn(                              \
+        SWAR {                                     \
+            Literals<ZOO_PP_UNPARENTHESIZE TYPE>,  \
+            {ZOO_PP_UNPARENTHESIZE values}         \
+        }) ==                                      \
+        expected                                   \
     );
 
 #define HORIZONTAL_SUM_TESTS(fn) \
@@ -646,9 +709,9 @@ constexpr auto horizontalSum_reg(S x) {
   Y(fn, (8, u32), (255, 255, 255, 255), 1020)
 
 
-#define HORIZONTAL_SUM_TESTS_ALL                                               \
-    HORIZONTAL_SUM_TESTS(horizontalSum)                                       \
-    HORIZONTAL_SUM_TESTS(experimental::horizontalSum_prog)                                  \
+#define HORIZONTAL_SUM_TESTS_ALL \
+    HORIZONTAL_SUM_TESTS(horizontalSum_bits) \
+    HORIZONTAL_SUM_TESTS(experimental::horizontalSum_prog) \
     HORIZONTAL_SUM_TESTS(experimental::horizontalSum_reg)
 
 HORIZONTAL_SUM_TESTS_ALL
@@ -657,6 +720,9 @@ HORIZONTAL_SUM_TESTS_ALL
 #undef Y
 #undef HORIZONTAL_SUM_TESTS
 #undef HORIZONTAL_SUM_TESTS_ALL
+
+
+static_assert(((0x01'01 * 0x05'01) & 0xFF'00) == 0x06'00, "Test failed");
 
 }
 
