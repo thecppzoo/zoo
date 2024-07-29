@@ -53,6 +53,9 @@ static_assert(\
 );
 
 static_assert(SWAR{Literals<16, u32>, {1, 2}}.value() == 0x0001'0002);
+static_assert(SWAR<5, u32>::Lanes == 6);
+static_assert(SWAR<8, u32>::Lanes == 4);
+static_assert(SWAR<9, u32>::Lanes == 3);
 
 /* Preserved to illustrate a technique, remove in a few revisions
 static_assert(SWAR{Literals<32, u64>, {2, 1}}.value() == 0x00000002'00000001);
@@ -122,11 +125,19 @@ static_assert(BS{Literals<4, u16>, {T, F, F, F}}.value() == 0b1000'0000'0000'000
 static_assert(SWAR{Literals<8, u16>, {2, 1}}.value() == 0x0201);
 static_assert(SWAR{Literals<8, u16>, {1, 2}}.value() == 0x0102);
 */
+
+static_assert(SWAR{Literals<5, u32>, {1, 1, 1, 1, 1, 1}}.value() == 0b00001'00001'00001'00001'00001'00001);
+
 #define LITERALS_TESTS \
 X(\
     (32, u64),\
     (2, 1),\
     0x00000002'00000001\
+);\
+X(\
+    (5, u32),\
+    (1, 1, 1, 1, 1, 1),\
+    0b00001'00001'00001'00001'00001'00001\
 );\
 X(\
     (8, u32),\
