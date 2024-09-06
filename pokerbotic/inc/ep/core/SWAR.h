@@ -104,6 +104,21 @@ static_assert(0x210 == popcount<0>(0x320), "");
 static_assert(0x4321 == popcount<1>(0xF754), "");
 static_assert(0x50004 == popcount<3>(0x3E001122), "");
 
+static_assert(4 == popcount<1>(0b1111));
+static_assert(3 == popcount<1>(0b1011));
+
+static_assert(3 == popcount<1>(0b1011));
+static_assert(8 == popcount<2>(0xFF));
+static_assert(16 == popcount<3>(0xFF'FF));
+static_assert(24 == popcount<4>(0xFF'FF'FF));
+static_assert(32 == popcount<4>(0xFF'FF'FF'FF));
+static_assert(40 == popcount<5>(0xFF'FF'FF'FF'FF));
+static_assert(48 == popcount<5>(0xFF'FF'FF'FF'FF'FF));
+static_assert(55 == popcount<5>(0xFF'FF'FF'FF'FF'FF'FF - 8));
+
+// todo eduardo why is this broken?
+// static_assert(64 == popcount<6>(0xFF'FF'FF'FF'FF'FF'FF'FF));
+
 
 template<typename T> constexpr typename std::make_unsigned<T>::type msb(T v) {
     return 8*sizeof(T) - 1 - __builtin_clzll(v);

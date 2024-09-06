@@ -2,6 +2,8 @@
 #define ZOO_HEADER_META_POPCOUNT_H
 
 #include "zoo/meta/BitmaskMaker.h"
+#include <cstdint>
+#include <type_traits>
 
 namespace zoo { namespace meta {
 
@@ -89,6 +91,30 @@ struct PopcountIntrinsic {
     }
 };
 #endif
+
+template<typename T>
+constexpr auto NumBits() {
+    return sizeof(T) * 8;
+}
+static_assert(NumBits<uint16_t>() == 16);
+static_assert(NumBits<uint64_t>() == 64);
+
+template <typename T = std::uint64_t>
+constexpr
+std::enable_if_t<std::is_unsigned_v<T> && NumBits<T>() <= 64, T>
+basic_popcount(T x) {
+    if constexpr (NumBits<T>() <= 32) {
+        return __builtin_popcountl(x);
+    } else {
+        return __builtin_popcountll(x);
+    }
+}
+
+static_assert(basic_popcount<uint64_t>(0b111) == 3);
+static_assert(basic_popcount<uint64_t>(0xFF) == 8);
+static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF) == 32);
+static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF) == 64);
+static_assert(basic_popcount<uint64_t>(0xFF'FF'FF'FF'FF'FF'FF'FF - 2 - 4 - 8) == 61);
 
 }}
 
