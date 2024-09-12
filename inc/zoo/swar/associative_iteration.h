@@ -58,6 +58,7 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
         // ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
     for(;;) {
         ZTE(doubling);
+        // From the perspective of "associative iteration", this is when we ask whether to "add"
         if(1 & bitsToXOR) {
             ZTE(result ^ doubling);
             result = result ^ doubling;
@@ -70,6 +71,8 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
         auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
         ZTE(shifted);
         ZTE(doubling ^ shifted);
+        // This is part of the "doubling" step in A. I.
+        // Doubling has several parts, though, the shifting, masking and XOR
         doubling = doubling ^ shifted;
         // 01...1
         // 001...1
