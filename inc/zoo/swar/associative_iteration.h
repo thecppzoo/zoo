@@ -42,42 +42,36 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 namespace zoo::swar {
 
+constexpr auto log2_of_power_of_two = [](auto power_of_two) {
+    if (power_of_two == 0) {
+        return 0;
+    }
+    if (power_of_two == 1) {
+        return 1;
+    }
+    return __builtin_ctz(power_of_two);
+};
+
 /// \note This code should be substituted by an application of "progressive" algebraic iteration
 /// \note There is also parallelPrefix (to be implemented)
-template<int NB, typename B>
-constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
-    using S = SWAR<NB, B>;
-    auto shiftClearingMask = S{~S::MostSignificantBit};
-
-    auto
-        doubling = input,
-        result = S{0};
-
-    auto
-        bitsToXOR = NB,
-        power = 1;
-
-    for(;;) {
-        // From the perspective of "associative iteration", this is when we ask whether to "add"
-        if (1 & bitsToXOR) {
-            result = result ^ doubling;
-            doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
-        }
-        bitsToXOR >>= 1;
-
-        if (!bitsToXOR) { break; }
-        auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
-
-        // This is part of the "doubling" step in A. I.
-        // Doubling has several parts, though, the shifting, masking and XOR
+template<typename S>
+constexpr auto parallelSuffix(S input) {
+    constexpr auto log2Count = log2_of_power_of_two(S::NBits);
+    constexpr auto operation = [] (auto doubling, auto power, auto mask) {
+        auto shifted = doubling.shiftIntraLaneLeft(power, mask);
         doubling = doubling ^ shifted;
-        // 01...1
-        // 001...1
-        // 00001...1
-        // 000000001...1
-        shiftClearingMask =
-            shiftClearingMask &
-                S{shiftClearingMask.value() >> power};
+        return doubling;
+    };
+    auto result = input;
+    auto shiftClearingMask = S{~S::MostSignificantBit};
+    auto power = 1;
+    for(;;) {
+        result = operation(result, power, shiftClearingMask);
+        if (power >= log2Count) { // this is log2Count only
+            break;
+        }
+        // I'm pretty sure we need to keep track of both of these...
+        shiftClearingMask = shiftClearingMask & S{shiftClearingMask.value() >> power};
         power <<= 1;
     }
     return S{result};
@@ -97,8 +91,8 @@ static_assert(
 
 static_assert(
     parallelSuffix(SWAR<8, u32>{
-        0b00000000'00000011'00000000'00000011}).value()
-     == 0b00000000'00000001'00000000'00000001
+        0b00011000'00000011'00111000'00000011}).value()
+     == 0b00001000'00000001'11101000'00000001
 );
 
 
@@ -477,7 +471,6 @@ constexpr auto parallel_suffix(S input) {
 
     auto count = S{S::MostSignificantBit};
     auto forSquaring = S{S::LeastSignificantBit};
-
 
     return associativeOperatorIterated_regressive(
         input,
