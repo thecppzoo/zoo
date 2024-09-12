@@ -55,21 +55,22 @@ constexpr auto log2_of_power_of_two = [](auto power_of_two) {
 /// \note There is also parallelPrefix (to be implemented)
 template<typename S>
 constexpr auto parallelSuffix(S input) {
-    constexpr auto log2Count = log2_of_power_of_two(S::NBits);
     constexpr auto operation = [] (auto doubling, auto power, auto mask) {
         auto shifted = doubling.shiftIntraLaneLeft(power, mask);
         doubling = doubling ^ shifted;
         return doubling;
     };
+
     auto result = input;
     auto shiftClearingMask = S{~S::MostSignificantBit};
     auto power = 1;
+    auto log2Count = log2_of_power_of_two(S::NBits) + 1;
+
     for(;;) {
         result = operation(result, power, shiftClearingMask);
-        if (power >= log2Count) { // this is log2Count only
+        if (!--log2Count) {
             break;
         }
-        // I'm pretty sure we need to keep track of both of these...
         shiftClearingMask = shiftClearingMask & S{shiftClearingMask.value() >> power};
         power <<= 1;
     }
@@ -77,9 +78,21 @@ constexpr auto parallelSuffix(S input) {
 }
 
 static_assert(
+    parallelSuffix(SWAR<16, u32>{
+        0b0000000000000011'0000000000000011}).value()
+     == 0b0000000000000001'0000000000000001
+);
+
+static_assert(
     parallelSuffix(SWAR<8, u32>{
         0b00000000'00000000'00000000'00000000}).value()
      == 0b00000000'00000000'00000000'00000000
+);
+
+static_assert(
+    parallelSuffix(SWAR<4, u32> {
+        0b0011'0110'0011'0000'0110'0011'0011'0011}).value()
+     == 0b0001'0010'0001'0000'0010'0001'0001'0001
 );
 
 static_assert(
@@ -93,6 +106,7 @@ static_assert(
         0b00011000'00000011'00111000'00000011}).value()
      == 0b00001000'00000001'11101000'00000001
 );
+
 
 
 /*
