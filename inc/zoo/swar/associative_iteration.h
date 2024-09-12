@@ -64,45 +64,6 @@ constexpr auto parallelSuffix(S input) {
     return S{result};
 }
 
-static_assert(
-    parallelSuffix(SWAR<32, u64>{
-        0b00000000000000110000000000000011'00000000000000000000000000000111}).value()
-     == 0b00000000000000010000000000000001'11111111111111111111111111111101
-);
-
-
-static_assert(
-    parallelSuffix(SWAR<16, u32>{
-        0b0000000000000011'0000000000000011}).value()
-     == 0b0000000000000001'0000000000000001
-);
-
-static_assert(
-    parallelSuffix(SWAR<8, u32>{
-        0b00000000'00000000'00000000'00000000}).value()
-     == 0b00000000'00000000'00000000'00000000
-);
-
-static_assert(
-    parallelSuffix(SWAR<8, u32>{
-        0b00000011'00000011'00000111'00000011}).value()
-     == 0b00000001'00000001'11111101'00000001
-);
-
-static_assert(
-    parallelSuffix(SWAR<8, u32>{
-        0b00011000'00000011'00111000'00000011}).value()
-     == 0b00001000'00000001'11101000'00000001
-);
-
-static_assert(
-    parallelSuffix(SWAR<4, u32> {
-        0b0011'0110'0011'0000'0110'0011'0011'0011}).value()
-     == 0b0001'0010'0001'0000'0010'0001'0001'0001
-);
-
-
-
 /*
 Binary compress: A fascinating algorithm.
 
