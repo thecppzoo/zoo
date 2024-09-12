@@ -2,7 +2,6 @@
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
 #include "zoo/swar/SWAR.h"
-#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -414,73 +413,6 @@ constexpr auto associativeOperatorIterated_regressive(
         count = ch(count);
     }
     return result;
-}
-
-constexpr auto log2_of_power_of_two = [](auto power_of_two) {
-    if (power_of_two == 0) {
-        return 0;
-    }
-    if (power_of_two == 1) {
-        return 1;
-    }
-    return __builtin_ctz(power_of_two);
-};
-
-static_assert(log2_of_power_of_two(1) == 1);
-static_assert(log2_of_power_of_two(32) == 5);
-static_assert(log2_of_power_of_two(64) == 6);
-
-template <typename T>
-constexpr T ps(T x) {
-    constexpr auto sizeOfType = sizeof(T) * 8;
-    constexpr auto log2Count = log2_of_power_of_two(sizeOfType);
-
-    auto operation = [](auto input, auto num_shifts) {
-        auto shifted = input << num_shifts;
-        return input ^ shifted;
-    };
-
-    for (auto i = 0; i < log2Count; ++i) {
-        x = operation(x, 1 << i);
-    }
-
-    return x;
-}
-
-static_assert(ps<uint32_t>(0b00000000'00000001) == 0b11111111'11111111'11111111'11111111);
-static_assert(ps<uint32_t>(0b00000000'00000011) == 0b00000000'00000000'00000000'00000001);
-static_assert(ps<uint32_t>(0b00000000'00000111) == 0b11111111'11111111'11111111'11111101);
-static_assert(ps<uint32_t>(0b00000000'00001111) == 0b00000000'00000000'00000000'00000101);
-static_assert(ps<uint32_t>(0b00000000'00011111) == 0b11111111'11111111'11111111'11110101);
-static_assert(ps<uint32_t>(0b00000000'00111111) == 0b00000000'00000000'00000000'00010101);
-static_assert(ps<uint32_t>(0b00000000'01111111) == 0b11111111'11111111'11111111'11010101);
-static_assert(ps<uint32_t>(0b00000000'11111111) == 0b00000000'00000000'00000000'01010101);
-
-template<typename S>
-constexpr auto parallel_suffix(S input) {
-    constexpr auto log2Count = S::Lanes;
-    constexpr auto neutral = S{0};
-
-    auto operation = [](auto left, auto right, auto counts) {
-        return left + (right & counts);
-    };
-
-    auto halver = [](auto counts) {
-        return counts >> 1;
-    };
-
-    auto count = S{S::MostSignificantBit};
-    auto forSquaring = S{S::LeastSignificantBit};
-
-    return associativeOperatorIterated_regressive(
-        input,
-        neutral,
-        count,
-        forSquaring,
-        operation,
-        log2Count, halver
-    );
-
 }
 
 template<int ActualBits, int NB, typename T>
