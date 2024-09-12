@@ -64,7 +64,7 @@ constexpr auto parallelSuffix(S input) {
     auto result = input;
     auto shiftClearingMask = S{~S::MostSignificantBit};
     auto power = 1;
-    auto log2Count = log2_of_power_of_two(S::NBits) + 1;
+    auto log2Count = log2_of_power_of_two(S::NBits);
 
     for(;;) {
         result = operation(result, power, shiftClearingMask);
