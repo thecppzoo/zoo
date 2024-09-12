@@ -42,12 +42,8 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 namespace zoo::swar {
 
 constexpr auto log2_of_power_of_two = [](auto power_of_two) {
-    if (power_of_two == 1) {
-        return 1;
-    }
     return __builtin_ctz(power_of_two);
 };
-
 
 template<typename S>
 constexpr auto parallelSuffix(S input) {
