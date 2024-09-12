@@ -54,11 +54,12 @@ constexpr auto log2_of_power_of_two = [](auto power_of_two) {
 
 template<typename S>
 constexpr auto parallelSuffix(S input) {
-    auto log2Count = log2_of_power_of_two(S::NBits),
-         power = 1;
-
-    auto result = input,
-         shiftMask = S{~S::MostSignificantBit};
+    auto
+        log2Count = log2_of_power_of_two(S::NBits),
+        power = 1;
+    auto
+        result = input,
+        shiftMask = S{~S::MostSignificantBit};
 
     for (;;) {
         result = result ^ result.shiftIntraLaneLeft(power, shiftMask);
