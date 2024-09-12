@@ -2,6 +2,7 @@
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
 #include "zoo/swar/SWAR.h"
+#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -46,31 +47,27 @@ namespace zoo::swar {
 template<int NB, typename B>
 constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
     using S = SWAR<NB, B>;
+    auto shiftClearingMask = S{~S::MostSignificantBit};
+
     auto
-        shiftClearingMask = S{static_cast<B>(~S::MostSignificantBit)},
         doubling = input,
         result = S{0};
+
     auto
         bitsToXOR = NB,
         power = 1;
 
-    #define ZTE(...)
-        // ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
     for(;;) {
-        ZTE(doubling);
         // From the perspective of "associative iteration", this is when we ask whether to "add"
-        if(1 & bitsToXOR) {
-            ZTE(result ^ doubling);
+        if (1 & bitsToXOR) {
             result = result ^ doubling;
-            ZTE(doubling.shiftIntraLaneLeft(power, shiftClearingMask));
             doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
         }
-        ZTE(bitsToXOR >> 1);
         bitsToXOR >>= 1;
-        if(!bitsToXOR) { break; }
+
+        if (!bitsToXOR) { break; }
         auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
-        ZTE(shifted);
-        ZTE(doubling ^ shifted);
+
         // This is part of the "doubling" step in A. I.
         // Doubling has several parts, though, the shifting, masking and XOR
         doubling = doubling ^ shifted;
@@ -80,14 +77,30 @@ constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
         // 000000001...1
         shiftClearingMask =
             shiftClearingMask &
-                S{static_cast<B>(shiftClearingMask.value() >> power)};
-        ZTE(power << 1);
+                S{shiftClearingMask.value() >> power};
         power <<= 1;
     }
-    ZTE(input);
-    #undef ZTE
     return S{result};
 }
+
+static_assert(
+    parallelSuffix(SWAR<8, u32>{
+        0b00000000'00000000'00000000'00000000}).value()
+     == 0b00000000'00000000'00000000'00000000
+);
+
+static_assert(
+    parallelSuffix(SWAR<8, u32>{
+        0b00000011'00000011'00000111'00000011}).value()
+     == 0b00000001'00000001'11111101'00000001
+);
+
+static_assert(
+    parallelSuffix(SWAR<8, u32>{
+        0b00000000'00000011'00000000'00000011}).value()
+     == 0b00000000'00000001'00000000'00000001
+);
+
 
 /*
 Binary compress: A fascinating algorithm.
@@ -407,6 +420,74 @@ constexpr auto associativeOperatorIterated_regressive(
         count = ch(count);
     }
     return result;
+}
+
+constexpr auto log2_of_power_of_two = [](auto power_of_two) {
+    if (power_of_two == 0) {
+        return 0;
+    }
+    if (power_of_two == 1) {
+        return 1;
+    }
+    return __builtin_ctz(power_of_two);
+};
+
+static_assert(log2_of_power_of_two(1) == 1);
+static_assert(log2_of_power_of_two(32) == 5);
+static_assert(log2_of_power_of_two(64) == 6);
+
+template <typename T>
+constexpr T ps(T x) {
+    constexpr auto sizeOfType = sizeof(T) * 8;
+    constexpr auto log2Count = log2_of_power_of_two(sizeOfType);
+
+    auto operation = [](auto input, auto num_shifts) {
+        auto shifted = input << num_shifts;
+        return input ^ shifted;
+    };
+
+    for (auto i = 0; i < log2Count; ++i) {
+        x = operation(x, 1 << i);
+    }
+
+    return x;
+}
+
+static_assert(ps<uint32_t>(0b00000000'00000001) == 0b11111111'11111111'11111111'11111111);
+static_assert(ps<uint32_t>(0b00000000'00000011) == 0b00000000'00000000'00000000'00000001);
+static_assert(ps<uint32_t>(0b00000000'00000111) == 0b11111111'11111111'11111111'11111101);
+static_assert(ps<uint32_t>(0b00000000'00001111) == 0b00000000'00000000'00000000'00000101);
+static_assert(ps<uint32_t>(0b00000000'00011111) == 0b11111111'11111111'11111111'11110101);
+static_assert(ps<uint32_t>(0b00000000'00111111) == 0b00000000'00000000'00000000'00010101);
+static_assert(ps<uint32_t>(0b00000000'01111111) == 0b11111111'11111111'11111111'11010101);
+static_assert(ps<uint32_t>(0b00000000'11111111) == 0b00000000'00000000'00000000'01010101);
+
+template<typename S>
+constexpr auto parallel_suffix(S input) {
+    constexpr auto log2Count = S::Lanes;
+    constexpr auto neutral = S{0};
+
+    auto operation = [](auto left, auto right, auto counts) {
+        return left + (right & counts);
+    };
+
+    auto halver = [](auto counts) {
+        return counts >> 1;
+    };
+
+    auto count = S{S::MostSignificantBit};
+    auto forSquaring = S{S::LeastSignificantBit};
+
+
+    return associativeOperatorIterated_regressive(
+        input,
+        neutral,
+        count,
+        forSquaring,
+        operation,
+        log2Count, halver
+    );
+
 }
 
 template<int ActualBits, int NB, typename T>
