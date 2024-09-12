@@ -41,51 +41,26 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 namespace zoo::swar {
 
-/// \note This code should be substituted by an application of "progressive" algebraic iteration
-/// \note There is also parallelPrefix (to be implemented)
-template<int NB, typename B>
-constexpr SWAR<NB, B> parallelSuffix(SWAR<NB, B> input) {
-    using S = SWAR<NB, B>;
-    auto
-        shiftClearingMask = S{static_cast<B>(~S::MostSignificantBit)},
-        doubling = input,
-        result = S{0};
-    auto
-        bitsToXOR = NB,
-        power = 1;
+constexpr auto log2_of_power_of_two = [](auto power_of_two) {
+    return __builtin_ctz(power_of_two);
+};
 
-    #define ZTE(...)
-        // ZOO_TRACEABLE_EXPRESSION(__VA_ARGS__)
-    for(;;) {
-        ZTE(doubling);
-        // From the perspective of "associative iteration", this is when we ask whether to "add"
-        if(1 & bitsToXOR) {
-            ZTE(result ^ doubling);
-            result = result ^ doubling;
-            ZTE(doubling.shiftIntraLaneLeft(power, shiftClearingMask));
-            doubling = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
-        }
-        ZTE(bitsToXOR >> 1);
-        bitsToXOR >>= 1;
-        if(!bitsToXOR) { break; }
-        auto shifted = doubling.shiftIntraLaneLeft(power, shiftClearingMask);
-        ZTE(shifted);
-        ZTE(doubling ^ shifted);
-        // This is part of the "doubling" step in A. I.
-        // Doubling has several parts, though, the shifting, masking and XOR
-        doubling = doubling ^ shifted;
-        // 01...1
-        // 001...1
-        // 00001...1
-        // 000000001...1
-        shiftClearingMask =
-            shiftClearingMask &
-                S{static_cast<B>(shiftClearingMask.value() >> power)};
-        ZTE(power << 1);
+template<typename S>
+constexpr auto parallelSuffix(S input) {
+    auto
+        log2Count = log2_of_power_of_two(S::NBits),
+        power = 1;
+    auto
+        result = input,
+        shiftMask = S{~S::MostSignificantBit};
+
+    for (;;) {
+        result = result ^ result.shiftIntraLaneLeft(power, shiftMask);
+        if (!--log2Count) { break; }
+        shiftMask = shiftMask & S{shiftMask.value() >> power};
         power <<= 1;
     }
-    ZTE(input);
-    #undef ZTE
+
     return S{result};
 }
 
