@@ -51,8 +51,6 @@ constexpr auto log2_of_power_of_two = [](auto power_of_two) {
     return __builtin_ctz(power_of_two);
 };
 
-/// \note This code should be substituted by an application of "progressive" algebraic iteration
-/// \note There is also parallelPrefix (to be implemented)
 template<typename S>
 constexpr auto parallelSuffix(S input) {
     constexpr auto operation = [] (auto doubling, auto power, auto mask) {
@@ -60,18 +58,16 @@ constexpr auto parallelSuffix(S input) {
         doubling = doubling ^ shifted;
         return doubling;
     };
-
-    auto result = input;
-    auto shiftClearingMask = S{~S::MostSignificantBit};
-    auto power = 1;
-    auto log2Count = log2_of_power_of_two(S::NBits);
-
+    auto log2Count = log2_of_power_of_two(S::NBits),
+         power = 1;
+    auto result = input,
+         mask = S{~S::MostSignificantBit};
     for(;;) {
-        result = operation(result, power, shiftClearingMask);
+        result = operation(result, power, mask);
         if (!--log2Count) {
             break;
         }
-        shiftClearingMask = shiftClearingMask & S{shiftClearingMask.value() >> power};
+        mask = mask & S{mask.value() >> power};
         power <<= 1;
     }
     return S{result};
