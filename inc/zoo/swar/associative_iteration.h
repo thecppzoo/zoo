@@ -43,9 +43,6 @@ namespace zoo::swar {
 
 // i'm sure we must have one of these elsewhere lol
 constexpr auto log2_of_power_of_two = [](auto power_of_two) {
-    if (power_of_two == 0) {
-        return 0;
-    }
     if (power_of_two == 1) {
         return 1;
     }
