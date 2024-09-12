@@ -51,10 +51,20 @@ constexpr auto log2_of_power_of_two = [](auto power_of_two) {
     return __builtin_ctz(power_of_two);
 };
 
-template<typename S>
-constexpr auto parallelSuffix(S input) {
+enum class ParallelXixOperation {
+    Suffix,
+    Prefix
+};
+
+template<ParallelXixOperation XixType, typename S>
+constexpr auto parallelXix(S input) {
     constexpr auto operation = [] (auto doubling, auto power, auto mask) {
-        auto shifted = doubling.shiftIntraLaneLeft(power, mask);
+        auto shifted = [&] {
+            if constexpr(XixType == ParallelXixOperation::Suffix) {
+                return doubling.shiftIntraLaneLeft(power, mask);
+            }
+            return doubling.shiftIntraLaneRight(power, mask);
+        }();
         doubling = doubling ^ shifted;
         return doubling;
     };
@@ -73,6 +83,25 @@ constexpr auto parallelSuffix(S input) {
     return S{result};
 }
 
+// not 100% sure this one works yet, need to test
+// not sure that the power needs to shift the mask which way, and if the
+// mask needs to start with the least significant bit etc.
+template<typename S>
+constexpr auto parallelPrefix(S input) {
+    return parallelXix<ParallelXixOperation::Prefix>(input);
+}
+
+template<typename S>
+constexpr auto parallelSuffix(S input) {
+    return parallelXix<ParallelXixOperation::Suffix>(input);
+}
+
+static_assert(
+    parallelSuffix(SWAR<32, u64>{
+        0b00000000000000110000000000000011'00000000000000000000000000000111}).value()
+     == 0b00000000000000010000000000000001'11111111111111111111111111111101
+);
+
 static_assert(
     parallelSuffix(SWAR<16, u32>{
         0b0000000000000011'0000000000000011}).value()
@@ -86,12 +115,6 @@ static_assert(
 );
 
 static_assert(
-    parallelSuffix(SWAR<4, u32> {
-        0b0011'0110'0011'0000'0110'0011'0011'0011}).value()
-     == 0b0001'0010'0001'0000'0010'0001'0001'0001
-);
-
-static_assert(
     parallelSuffix(SWAR<8, u32>{
         0b00000011'00000011'00000111'00000011}).value()
      == 0b00000001'00000001'11111101'00000001
@@ -101,6 +124,12 @@ static_assert(
     parallelSuffix(SWAR<8, u32>{
         0b00011000'00000011'00111000'00000011}).value()
      == 0b00001000'00000001'11101000'00000001
+);
+
+static_assert(
+    parallelSuffix(SWAR<4, u32> {
+        0b0011'0110'0011'0000'0110'0011'0011'0011}).value()
+     == 0b0001'0010'0001'0000'0010'0001'0001'0001
 );
 
 
