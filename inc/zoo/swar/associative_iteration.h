@@ -41,57 +41,33 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 namespace zoo::swar {
 
-// i'm sure we must have one of these elsewhere lol
 constexpr auto log2_of_power_of_two = [](auto power_of_two) {
+    if (power_of_two == 0) {
+        return 0;
+    }
     if (power_of_two == 1) {
         return 1;
     }
     return __builtin_ctz(power_of_two);
 };
 
-enum class ParallelXixOperation {
-    Suffix,
-    Prefix
-};
-
-template<ParallelXixOperation XixType, typename S>
-constexpr auto parallelXix(S input) {
-    constexpr auto operation = [] (auto doubling, auto power, auto mask) {
-        auto shifted = [&] {
-            if constexpr(XixType == ParallelXixOperation::Suffix) {
-                return doubling.shiftIntraLaneLeft(power, mask);
-            }
-            return doubling.shiftIntraLaneRight(power, mask);
-        }();
-        doubling = doubling ^ shifted;
-        return doubling;
-    };
-    auto log2Count = log2_of_power_of_two(S::NBits),
-         power = 1;
-    auto result = input,
-         mask = S{~S::MostSignificantBit};
-    for(;;) {
-        result = operation(result, power, mask);
-        if (!--log2Count) {
-            break;
-        }
-        mask = mask & S{mask.value() >> power};
-        power <<= 1;
-    }
-    return S{result};
-}
-
-// not 100% sure this one works yet, need to test
-// not sure that the power needs to shift the mask which way, and if the
-// mask needs to start with the least significant bit etc.
-template<typename S>
-constexpr auto parallelPrefix(S input) {
-    return parallelXix<ParallelXixOperation::Prefix>(input);
-}
 
 template<typename S>
 constexpr auto parallelSuffix(S input) {
-    return parallelXix<ParallelXixOperation::Suffix>(input);
+    auto log2Count = log2_of_power_of_two(S::NBits),
+         power = 1;
+
+    auto result = input,
+         shiftMask = S{~S::MostSignificantBit};
+
+    for (;;) {
+        result = result ^ result.shiftIntraLaneLeft(power, shiftMask);
+        if (!--log2Count) { break; }
+        shiftMask = shiftMask & S{shiftMask.value() >> power};
+        power <<= 1;
+    }
+
+    return S{result};
 }
 
 static_assert(
@@ -99,6 +75,7 @@ static_assert(
         0b00000000000000110000000000000011'00000000000000000000000000000111}).value()
      == 0b00000000000000010000000000000001'11111111111111111111111111111101
 );
+
 
 static_assert(
     parallelSuffix(SWAR<16, u32>{
