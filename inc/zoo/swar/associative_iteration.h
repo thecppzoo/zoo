@@ -43,6 +43,27 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 namespace zoo::swar {
 
+template<typename S>
+constexpr auto jamie_parallelSuffix(S input) {
+    auto
+        log2Count = meta::logCeiling(S::NBits),
+        power = 1;
+
+    auto
+        result = input,
+        shiftMask = S{~S::MostSignificantBit};
+
+    for (;;) {
+        result = result ^ result.shiftIntraLaneLeft(power, shiftMask);
+        if (!--log2Count) { break; }
+        shiftMask = shiftMask & S{shiftMask.value() >> power};
+        power <<= 1;
+    }
+
+    return S{result};
+}
+
+
 /// \note This code should be substituted by an application of "progressive" algebraic iteration
 /// \note There is also parallelPrefix (to be implemented)
 template<int NB, typename B>
