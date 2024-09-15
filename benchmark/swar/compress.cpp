@@ -1,3 +1,5 @@
+#include "junk/compressionWithOldParallelSuffix.h"
+
 #include "zoo/pp/platform.h"
 
 #include "zoo/swar/associative_iteration.h"
@@ -18,13 +20,30 @@ using S = zoo::swar::SWAR<NB, uint64_t>;
 enum ExtractionPrimitive {
     UseBuiltin,
     UseSWAR,
-    CompareBuiltinAndSWAR
+    UseOldParallelSuffix,
+    CompareBuiltinAndSWAR,
+    CompareNewAndOldParallelSuffix
 };
 
 template<int NB, ExtractionPrimitive P>
 S<NB> parallelExtraction(S<NB> i, S<NB> m) {
     if constexpr(UseSWAR == P) {
         return compress(i, m);
+    } else if constexpr(UseOldParallelSuffix == P) {
+        return zoo::swar::junk::compressWithOldParallelSuffix(i, m);
+    } else if constexpr(CompareNewAndOldParallelSuffix == P) {
+        auto newOne = compress(i, m);
+        auto oldOne = zoo::swar::junk::compressWithOldParallelSuffix(i, m);
+        if (newOne.value() != oldOne.value()) {
+            using B = std::bitset<64>;
+            auto toBinary = [](S<NB> what) { return B(what.value()); };
+            std::cout << NB << '\n' <<
+                toBinary(i) << '\n' <<
+                toBinary(m) << "\n---------\n" <<
+                toBinary(newOne) << '\n' <<
+                toBinary(oldOne) << '\n' << std::endl;
+        }
+        return newOne;
     } else {
         constexpr auto LaneCount = 64 / NB;
         uint64_t
@@ -96,6 +115,9 @@ void runCompressions(benchmark::State &s) {
 #endif
 #define X(nb) \
     BENCHMARK(runCompressions<nb, UseSWAR>); \
+    BENCHMARK(runCompressions<nb, UseOldParallelSuffix>); \
+    BENCHMARK(runCompressions<nb, CompareNewAndOldParallelSuffix>); \
     EXTENSION_LIST(nb)
 
 BIT_SIZE_X_LIST
+
