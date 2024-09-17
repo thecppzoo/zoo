@@ -202,11 +202,11 @@ struct SWAR {
     }
 
     constexpr SWAR consumeLSB() const noexcept {
-        return shiftIntraLaneRight(1, LeastSignificantBit);
+        return shiftIntraLaneRight(1, SWAR{~LeastSignificantBit});
     }
 
     constexpr SWAR consumeMSB() const noexcept {
-        return shiftIntraLaneLeft(1, MostSignificantBit);
+        return shiftIntraLaneLeft(1, SWAR{~MostSignificantBit});
     }
 
     /// \brief as the name suggests
