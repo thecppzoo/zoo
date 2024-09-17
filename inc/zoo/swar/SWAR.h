@@ -201,6 +201,14 @@ struct SWAR {
         return SWAR(value() >> (NBits * laneCount));
     }
 
+    constexpr SWAR consumeLSB() const noexcept {
+        return shiftIntraLaneRight(1, LeastSignificantBit);
+    }
+
+    constexpr SWAR consumeMSB() const noexcept {
+        return shiftIntraLaneLeft(1, MostSignificantBit);
+    }
+
     /// \brief as the name suggests
     /// \param protectiveMask should clear the bits that would cross the lane.
     /// The bits that will be cleared are directly related to the count of

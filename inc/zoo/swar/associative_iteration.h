@@ -393,8 +393,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     };
 
     auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        return counts.consumeMSB();
     };
 
     auto shifted = S{multiplier.value() << (NB - ActualBits)};
@@ -443,8 +442,7 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
 
     // halver should work same as multiplication... i think...
     auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{static_cast<T>(msbCleared.value() << 1)};
+        return counts.consumeMSB();
     };
 
     exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
