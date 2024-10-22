@@ -363,10 +363,6 @@ struct BooleanSWAR: SWAR<NBits, T> {
 
     template<int N, int NB, typename TT>
     friend constexpr BooleanSWAR<NB, TT>
-    constantIsGreaterEqual(SWAR<NB, TT>) noexcept;
-
-    template<int N, int NB, typename TT>
-    friend constexpr BooleanSWAR<NB, TT>
     constantIsGreaterEqual_MSB_off(SWAR<NB, TT>) noexcept;
 
     template<int NB, typename TT>
@@ -398,36 +394,31 @@ convertToBooleanSWAR(SWAR<NBits, T> arg) noexcept {
     return SWAR<NBits, T>{SWAR<NBits, T>::MostSignificantBit} & arg;
 }
 
+template<typename T, typename U, typename V>
+constexpr T median(T x, U y, V z) {
+    return (x | y) & (y | z) & (x | z);
+}
+
+template<int NBits, typename T>
+constexpr BooleanSWAR<NBits, T>
+greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
+    // Adapted from TAOCP V4 P152
+    // h is msbselector, x is right, l is lower/left.  Sets MSB to 1 in lanes
+    // in test variable t for when xi < yi for lane i . Invert for greaterEqual.
+    // t = h & ~<x~yz>
+    // z = (x|h) - (y&~h)
+    using S = swar::SWAR<NBits, T>;
+    const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
+    const auto z = (x|h) - (y&~h);
+    // bitwise ternary median!
+    const auto t = h & ~median(x, ~y, z);
+    return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
+}
+
 template<int N, int NBits, typename T>
 constexpr BooleanSWAR<NBits, T>
 constantIsGreaterEqual(SWAR<NBits, T> subtrahend) noexcept {
-    static_assert(1 < NBits, "Degenerated SWAR");
-    constexpr auto MSB_Position  = NBits - 1;
-    constexpr auto MSB = T(1) << MSB_Position;
-    constexpr auto MSB_Mask =
-        SWAR<NBits, T>{meta::BitmaskMaker<T, MSB, NBits>::value};
-    constexpr auto Minuend =
-        SWAR<NBits, T>{meta::BitmaskMaker<T, N, NBits>::value};
-    constexpr auto N_MSB = MSB & N;
-
-    auto subtrahendWithMSB_on = MSB_Mask & subtrahend;
-    auto subtrahendWithMSB_off = ~subtrahendWithMSB_on;
-    auto subtrahendMSBs_turnedOff = subtrahend ^ subtrahendWithMSB_on;
-    if constexpr(N_MSB) {
-        auto leastSignificantComparison = Minuend - subtrahendMSBs_turnedOff;
-        auto merged =
-            subtrahendMSBs_turnedOff | // the minuend MSBs are on
-            leastSignificantComparison;
-        return MSB_Mask & merged;
-    } else {
-        auto minuendWithMSBs_turnedOn = Minuend | MSB_Mask;
-        auto leastSignificantComparison =
-            minuendWithMSBs_turnedOn - subtrahendMSBs_turnedOff;
-        auto merged =
-            subtrahendWithMSB_off & // the minuend MSBs are off
-            leastSignificantComparison;
-        return MSB_Mask & merged;
-    }
+    return greaterEqual(SWAR<NBits, T>{N}, subtrahend);
 }
 
 template<int N, int NBits, typename T>
@@ -450,27 +441,6 @@ constantIsGreaterEqual_MSB_off(SWAR<NBits, T> subtrahend) noexcept {
             minuendWithMSBs_turnedOn - subtrahendMSBs_turnedOff;
         return MSB_Mask & leastSignificantComparison;
     }
-}
-
-template<typename T, typename U, typename V>
-constexpr T median(T x, U y, V z) {
-    return (x | y) & (y | z) & (x | z);
-}
-
-template<int NBits, typename T>
-constexpr BooleanSWAR<NBits, T>
-greaterEqual(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
-    // Adapted from TAOCP V4 P152
-    // h is msbselector, x is right, l is lower/left.  Sets MSB to 1 in lanes
-    // in test variable t for when xi < yi for lane i . Invert for greaterEqual.
-    // t = h & ~<x~yz>
-    // z = (x|h) - (y&~h)
-    using S = swar::SWAR<NBits, T>;
-    const auto h = S::MostSignificantBit, x = left.value(), y = right.value();  // x=left, y= right is x < y
-    const auto z = (x|h) - (y&~h);
-    // bitwise ternary median!
-    const auto t = h & ~median(x, ~y, z);
-    return ~BooleanSWAR<NBits, T>{static_cast<T>(t)};  // ~(x<y) === x >= y
 }
 
 // In the condition where only MSBs will be on, we can fast lookup with 1 multiply the index of the most signficant byte that is on.
@@ -497,7 +467,7 @@ greaterEqual_MSB_off(SWAR<NBits, T> left, SWAR<NBits, T> right) noexcept {
 template<int NB, typename T>
 constexpr auto
 booleans(SWAR<NB, T> arg) noexcept {
-    return ~constantIsGreaterEqual<0>(arg);
+    return ~greaterEqual(SWAR<NB, T>{0}, arg);
 }
 
 template<int NBits, typename T>
