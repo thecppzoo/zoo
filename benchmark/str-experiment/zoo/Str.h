@@ -71,11 +71,11 @@ struct Str {
     static_assert(sizeof(void *) <= Size);
     alignas(sizeof(StorageModel)) char buffer_[sizeof(StorageModel)];
 
-    auto &lastByte() const { return buffer_[Size - 1]; }
-    auto &lastByte() { return buffer_[Size - 1]; }
-    auto lastPtr() const { return buffer_ + Size - sizeof(char *); }
-    auto lastPtr() { return buffer_ + Size - sizeof(char *); }
-    auto allocationPtr() const {
+    auto &lastByte() const noexcept { return buffer_[Size - 1]; }
+    auto &lastByte() noexcept { return buffer_[Size - 1]; }
+    auto lastPtr() const noexcept { return buffer_ + Size - sizeof(char *); }
+    auto lastPtr() noexcept { return buffer_ + Size - sizeof(char *); }
+    auto allocationPtr() const noexcept {
         uintptr_t codeThatContainsAPointer;
         memcpy(&codeThatContainsAPointer, lastPtr(), sizeof(char *));
         assert(onHeap());
@@ -89,11 +89,10 @@ struct Str {
         return rv;
     }
 
-    Str() {
+    Str() noexcept {
         buffer_[0] = '\0';
         lastByte() = Size - 1;
     }
-
 
     Str(const char *source, std::size_t length) {
         if(length <= Size) {
@@ -143,8 +142,6 @@ struct Str {
                 printf("%c ", (unsigned char)ptrToStr[i]);
             }
             printf("\n");
-            
-            //assert('\0' == ptrToStr[length]);
 
             printf("Size: %lu\n", Size);
             printf("BitsToEncodeLocalLength: %lu\n", BitsToEncodeLocalLength);
@@ -167,8 +164,9 @@ struct Str {
     }
 
     template<std::size_t L>
-    Str(const char (&in)[L]): Str(static_cast<const char *>(in), L - 1) {}
-
+    Str(const char (&in)[L]) noexcept(L <= Size):
+        Str(static_cast<const char *>(in), L - 1)
+    {}
 
     const char *c_str() noexcept {
         if (!onHeap()) {
@@ -185,6 +183,10 @@ struct Str {
         auto rv = location + bytesForLength;
         fprintf(stderr, "Returning %s\n", rv);
         return rv;
+    }
+
+    ~Str() {
+        if(onHeap()) { delete[] allocationPtr(); }
     }
 
     auto onHeap() const noexcept {
