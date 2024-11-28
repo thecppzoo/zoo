@@ -126,7 +126,6 @@ struct Str {
             
             lastByte() |= code;
             fprintf(stderr, "LB after: %x\n", (unsigned char)lastByte());
-            assert(onHeap);
             printf("In ctor: lastByte(): %02x\n", (unsigned char)lastByte());
             printf("length: %lu, bytesForSize: %lu\n", length, bytesForSize);
             printf("OnHeapIndicatorFlag: %02x\n", OnHeapIndicatorFlag);
@@ -175,14 +174,12 @@ struct Str {
         if (!onHeap()) {
             return buffer_;
         }
-        
-        uintptr_t code;
-        memcpy(&code, lastPtr(), sizeof(char *));
 
         // the three least-significant bits of code contain the size of length,
         // encoded as a range [0..7] that maps to a range [1..8] in which each
         // the unit is a byte
-        auto bytesForLength = 1 + (code & 7);
+        auto byteWithEncoding = lastByte();
+        auto bytesForLength = 1 + (byteWithEncoding & 7);
 
         auto location = allocationPtr();
         auto rv = location + bytesForLength;

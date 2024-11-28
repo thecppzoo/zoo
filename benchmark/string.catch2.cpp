@@ -2,6 +2,14 @@
 
 #include <catch2/catch.hpp>
 
+constexpr char chars257[] = "\
+0123456789ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef\
+we can put anything here, since we can see it is 64-bytes wide--\
+continuing, spaces are also good                               -\
+this is the last line                                         !!\
+";
+static_assert(257 == sizeof(chars257));
+
 TEST_CASE("String", "[str][api]") {
     using S = zoo::Str<void *>;
     SECTION("Potential regression") {
@@ -47,5 +55,6 @@ TEST_CASE("String", "[str][api]") {
 En un lugar de la Mancha que no quiero recordar\
 ";
         checks(Quixote, true);
+        checks(chars257, true);
     }
 }
