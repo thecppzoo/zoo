@@ -21,6 +21,20 @@ this is the last line                                         !!\
 ";
 static_assert(257 == sizeof(chars257));
 
+template<typename StringType>
+auto stringChecks(const char *givenString, bool onHeap) {
+    auto facilitateComparisons = std::string(givenString);
+    StringType s(givenString, facilitateComparisons.length() + 1);
+    auto isOnHeap = s.onHeap();
+    CHECK(onHeap == isOnHeap);
+
+    auto c_str = s.c_str();
+    CHECK(c_str == facilitateComparisons);
+    CHECK(strlen(c_str) == facilitateComparisons.size());
+    auto zooSize = s.size();
+    CHECK(zooSize == facilitateComparisons.size());
+};
+
 TEST_CASE("String", "[str][api]") {
     SECTION("Potential regression") {
         char buff[8] = { "****#!-" };
@@ -37,34 +51,32 @@ TEST_CASE("String", "[str][api]") {
         CHECK(0 == empty.size());
         CHECK('\0' == *empty.c_str());
     }
-    auto checks =
-        [](auto &givenString, bool onHeap) {
-            auto facilitateComparisons = std::string(givenString);
-            S s(givenString, facilitateComparisons.length() + 1);
-            auto isOnHeap = s.onHeap();
-            CHECK(onHeap == isOnHeap);
-
-            auto c_str = s.c_str();
-            CHECK(c_str == facilitateComparisons);
-            CHECK(strlen(c_str) == facilitateComparisons.size());
-            auto zooSize = s.size();
-            CHECK(zooSize == facilitateComparisons.size());
-        };
+    constexpr char Exactly7[] = { "1234567" };
+    char Exactly15[] = "123456789ABCDEF";
+    constexpr char Quixote[] = "\
+En un lugar de la Mancha que no quiero recordar\
+";
+    auto *checks = stringChecks<S>;
     SECTION("Local") {
         SECTION("Not boundary") {
             checks("Hello", false);
         }
         SECTION("Boundary of all chars needed") {
             static_assert(8 == sizeof(S));
-            constexpr char Exactly7[] = { "1234567" };
             checks(Exactly7, false);
         }
     }
     SECTION("Heap") {
-        constexpr char Quixote[] = "\
-En un lugar de la Mancha que no quiero recordar\
-";
+        checks(Exactly15, true);
         checks(Quixote, true);
-        checks(chars257, true);
+        SECTION("Case in which 1 < the bytes for size") {
+            checks(chars257, true);
+        }
+    }
+    SECTION("Larger than void *") {
+        using S2 = zoo::Str<void *[2]>;
+        stringChecks<S2>(Exactly7, false);
+        stringChecks<S2>(Exactly15, false);
+        stringChecks<S2>(Quixote, true);
     }
 }
