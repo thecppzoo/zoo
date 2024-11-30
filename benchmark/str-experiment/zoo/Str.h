@@ -89,9 +89,32 @@ struct Str {
         return rv;
     }
 
-    Str() noexcept {
-        buffer_[0] = '\0';
-        lastByte() = Size - 1;
+    auto encodePointer(char numberOfBytes, const char *ptr) {
+        uintptr_t code;
+        memcpy(&code, &ptr, sizeof(char *));
+        static_assert(8 == sizeof(char *));
+        if(8 < numberOfBytes) {
+            __builtin_unreachable();
+        }
+        return
+            __builtin_bswap64(code | (numberOfBytes - 1) | OnHeapIndicatorFlag);
+    }
+
+    auto size() const noexcept {
+        if(onHeap()) {
+            auto countOfBytesForEncodingSize = 1 + (lastByte() & 7);
+            const char *ptr = allocationPtr();
+            std::remove_const_t<decltype(Size)> length = 0;
+            memcpy(&length, ptr, countOfBytesForEncodingSize);
+            return length - 1;
+        }
+        else {
+            return Size - lastByte() - 1;
+        }
+    }
+
+    auto onHeap() const noexcept {
+        return bool(OnHeapIndicatorFlag & lastByte());
     }
 
     Str(const char *source, std::size_t length) {
@@ -110,25 +133,11 @@ struct Str {
             memcpy(onHeap, &length, bytesForSize);
             memcpy(onHeap + bytesForSize, source, length);
 
-            uintptr_t littleEndian;
-            memcpy(&littleEndian, &onHeap, sizeof(char *));
-            auto bigEndian = __builtin_bswap64(littleEndian);
-            memcpy(lastPtr(), &bigEndian, sizeof(char *));
+            auto code = encodePointer(bytesForSize, onHeap);
+            auto addressOfLastPointerWorthOfSpace = lastPtr();
+            memcpy(addressOfLastPointerWorthOfSpace, &code, sizeof(char *));
             // We encode the range [1..8] as [0..7]
-            auto code = (bytesForSize - 1) | OnHeapIndicatorFlag;
-            fprintf(
-                stderr,
-                "LB before: %x, code %x\n",
-                (unsigned char)lastByte(),
-                (unsigned char) code
-            );
-            
-            lastByte() |= code;
-            fprintf(stderr, "LB after: %x\n", (unsigned char)lastByte());
-            printf("In ctor: lastByte(): %02x\n", (unsigned char)lastByte());
-            printf("length: %lu, bytesForSize: %lu\n", length, bytesForSize);
-            printf("OnHeapIndicatorFlag: %02x\n", OnHeapIndicatorFlag);
-            
+
             printf("buffer_ : %p:\n", buffer_);
             for (auto i = 0; i < Size; i++) {
                 printf("%02x ", (unsigned char)buffer_[i]);
@@ -150,23 +159,58 @@ struct Str {
         }
     }
 
-    auto size() const noexcept {
-        if(onHeap()) {
-            auto countOfBytesForEncodingSize = 1 + (lastByte() & 7);
-            const char *ptr = allocationPtr();
-            std::remove_const_t<decltype(Size)> length = 0;
-            memcpy(&length, ptr, countOfBytesForEncodingSize);
-            return length - 1;
-        }
-        else {
-            return Size - lastByte() - 1;
-        }
-    }
-
     template<std::size_t L>
     Str(const char (&in)[L]) noexcept(L <= Size):
         Str(static_cast<const char *>(in), L - 1)
     {}
+
+    Str() noexcept {
+        buffer_[0] = '\0';
+        lastByte() = Size - 1;
+    }
+
+    Str(const Str &model): Str(model.c_str(), model.size() + 1) {}
+
+    Str(Str &&donor) noexcept {
+        memcpy(buffer_, donor.buffer_, sizeof(this->buffer_));
+        donor.lastByte() = ~OnHeapIndicatorFlag;
+    }
+
+    Str &operator=(const Str &model) {
+        if(!model.onHeap()) {
+            if(onHeap()) { delete[] allocationPtr(); }
+            else {
+                if(this == &model) { return *this; }
+            }
+            new(this) Str(model);
+            return *this;
+        }
+        // The model is on the heap
+        auto modelSize = model.size();
+        if(size() < modelSize) {
+            if(onHeap()) { this->~Str(); }
+            new(this) Str(model);
+        } else {
+            if(this == &model) { return *this; }
+            // assert we are on the heap too
+            auto modelBytesForSize = 1 + (model.lastByte() & 7);
+            auto myPtr = allocationPtr();
+            auto modelPtr = model.allocationPtr();
+            memcpy(myPtr, modelPtr, modelBytesForSize + modelSize + 1);
+            encodePointer(modelBytesForSize, myPtr);
+        }
+        return *this;
+    };
+
+    Str &operator=(Str &&donor) noexcept {
+        Str temporary(std::move(donor));
+        this->~Str();
+        return *new(this) Str(std::move(temporary));
+    }
+
+    ~Str() {
+        if(onHeap()) { delete[] allocationPtr(); }
+    }
 
     const char *c_str() noexcept {
         if (!onHeap()) {
@@ -183,14 +227,6 @@ struct Str {
         auto rv = location + bytesForLength;
         fprintf(stderr, "Returning %s\n", rv);
         return rv;
-    }
-
-    ~Str() {
-        if(onHeap()) { delete[] allocationPtr(); }
-    }
-
-    auto onHeap() const noexcept {
-        return bool(OnHeapIndicatorFlag & lastByte());
     }
 };
 

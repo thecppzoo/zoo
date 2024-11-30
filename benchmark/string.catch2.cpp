@@ -2,6 +2,17 @@
 
 #include <catch2/catch.hpp>
 
+using S = zoo::Str<void *>;
+
+static_assert(std::is_nothrow_default_constructible_v<S>);
+
+char BufferAsBigAsStr[sizeof(S)];
+static_assert(noexcept(S{BufferAsBigAsStr}));
+
+char BufferLargerThanStr[sizeof(S) * 2];
+static_assert(not noexcept(S{BufferLargerThanStr}));
+static_assert(std::is_nothrow_move_constructible_v<S>);
+
 constexpr char chars257[] = "\
 0123456789ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef\
 we can put anything here, since we can see it is 64-bytes wide--\
@@ -11,7 +22,6 @@ this is the last line                                         !!\
 static_assert(257 == sizeof(chars257));
 
 TEST_CASE("String", "[str][api]") {
-    using S = zoo::Str<void *>;
     SECTION("Potential regression") {
         char buff[8] = { "****#!-" };
         char Hi[] = { "Hello" };
