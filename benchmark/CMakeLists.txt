@@ -96,3 +96,21 @@ set_target_properties(catch2StringTest PROPERTIES
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
+
+# not yet mergeable with the master branch
+add_executable(
+    str-benchmark.catch2
+    onlyMain.benchmark.catch2.cpp
+    str.benchmark.catch2.cpp
+)
+
+set_xcode_properties(str-benchmark.catch2)
+
+target_include_directories(
+    str-benchmark.catch2 PRIVATE
+    str-experiment
+    ../test/inc
+    ../inc
+    ../junkyard/inc
+    ../test/third_party/Catch2/single_include
+)

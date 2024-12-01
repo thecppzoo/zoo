@@ -212,7 +212,7 @@ struct Str {
         if(onHeap()) { delete[] allocationPtr(); }
     }
 
-    const char *c_str() noexcept {
+    const char *c_str() const noexcept {
         if (!onHeap()) {
             return buffer_;
         }
