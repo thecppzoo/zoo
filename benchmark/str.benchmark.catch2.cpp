@@ -99,7 +99,7 @@ auto minimumUsedBytes(const STR &s) {
     // example, allocation size is 64, the mask is then 0b1.1111 (5 bits)
     // and size is 17: that's 0b1.0001, the bytes 18 to 63 are not used,
     // so, the bytes that this code takes are 63
-    return size | roundSizeToAllocationSizeMask;
+    return (size | roundSizeToAllocationSizeMask) + sizeof(STR);
 }
 
 using ZStr = zoo::Str<void *>;
