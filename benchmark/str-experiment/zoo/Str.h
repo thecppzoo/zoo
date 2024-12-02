@@ -19,6 +19,11 @@ constexpr auto Log2Ceiling(T value) {
     return 1 + Log2Floor(value - 1);
 }
 
+template<typename T>
+constexpr auto Log256Celing(T value) {
+    return (7 + Log2Ceiling(value)) / 8;
+}
+
 inline void noOp(...) {}
 #define printf noOp
 #define fprintf noOp
@@ -69,7 +74,7 @@ struct Str {
     ;
     constexpr static char OnHeapIndicatorFlag = 1 << BitsToEncodeLocalLength;
     static_assert(sizeof(void *) <= Size);
-    alignas(sizeof(StorageModel)) char buffer_[sizeof(StorageModel)];
+    alignas(alignof(StorageModel)) char buffer_[sizeof(StorageModel)];
 
     auto &lastByte() const noexcept { return buffer_[Size - 1]; }
     auto &lastByte() noexcept { return buffer_[Size - 1]; }
