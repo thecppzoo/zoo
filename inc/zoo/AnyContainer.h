@@ -298,7 +298,7 @@ protected:
     {}
 
     template<typename ValueType>
-    void emplaced(ValueType *ptr) noexcept { SuperContainer::template emplaced(ptr); }
+    void emplaced(ValueType *ptr) noexcept { SuperContainer::emplaced(ptr); }
 
     AnyContainerBase &copy_assign(const AnyContainerBase &model) {
         SuperContainer::copy_assign(model);
