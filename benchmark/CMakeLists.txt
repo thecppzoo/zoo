@@ -15,14 +15,14 @@ if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
     endif()
 endif()
 
-# Macro to set properties for Xcode targets
 macro(set_xcode_properties TARGET_NAME)
-    if(CMAKE_GENERATOR STREQUAL Xcode)
-        set_target_properties(${TARGET_NAME} PROPERTIES
-            XCODE_ATTRIBUTE_ENABLE_AVX YES
-            XCODE_ATTRIBUTE_ENABLE_AVX2 YES
-            XCODE_ATTRIBUTE_OTHER_CPLUSPLUSFLAGS "-mavx -mavx2 -mbmi2"
-            XCODE_ATTRIBUTE_OTHER_CFLAGS "-mavx -mavx2 -mbmi2"
+    if(
+        CMAKE_GENERATOR STREQUAL Xcode AND
+        CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"
+    )
+        target_compile_options(
+            # Todo: Introduce support for AVX512BW
+            ${TARGET_NAME} PRIVATE -mavx -mavx2 -mbmi2
         )
     endif()
 endmacro()
