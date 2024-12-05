@@ -298,7 +298,7 @@ protected:
     {}
 
     template<typename ValueType>
-    void emplaced(ValueType *ptr) noexcept { SuperContainer::template emplaced(ptr); }
+    void emplaced(ValueType *ptr) noexcept { SuperContainer::emplaced(ptr); }
 
     AnyContainerBase &copy_assign(const AnyContainerBase &model) {
         SuperContainer::copy_assign(model);
@@ -326,6 +326,8 @@ struct AnyCopyable: AnyContainerBase<Policy> {
 
     AnyCopyable &operator=(AnyCopyable &&) = default;
 
+    /// \note Does not provide the strong exception safety guarantee
+    // Affordance of non-destructive copying?
     AnyCopyable &operator=(const AnyCopyable &model) {
         if constexpr(std::is_copy_constructible_v<Base>)this->copy_assign(model);
         auto myself = this->container();
