@@ -126,10 +126,15 @@ else()
         egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp root/mem.cpp
     )
     set(
+        GENETIC_PROGRAMMING_SOURCES
+        gp/GeneticProgramming.cpp
+    )
+    set(
         ZOO_TEST_SOURCES
         ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
         ${SWAR_SOURCES}
         ${MISCELLANEA_SOURCES}
+        ${GENETIC_PROGRAMMING_SOURCES}
     )
 
     add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
