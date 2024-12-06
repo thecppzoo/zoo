@@ -31,13 +31,14 @@ inline void noOp(...) {}
 /// \brief Ah
 ///
 /// Design:
-/// To minimize allocations, this type will attempt to hold the chars
-/// of the string locally.
+/// To minimize allocations, this type has a configurqble internal
+/// buffer --of size N * sizeof(char *)-- that will hold the carac-
+/// ters of a string short enough to fit in it.
 /// To maximize space efficiency, the encoding of whether the string
 /// is local or on the heap will occur at the last byte, least
 /// significant bits of the local storage.
-/// the local storage doubles as the encoding of a heap pointer, for
-/// strings that can not be held locally
+/// The local storage doubles as the encoding of a heap pointer, for
+/// strings that can not be held locally.
 /// This uses Andrei Alexandrescu's idea of storing the size of the
 /// string as the remaining local capacity, in this way, a 0 local
 /// capacity also encodes the null byte for c_str(), as reported by
@@ -45,25 +46,52 @@ inline void noOp(...) {}
 /// In case the string is too long for local allocation, the
 /// pointer in the heap will be encoded locally in the last word
 /// of the representation.
+/// Thus the optimal size of the local buffer is of sizeof(char *)
+/// since it well either used as local storage or as pointer to the
+/// heap.
 /// \tparam StorageModel Indicates the size of the local storage
-/// and its alignment
+/// and its alignment.
 /// For large strings (allocated in the heap):
 /// In the last void * worth of local storage:
-/// +--------- Big Endian diagram ------------------------
-/// | Most significant part of Pointer | BytesForSizeEncoding
-/// +--------- Little Endian actual representation
+/// +---------------- Big Endian diagram -----------------------------+
+/// | Most significant part of Pointer |  Last Byte, rob 4 lower bits |
+/// +-----------------------------------------------------------------+
+/// Since we're robbing 4 bits from the last byte, this implies the 
+/// pointers are rounded to 16 bytes.
 /// For local strings:
-/// Little Endian diagram
-/// +-----------------------------------------------------
-/// | characters... | remaining count
-/// +------------------------------
+/// +------- Little Endian Diagam -----+
+/// | characters... | last byte        |
+/// +----------------------------------+
 /// The last byte looks like this:
 /// For heap encoding: number of bytes of the size in the allocation,
-/// the value is in the interval [1, 8], this is represented with 4
-/// bits in which the bit for
-/// For local encoding there is the need for log2(Size) bits to express
-/// the size of the local string (either as size or remaining)
-/// And we need one more bit to encode local (zero) or heap(1)
+/// the value is in the interval [1, 8], this is represented with a 
+/// shifted range of [0, 7] which allow us to use 3 bits to encode the
+/// number of bytes used to encode the length of the string. A fourth
+/// bit is used to flag whether the local buffer stores a pointer to a
+/// heap allocated string (1) or if it is represented in the local bu=
+/// ffer (0). In the heap encoding the binary number represented in such
+/// bits, precedes the actual string payload.
+/// For local encoding: the last bytes take the form of the null ter-
+/// minator.
+///
+/// The Case For A Custom Allocator.
+/// A custom allocator was being considered for integration with the
+/// StorageModel String. The considerations we see are:
+/// * The size of the StorageModel can be set to size of char *, the
+///   theoretical optimal size of the StorageModel String.
+/// * The rest of the sizes can be divided in arenas (with increasing
+///   limit sizes) to minimize the waste. We can assign some regular
+///   (constexpr) step to these (say 1 between 8-15, 2 between 16-23,
+///   and so on. that will depend on trial an error).
+/// * An arena should be able to 'steal' a slot from an arena that has 
+///   a base size that is a multiple of the original. This will force
+///   us to maintain metadata of the size and load factor for each
+///   arena.
+/// * A goal that the previous point tries to achieve is to minimize 
+///   the number of hits on the general allocator.
+/// * The design has rely on touching only metadata. with just a visit
+///   to the arena to mark the buffer as taken.
+///   
 template<typename StorageModel>
 struct Str {
     constexpr static auto
