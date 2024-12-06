@@ -28,70 +28,92 @@ inline void noOp(...) {}
 #define printf noOp
 #define fprintf noOp
 
-/// \brief Ah
+/// \brief String controller type optimized for minimum
+/// size and configurability
 ///
 /// Design:
-/// To minimize allocations, this type has a configurqble internal
-/// buffer --of size N * sizeof(char *)-- that will hold the carac-
-/// ters of a string short enough to fit in it.
-/// To maximize space efficiency, the encoding of whether the string
-/// is local or on the heap will occur at the last byte, least
-/// significant bits of the local storage.
-/// The local storage doubles as the encoding of a heap pointer, for
-/// strings that can not be held locally.
-/// This uses Andrei Alexandrescu's idea of storing the size of the
-/// string as the remaining local capacity, in this way, a 0 local
-/// capacity also encodes the null byte for c_str(), as reported by
-/// Nicholas Omrod at CPPCon 2016.
-/// In case the string is too long for local allocation, the
-/// pointer in the heap will be encoded locally in the last word
-/// of the representation.
-/// Thus the optimal size of the local buffer is of sizeof(char *)
-/// since it well either used as local storage or as pointer to the
-/// heap.
-/// \tparam StorageModel Indicates the size of the local storage
-/// and its alignment.
+/// This type attempts to use a minimum size fully usable string type
+/// compatible with the API of std::string. The extreme case is when
+/// sizeof(Str<void *>) == sizeof(void *). This type is a template that
+/// takes a type argument to serve as the *prototype* for the local
+/// buffer. If you select "void *" as the prototype, the local buffer and
+/// the size of Str<void *> will have size and alignment of void *. If you
+/// select "void *[2]" (array of two pointers), then there will be 2 void
+/// pointers worth of space (16 bytes) locally.
+///
+/// To maximize space efficiency, the encoding of whether the string is
+/// local or on the heap will occur at the last byte, least significant
+/// bits of the local storage. The space corresponding to the last pointer
+/// worth of local storage doubles as the encoding of a heap pointer for
+/// strings that cannot be held locally.
+///
+/// This uses Andrei Alexandrescu's idea of storing the size of the string
+/// as the remaining local capacity. In this way, a 0 local capacity also
+/// encodes the null byte for c_str(), as reported by Nicholas Omrod at
+/// CPPCon 2016. In case the string is too long for local allocation, the
+/// pointer in the heap will be encoded locally in the last word of the
+/// representation.
+///
+/// For an application expecting large strings, the optimal size of the
+/// local storage would be that of a "char *". Since most strings would be
+/// large, there would be few chances of storing them in the local buffer.
+/// You could use "char *" or "void *" for the storage prototype.
+///
+/// \tparam StorageModel Indicates the size of the local storage and its
+/// alignment.
+///
 /// For large strings (allocated in the heap):
 /// In the last void * worth of local storage:
 /// +---------------- Big Endian diagram -----------------------------+
 /// | Most significant part of Pointer |  Last Byte, rob 4 lower bits |
 /// +-----------------------------------------------------------------+
-/// Since we're robbing 4 bits from the last byte, this implies the 
-/// pointers are rounded to 16 bytes.
-/// For local strings:
-/// +------- Little Endian Diagam -----+
-/// | characters... | last byte        |
-/// +----------------------------------+
-/// The last byte looks like this:
-/// For heap encoding: number of bytes of the size in the allocation,
-/// the value is in the interval [1, 8], this is represented with a 
-/// shifted range of [0, 7] which allow us to use 3 bits to encode the
-/// number of bytes used to encode the length of the string. A fourth
-/// bit is used to flag whether the local buffer stores a pointer to a
-/// heap allocated string (1) or if it is represented in the local bu=
-/// ffer (0). In the heap encoding the binary number represented in such
-/// bits, precedes the actual string payload.
-/// For local encoding: the last bytes take the form of the null ter-
-/// minator.
+/// Since we're robbing 4 bits from the last byte, this implies the pointers
+/// are rounded up to 16 bytes.
 ///
-/// The Case For A Custom Allocator.
-/// A custom allocator was being considered for integration with the
-/// StorageModel String. The considerations we see are:
-/// * The size of the StorageModel can be set to size of char *, the
-///   theoretical optimal size of the StorageModel String.
-/// * The rest of the sizes can be divided in arenas (with increasing
-///   limit sizes) to minimize the waste. We can assign some regular
-///   (constexpr) step to these (say 1 between 8-15, 2 between 16-23,
-///   and so on. that will depend on trial an error).
-/// * An arena should be able to 'steal' a slot from an arena that has 
-///   a base size that is a multiple of the original. This will force
-///   us to maintain metadata of the size and load factor for each
-///   arena.
-/// * A goal that the previous point tries to achieve is to minimize 
-///   the number of hits on the general allocator.
-/// * The design has rely on touching only metadata. with just a visit
-///   to the arena to mark the buffer as taken.
-///   
+/// For local strings:
+/// +------- Little Endian Diagram -----+
+/// | characters... | last byte         |
+/// +-----------------------------------+
+///
+/// The last byte looks like this:
+/// For heap encoding: the number of bytes required to encode the size of
+/// the string, or mathematically, the logarithm base 256 of the string's
+/// size. This value will be in the interval [1, 8], encoded with a shifted
+/// range of [0, 7], allowing us to use 3 bits to encode the length. An
+/// extra bit flags whether the local buffer stores a pointer to a heap
+/// string (1) or if it is represented in the local buffer (0).
+///
+/// Because the storage model can be of arbitrary size, we cannot assume
+/// the lowest available bit will encode 8. It will be the lowest bit the
+/// local buffer size allows. For a storage model of void *[4], the heap
+/// flag encodes for 32 as a number. For Str<void *>, the bit encodes for 8.
+/// This strategy forces allocations to align to the ceiling of
+/// log2(sizeof(StorageModel)).
+///
+/// Local strings:
+/// The last byte serves as the COUNT OF REMAINING BYTES, including the null
+/// character terminator. Hence, Str<void *> can hold up to seven bytes
+/// + null terminator locally. Str<void *[8]> allows 8*8 = 64 characters
+/// locally (including the null).
+///
+/// Heap-allocated strings:
+/// As explained, the lower three bits indicate the number of bytes needed
+/// to encode the string's length, shifted by 1. The memory referenced by
+/// the encoded pointer starts with however many bytes are needed to encode
+/// the length, followed by the actual bytes of the string.
+///
+/// The Case For A Custom Allocator:
+/// A custom allocator is considered for integration with the StorageModel
+/// for Str. The considerations are:
+/// * The size of the StorageModel can be set to the size of char *, the
+///   theoretical optimal size of the StorageModel.
+/// * The remaining sizes can be divided into arenas (with increasing limit
+///   sizes) to minimize waste. Regular (constexpr) steps (e.g., 1 between
+///   8-15, 2 between 16-23, etc.) can be trialed.
+/// * An arena should 'steal' a slot from an arena whose base size is a
+///   multiple of the original. This forces us to maintain metadata on the
+///   size and load factor for each arena.
+/// * The previous point aims to minimize hits on the general allocator.
 template<typename StorageModel>
 struct Str {
     constexpr static auto
