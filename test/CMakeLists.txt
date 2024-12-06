@@ -124,6 +124,7 @@ else()
     set(
         MISCELLANEA_SOURCES
         egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp root/mem.cpp
+        compilation/Iota.cpp
     )
     set(
         GENETIC_PROGRAMMING_SOURCES

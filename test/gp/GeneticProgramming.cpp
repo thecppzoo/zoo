@@ -1,13 +1,17 @@
+#include "zoo/remedies-17/iota.h"
+
 #include <array>
 #include <random>
+#include <stack>
+
 #include <assert.h>
 
 struct ArtificialAnt {
     constexpr static inline std::array Tokens {
-        "TR", "TL", "Move", "IFA", "Prog"
+        "TR", "TL", "Move", "IFA", "Prog", "P3"
     };
     constexpr static inline std::array ArgumentCount {
-        0, 0, 0, 1, 2
+        0, 0, 0, 1, 2, 3
     };
 };
 
@@ -36,6 +40,16 @@ using Language = ArtificialAnt;
 
 std::string tokens[1000];
 int index = 0;
+
+/// \brief by ChatGPT 4o
+template<std::size_t N, typename RNG>
+auto shuffledIndices(RNG &g) {
+    std::array<int, N> indices;
+    std::iota(indices.begin(), indices.end(), 0); // Fill with 0, 1, ..., N-1
+
+    std::shuffle(indices.begin(), indices.end(), g); // Shuffle the indices
+    return indices;
+}
 
 struct Population {
     static_assert(size(Language::Tokens) == size(Language::ArgumentCount));
@@ -98,6 +112,10 @@ struct Population {
         auto currentDescendantMaxHeight = h - 1;
         auto choiceDescendants = Language::ArgumentCount[choice];
         auto tailForDescendants = tail - choiceDescendants;
+
+        constexpr static auto iota =
+            Iota<std::array<unsigned, MaxArgumentCount>, MaxArgumentCount>::value;
+        if(1 == choiceDescendants)
         for(auto ndx = choiceDescendants;;) {
             // this would be a great place for a recursive lambda to
             // improve performance by not capturing all the invariant context.
@@ -144,6 +162,50 @@ struct Population {
             individuals_[ndx] = allocate(generationBuffer, gr.weight);
         }
     }
+
+    struct ConversionFrame {
+        unsigned weight, remainingSiblings;
+        char *destination;
+    };
+    auto conversionToWeightedElement(const char *input, char *output) {
+        using L = Language;
+        std::stack<ConversionFrame> frames;
+
+        auto writeWeight = [&](unsigned w) {
+            // assumes little endian
+            // memcpy would allow unaligned copying of the bytes
+            // on the platforms that support it,
+            // a "reinterpret_cast" might not respect necessary
+            // alignment in some platforms
+            memcpy(frames.top().destination, &w, sizeof(uint16_t));
+            output += 2;
+        };
+
+        frames.push({0, 1, output});
+        assert(0 < L::ArgumentCount[*input]);
+
+        for(;;) {
+            auto &top = frames.top();
+            if(0 == top.remainingSiblings--) {
+                // No more siblings, thus completed the frame
+                writeWeight(top.weight);
+                frames.pop();
+                if(frames.empty()) { break; }
+                continue;
+            }
+            frames.top().weight += 1;
+            auto current = *input++;
+            auto destination = frames.top().destination;
+
+            *frames.top().destination++ = current;
+            auto argumentCount = L::ArgumentCount[current];
+            if(0 < argumentCount) {
+                // There are argumentCount descendants to convert,
+                // create a new frame for them
+                frames.push({0, unsigned(argumentCount), destination + 2});
+            }
+        }
+    }
 };
 
 }
@@ -153,7 +215,7 @@ struct Population {
 #include <sstream>
 
 static_assert(3 == zoo::TerminalsCount<ArtificialAnt>());
-static_assert(2 == zoo::NonTerminalsCount<ArtificialAnt>());
+static_assert(3 == zoo::NonTerminalsCount<ArtificialAnt>());
 
 template<typename Language>
 struct Individual {
