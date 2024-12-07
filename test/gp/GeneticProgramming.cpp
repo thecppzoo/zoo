@@ -6,6 +6,49 @@
 
 #include <assert.h>
 
+namespace zoo {
+
+template <typename Iter>
+class CyclingEngine {
+public:
+    using result_type = typename std::iterator_traits<Iter>::value_type;
+
+    CyclingEngine(Iter first, Iter last)
+        : valuesBegin(first), valuesEnd(last), current(first) {
+        if (valuesBegin == valuesEnd) {
+            throw std::invalid_argument("CyclingEngine: Range cannot be empty.");
+        }
+    }
+
+    result_type operator()() {
+        result_type value = *current;
+        ++current;
+        if (current == valuesEnd) {
+            current = valuesBegin; // Wrap around
+        }
+        return value;
+    }
+
+    void seed(std::size_t newSeed) {
+        std::advance(current = valuesBegin, newSeed % std::distance(valuesBegin, valuesEnd));
+    }
+
+    static constexpr result_type min() {
+        return std::numeric_limits<result_type>::lowest();
+    }
+
+    static constexpr result_type max() {
+        return std::numeric_limits<result_type>::max();
+    }
+
+private:
+    Iter valuesBegin;
+    Iter valuesEnd;
+    Iter current;
+};
+
+}
+
 struct ArtificialAnt {
     constexpr static inline std::array Tokens {
         "TR", "TL", "Move", "IFA", "Prog", "P3"
@@ -54,8 +97,10 @@ auto shuffledIndices(RNG &g) {
 struct Population {
     static_assert(size(Language::Tokens) == size(Language::ArgumentCount));
     static_assert(size(Language::Tokens) < 256);
+
     enum GenerationStrategies {
-        Rampled
+        Rampled,
+        Debug_RampledWithoutDescendantReordering
     };
 
     CSIA
@@ -85,6 +130,11 @@ struct Population {
         int weight;
     };
 
+    static inline auto argsIotaBase_ =
+        makeModifiable(
+            Iota_v<std::array<unsigned, MaxArgumentCount>, MaxArgumentCount>
+        );
+
     template<typename G>
     GenerationReturnType generate(int h, char *space, const char *tail, G &g) {
         auto spc = space;
@@ -113,21 +163,27 @@ struct Population {
         auto choiceDescendants = Language::ArgumentCount[choice];
         auto tailForDescendants = tail - choiceDescendants;
 
-        constexpr static auto iota =
-            Iota<std::array<unsigned, MaxArgumentCount>, MaxArgumentCount>::value;
-        if(1 == choiceDescendants)
+        std::array<unsigned, MaxArgumentCount> indexOrder = argsIotaBase_;
+        if(1 < choiceDescendants) {
+            std::shuffle(
+                indexOrder.begin(), indexOrder.begin() + choiceDescendants, g
+            );
+        }
+        std::array<int, MaxArgumentCount> heights = {};
+        for(auto ndx = choiceDescendants - 1;;) {
+            heights[indexOrder[ndx]] = currentDescendantMaxHeight;
+            if(0 == ndx) { break; }
+            currentDescendantMaxHeight =
+                currentDescendantMaxHeight * 2 / 3;
+        }
         for(auto ndx = choiceDescendants;;) {
             // this would be a great place for a recursive lambda to
             // improve performance by not capturing all the invariant context.
             // Check that indeed the compilers generate a dumb recursion
             auto recurringResult =
-                generate(
-                    currentDescendantMaxHeight, spc, tailForDescendants, g
-                );
+                generate(heights[ndx], spc, tailForDescendants, g);
             spc += recurringResult.weight;
             if(!--ndx) { break; }
-            currentDescendantMaxHeight =
-                currentDescendantMaxHeight * 2 / 3;
         }
         return { h, int(spc - space) };
     }
@@ -256,9 +312,30 @@ void trace(const char *ptr) {
     WARN(to_string(Individual<ArtificialAnt>{ptr}));
 }
 
+#include "zoo/range_streamability_traits.h"
+
+static_assert(zoo::IsStreamable_v<int>, "int should be streamable");
+static_assert(!zoo::IsStreamable_v<std::vector<int>>, "std::vector<int> is not directly streamable");
+//static_assert(IsRange_v<std::vector<int>>, "std::vector<int> is a range");
+//static_assert(IsStreamableContainer_v<std::vector<int>>, "std::vector<int> is a streamable container");
+
+//static_assert(!
+//    IsStreamableContainer_v<std::vector<std::vector<int>>>,
+  //  "std::vector<std::vector<int>> is not a streamable container");
+    
+    //std::vector<int> vec = {1, 2, 3};
+    //std::cout << "vec is streamable container: " << //IsStreamableContainer_v<decltype(vec)> << "\n";
+
+
 TEST_CASE("Genetic Programming", "[genetic-programming]") {
     std::mt19937_64 gennie(0xEdd1e);
-    zoo::Population p(7, gennie);
+    std::array<std::mt19937_64::result_type, 1000> other;
+    for(auto ndx = 0; ndx < other.size(); ++ndx) {
+        other[ndx] = gennie();
+    }
+    //WARN(other);
+    zoo::CyclingEngine engine(other.begin(), other.end());
+    zoo::Population p(7, engine);
     trace(p.individuals_[0]);
 }
 

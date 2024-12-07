@@ -12,6 +12,8 @@
 namespace zoo {
 
 /// \brief Generates the sequence 0, ..., N - 1 as constexpr
+///
+/// All because std::iota is not constexpr!
 template <typename Container, std::size_t N>
 struct Iota {
     static_assert(
@@ -47,9 +49,12 @@ struct Iota<std::array<T, N>, N> {
     }();
 };
 
+template <typename Container, std::size_t N>
+constexpr auto Iota_v = Iota<Container, N>::value;
 
+/// \brief constexpr containers make their elements `const`, this gives you a modifiable copy
 template <typename TargetContainer = void, typename SourceContainer>
-auto makeModifiable(const SourceContainer& constContainer) {
+auto makeModifiable(const SourceContainer &constContainer) {
     using ValueType =
         typename std::remove_const<typename SourceContainer::value_type>::type;
 
@@ -66,8 +71,9 @@ auto makeModifiable(const SourceContainer& constContainer) {
 
 // Specialization for std::array
 template <typename T, std::size_t N>
-auto makeModifiable(const std::array<const T, N>& constArray) {
-    std::array<T, N> modifiableArray;
+auto makeModifiable(const std::array<T, N> &constArray) {
+    using ModifiableT = std::remove_const_t<T>;
+    std::array<ModifiableT, N> modifiableArray;
     std::copy(begin(constArray), end(constArray), begin(modifiableArray));
     return modifiableArray;
 }

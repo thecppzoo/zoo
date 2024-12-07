@@ -8,8 +8,8 @@ struct ConstexprVector {
 
     constexpr void resize(std::size_t size) { sz = size; }
 
-    constexpr int* begin() { return data; }
-    constexpr int* end() { return data + sz; }
+    constexpr int *begin() { return data; }
+    constexpr int *end() { return data + sz; }
 };
 
 constexpr auto
