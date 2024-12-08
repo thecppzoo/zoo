@@ -126,7 +126,7 @@ struct Str {
     static_assert(sizeof(void *) <= Size);
     alignas(alignof(StorageModel)) char buffer_[sizeof(StorageModel)];
 
-    auto &lastByte() const noexcept { return buffer_[Size - 1]; }
+    auto lastByte() const noexcept { return buffer_[Size - 1]; }
     auto &lastByte() noexcept { return buffer_[Size - 1]; }
     auto lastPtr() const noexcept { return buffer_ + Size - sizeof(char *); }
     auto lastPtr() noexcept { return buffer_ + Size - sizeof(char *); }
