@@ -128,8 +128,9 @@ struct Str {
 
     auto lastByte() const noexcept { return buffer_[Size - 1]; }
     auto &lastByte() noexcept { return buffer_[Size - 1]; }
-    auto codePtr() const noexcept { return buffer_ + Size - sizeof(char *); }
-    auto codePtr() noexcept { return buffer_ + Size - sizeof(char *); }
+    auto codePtr() noexcept { return reinterpret_cast<char **>(buffer_ + Size - sizeof(char *)); }
+    const auto codePtr() const noexcept { return const_cast<Str *>(this)->codePtr(); }
+
     auto allocationPtr() const noexcept {
         uintptr_t codeThatContainsAPointer;
         memcpy(&codeThatContainsAPointer, codePtr(), sizeof(char *));
