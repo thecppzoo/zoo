@@ -128,11 +128,11 @@ struct Str {
 
     auto lastByte() const noexcept { return buffer_[Size - 1]; }
     auto &lastByte() noexcept { return buffer_[Size - 1]; }
-    auto lastPtr() const noexcept { return buffer_ + Size - sizeof(char *); }
-    auto lastPtr() noexcept { return buffer_ + Size - sizeof(char *); }
+    auto codePtr() const noexcept { return buffer_ + Size - sizeof(char *); }
+    auto codePtr() noexcept { return buffer_ + Size - sizeof(char *); }
     auto allocationPtr() const noexcept {
         uintptr_t codeThatContainsAPointer;
-        memcpy(&codeThatContainsAPointer, lastPtr(), sizeof(char *));
+        memcpy(&codeThatContainsAPointer, codePtr(), sizeof(char *));
         assert(onHeap());
         auto asLittleEndian = __builtin_bswap64(codeThatContainsAPointer);
         auto bytesForSizeMinus1 = asLittleEndian & 7;
@@ -189,7 +189,7 @@ struct Str {
             memcpy(onHeap + bytesForSize, source, length);
 
             auto code = encodePointer(bytesForSize, onHeap);
-            auto addressOfLastPointerWorthOfSpace = lastPtr();
+            auto addressOfLastPointerWorthOfSpace = codePtr();
             memcpy(addressOfLastPointerWorthOfSpace, &code, sizeof(char *));
             // We encode the range [1..8] as [0..7]
 
