@@ -60,8 +60,6 @@ struct ArtificialAnt {
 
 void trace(const char *);
 
-namespace zoo {
-
 using std::size;
 
 template<typename T>
@@ -77,6 +75,7 @@ constexpr auto NonTerminalsCount() {
     return size(T::ArgumentCount) - TerminalsCount<T>();
 }
 
+namespace zoo {
 using Language = ArtificialAnt;
 
 #define CSIA constexpr static inline auto
@@ -268,10 +267,8 @@ struct Population {
 
 #include <catch2/catch.hpp>
 
-#include <sstream>
-
-static_assert(3 == zoo::TerminalsCount<ArtificialAnt>());
-static_assert(3 == zoo::NonTerminalsCount<ArtificialAnt>());
+static_assert(3 == TerminalsCount<ArtificialAnt>());
+static_assert(3 == NonTerminalsCount<ArtificialAnt>());
 
 template<typename Language>
 struct Individual {
@@ -279,23 +276,36 @@ struct Individual {
 
     struct Conversion {
         std::string str;
-        const char *converter(const char *source) {
+
+        const char *convert(const char *source) {
+            return converter(this, source, (void *)&converter);
+        }
+
+        static const char *converter(
+            Conversion *thy,
+            const char *source,
+            void *ptrToConverter
+        ) {
+            auto recursion =
+                reinterpret_cast<
+                    const char *(*)(Conversion *, const char *, void *)
+                >(ptrToConverter);
             auto head = *source++;
             assert(unsigned(head) < size(ArtificialAnt::ArgumentCount));
-            str += Language::Tokens[head];
-            if(head < zoo::TerminalsCount<Language>()) {
+            thy->str += Language::Tokens[head];
+            if(head < TerminalsCount<Language>()) {
                 return source;
             }
-            str += "(";
-            source = converter(source);
+            thy->str += "(";
+            source = recursion(thy, source, ptrToConverter);
             for(
                 auto remainingCount = Language::ArgumentCount[head] - 1;
                 remainingCount--;
             ) {
-                str += ", ";
-                source = converter(source);
+                thy->str += ", ";
+                source = recursion(thy, source, ptrToConverter);
             }
-            str += ")";
+            thy->str += ")";
             return source;
         }
     };
@@ -304,7 +314,7 @@ struct Individual {
 template<typename Language>
 auto to_string(const Individual<Language> &i) {
     typename Individual<Language>::Conversion c;
-    c.converter(i.inorderRepresentation);
+    c.convert(i.inorderRepresentation);
     return c.str;
 };
 
@@ -312,20 +322,17 @@ void trace(const char *ptr) {
     WARN(to_string(Individual<ArtificialAnt>{ptr}));
 }
 
-#include "zoo/range_streamability_traits.h"
+#include "zoo/StreamableView.h"
 
-static_assert(zoo::IsStreamable_v<int>, "int should be streamable");
-static_assert(!zoo::IsStreamable_v<std::vector<int>>, "std::vector<int> is not directly streamable");
-//static_assert(IsRange_v<std::vector<int>>, "std::vector<int> is a range");
-//static_assert(IsStreamableContainer_v<std::vector<int>>, "std::vector<int> is a streamable container");
+static_assert(zoo::Streamable_v<int>);
+static_assert(!zoo::Streamable_v<std::vector<int>>);
+static_assert(zoo::Range_v<std::vector<int>>);
+static_assert(zoo::RangeWithStreamableElements_v<std::vector<int>>);
 
-//static_assert(!
-//    IsStreamableContainer_v<std::vector<std::vector<int>>>,
-  //  "std::vector<std::vector<int>> is not a streamable container");
-    
-    //std::vector<int> vec = {1, 2, 3};
-    //std::cout << "vec is streamable container: " << //IsStreamableContainer_v<decltype(vec)> << "\n";
-
+struct NotStreamable {};
+// Test the testing artifact itself
+static_assert(!zoo::Streamable_v<NotStreamable>);
+static_assert(!zoo::RangeWithStreamableElements_v<std::vector<NotStreamable>>);
 
 TEST_CASE("Genetic Programming", "[genetic-programming]") {
     std::mt19937_64 gennie(0xEdd1e);
@@ -333,10 +340,9 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     for(auto ndx = 0; ndx < other.size(); ++ndx) {
         other[ndx] = gennie();
     }
-    //WARN(other);
+    std::vector<int> a = { 1, 2, 3, 4, 5 };
+    WARN(zoo::StreamableView{a});
     zoo::CyclingEngine engine(other.begin(), other.end());
     zoo::Population p(7, engine);
     trace(p.individuals_[0]);
 }
-
-
