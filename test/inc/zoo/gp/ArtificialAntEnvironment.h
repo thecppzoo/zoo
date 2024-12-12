@@ -1,45 +1,6 @@
 #ifndef ZOO_GP_ENVIRONMENT_H
 #define ZOO_GP_ENVIRONMENT_H
 
-enum Node {
-    TurnLeft,
-    TurnRight,
-    Move,
-    IFA,
-    Prog2,
-    Prog3
-};
-
-struct Individual {
-    Node node_; // The node representing the type of instruction.
-    Individual *descendants_[3]; // Array of pointers to child nodes.
-
-    auto node() const noexcept {
-        return node_;
-    }
-
-    auto descendantsStart() const noexcept {
-        return const_cast<Individual **>(descendants_);
-    }
-
-    auto next(Individual **current) const noexcept {
-        return const_cast<Individual **>(current + 1);
-    }
-};
-
-auto descendantCount(Node n) {
-    switch (n) {
-    case IFA:
-        return 1;
-    case Prog2:
-        return 2;
-    case Prog3:
-        return 3;
-    default:
-        return 0;
-    }
-}
-
 struct Environment {
     static constexpr auto
         GridWidth = 32,
@@ -163,6 +124,7 @@ struct Environment {
     }
 };
 
-void artificialAntExecution(Environment &e, Individual &ind);
+template<typename IType>
+void artificialAntExecution(Environment &e, IType &ind);
 
 #endif

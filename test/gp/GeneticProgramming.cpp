@@ -1,51 +1,22 @@
+#include "zoo/gp/ArtificialAntLanguage.h"
+
 #include "zoo/CyclingEngine.h"
 #include "zoo/remedies-17/iota.h"
 
-#include <array>
-#include <random>
+#include <string>
 #include <stack>
-
-#include <assert.h>
-
-struct ArtificialAnt {
-    constexpr static inline std::array Tokens {
-        "TR", "TL", "Move", "IFA", "Prog", "P3"
-    };
-    constexpr static inline std::array ArgumentCount {
-        0, 0, 0, 1, 2, 3
-    };
-};
-
-void trace(const char *);
-
-using std::size;
-
-template<typename T>
-constexpr auto TerminalsCount() {
-    for(size_t ndx = 0; ndx < size(T::ArgumentCount); ++ndx) {
-        if(T::ArgumentCount[ndx]) { return ndx; }
-    }
-    return size(T::ArgumentCount);
-}
-
-template<typename T>
-constexpr auto NonTerminalsCount() {
-    return size(T::ArgumentCount) - TerminalsCount<T>();
-}
 
 namespace zoo {
 using Language = ArtificialAnt;
 
 #define CSIA constexpr static inline auto
 
-std::string tokens[1000];
-int index = 0;
-
 /// \brief by ChatGPT 4o
 template<std::size_t N, typename RNG>
 auto shuffledIndices(RNG &g) {
-    std::array<int, N> indices;
-    std::iota(indices.begin(), indices.end(), 0); // Fill with 0, 1, ..., N-1
+    using Base = std::array<int, N>;
+
+    auto indices = zoo::Iota<Base, N>::value;
 
     std::shuffle(indices.begin(), indices.end(), g); // Shuffle the indices
     return indices;
@@ -109,9 +80,6 @@ struct Population {
             *spc = t;
             auto he = std::to_string(h);
             auto to = ArtificialAnt::Tokens[t];
-            assert(index < 1000);
-            //tokens[index++] = he + ":" + to;
-            //tokens[index] = "<->";
         };
         auto onSpaceExhausted =
             [&]() -> GenerationReturnType {
@@ -189,7 +157,6 @@ struct Population {
             D{0, LanguageSize - 1}
         };
         for(auto ndx = Size; ndx--; ) {
-            index = 0;
             auto gr = generate(
                 dists,
                 maxHeight,
@@ -197,7 +164,6 @@ struct Population {
                 generationBuffer + sizeof(generationBuffer),
                 randomGenerator
             );
-            trace(generationBuffer);
             individuals_[ndx] = allocate(generationBuffer, gr.weight);
         }
     }

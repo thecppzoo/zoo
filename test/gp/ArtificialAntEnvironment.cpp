@@ -1,6 +1,8 @@
 #include "zoo/gp/ArtificialAntEnvironment.h"
+#include "zoo/gp/ArtificialAntLanguage.h"
 
-void artificialAntExecution(Environment &e, Individual &ind) {
+template<typename IType>
+void artificialAntExecution(Environment &e, IType &ind) {
     if (e.atEnd()) {
         return;
     }
