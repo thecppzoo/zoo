@@ -1,4 +1,7 @@
 #include <cstdio>
+#include <iostream>
+#include <string>
+#include <functional>
 
 enum Node {
     TurnLeft,
@@ -10,22 +13,17 @@ enum Node {
 };
 
 struct Individual {
-    Node node_; ///< The node representing the type of instruction.
-    Individual *descendants_[3]; ///< Array of pointers to child nodes.
+    Node node_; // The node representing the type of instruction.
+    Individual *descendants_[3]; // Array of pointers to child nodes.
 
-    /// Returns the current node type.
     auto node() const noexcept {
         return node_;
     }
 
-    /// Returns a pointer to the first descendant in the array.
     auto descendantsStart() const noexcept {
         return const_cast<Individual **>(descendants_);
     }
 
-    /// Advances the pointer to the next descendant in the array.
-    /// @param current Pointer to the current descendant.
-    /// @return Pointer to the next descendant.
     auto next(Individual **current) const noexcept {
         return const_cast<Individual **>(current + 1);
     }
@@ -44,10 +42,6 @@ auto descendantCount(Node n) {
     }
 }
 
-/// Represents the environment, including a trail of food and the ant's state.
-/// The environment tracks the ant's position, orientation, and the distribution of food.
-/// The ant moves on a grid with wrap-around boundaries, and tries to consume all the food
-/// placed according to the Santa Fe trail pattern.
 struct Environment {
     static constexpr auto
         GridWidth = 32,
@@ -112,37 +106,35 @@ struct Environment {
         #undef _
     };
 
-
-
-    auto initializeFood() {
-        for (auto r = 0; r < GridHeight; r = r + 1) {
-            for (auto c = 0; c < GridWidth; c = c + 1) {
+    void initializeFood() {
+        for (int r = 0; r < GridHeight; r++) {
+            for (int c = 0; c < GridWidth; c++) {
                 food_[r][c] = InitialFoodMatrix[r][c];
             }
         }
     }
 
-    auto turnLeft() {
-        auto oldX = ant_.dir.x;
-        auto oldY = ant_.dir.y;
+    void turnLeft() {
+        int oldX = ant_.dir.x;
+        int oldY = ant_.dir.y;
         ant_.dir = Position{-oldY, oldX};
     }
 
-    auto turnRight() {
-        auto oldX = ant_.dir.x;
-        auto oldY = ant_.dir.y;
+    void turnRight() {
+        int oldX = ant_.dir.x;
+        int oldY = ant_.dir.y;
         ant_.dir = Position{oldY, -oldX};
     }
 
-    auto aheadPosition() const {
+    Position aheadPosition() const {
         return ant_.pos + ant_.dir;
     }
 
-    auto hasFood(Position p) const {
+    bool hasFood(Position p) const {
         return food_[p.y][p.x];
     }
 
-    auto consumeFoodAt(Position p) {
+    bool consumeFoodAt(Position p) {
         if (hasFood(p)) {
             food_[p.y][p.x] = false;
             return true;
@@ -150,30 +142,30 @@ struct Environment {
         return false;
     }
 
-    auto foodAhead() {
+    bool foodAhead() const {
         return hasFood(aheadPosition());
     }
 
-    auto moveForward() {
+    void moveForward() {
         ant_.pos = aheadPosition();
     }
 
-    auto consumeFood() {
+    bool consumeFood() {
         return consumeFoodAt(ant_.pos);
     }
 
-    auto atEnd() const {
+    bool atEnd() const {
         return MaxSteps <= steps_;
     }
 
-    Environment() : steps_(decltype(0){}) {
-        ant_.pos = Position{decltype(0){}, decltype(0){}};
-        ant_.dir = Position{decltype(1){}, decltype(0){}};
+    Environment() : steps_(0) {
+        ant_.pos = Position{0, 0};
+        ant_.dir = Position{1, 0};
         initializeFood();
     }
 };
 
-auto artificialAntExecution(Environment &e, Individual &ind) {
+void artificialAntExecution(Environment &e, Individual &ind) {
     if (e.atEnd()) {
         return;
     }
@@ -222,104 +214,4 @@ auto artificialAntExecution(Environment &e, Individual &ind) {
     }
 }
 
-#include <iostream>
 
-void displayEnvironment(const Environment &env) {
-    static constexpr auto
-        EMPTY_CELL = '.',
-        FOOD_CELL = 'F',
-        ANT_UP = '^',
-        ANT_RIGHT = '>',
-        ANT_DOWN = 'v',
-        ANT_LEFT = '<';
-
-    // Select the character representing the ant's direction.
-    char antChar;
-    if (env.ant_.dir.x == 0 && env.ant_.dir.y == -1) antChar = ANT_UP;
-    else if (env.ant_.dir.x == 1 && env.ant_.dir.y == 0) antChar = ANT_RIGHT;
-    else if (env.ant_.dir.x == 0 && env.ant_.dir.y == 1) antChar = ANT_DOWN;
-    else if (env.ant_.dir.x == -1 && env.ant_.dir.y == 0) antChar = ANT_LEFT;
-    else antChar = '?'; // Fallback for invalid direction.
-
-    // Display the grid row by row.
-    for (int y = 0; y < Environment::GridHeight; ++y) {
-        for (int x = 0; x < Environment::GridWidth; ++x) {
-            if (x == env.ant_.pos.x && y == env.ant_.pos.y) {
-                // Ant's position.
-                std::cout << antChar;
-            } else if (env.food_[y][x]) {
-                // Food pellet.
-                std::cout << FOOD_CELL;
-            } else {
-                // Empty cell.
-                std::cout << EMPTY_CELL;
-            }
-        }
-        std::cout << '\n';
-    }
-}
-
-
-
-auto eval(Environment &env, Individual &ind) {
-    auto initialFoodCount = decltype(0){};
-    for (auto r = decltype(0){}; r < Environment::GridHeight; r = r + 1) {
-        for (auto c = decltype(0){}; c < Environment::GridWidth; c = c + 1) {
-            if (env.food_[r][c]) {
-                initialFoodCount = initialFoodCount + 1;
-            }
-        }
-    }
-
-    artificialAntExecution(env, ind);
-
-    auto remainingFoodCount = decltype(0){};
-    for (auto r = 0; r < Environment::GridHeight; r = r + 1) {
-        for (auto c = 0; c < Environment::GridWidth; c = c + 1) {
-            if (env.food_[r][c]) {
-                remainingFoodCount = remainingFoodCount + 1;
-            }
-        }
-    }
-
-    auto consumed = (initialFoodCount - remainingFoodCount);
-    return (consumed + decltype(0.0f){});
-}
-
-
-#include <string>
-#include <functional>
-
-/// \brief Preorder traversal of an individual's tree structure.
-///
-/// @tparam NodeProcessing A callable that takes a `Node` and processes it
-/// @param individual The root of the tree to traverse.
-/// @param fun The processor of nodes, for example, what converts a node to its label.
-/// @return The result of the traversal, for example, the string representation of the tree
-template<typename NodeProcessing>
-auto traverse(Individual &individual, NodeProcessing fun) {
-    auto result = fun(individual.node_); // Get the label for the current node.
-
-    // Check the number of descendants for the current node.
-    auto count = descendantCount(individual.node_);
-    if(0 == count) {
-        return result; // Early return for terminals, no descendants to process.
-    }
-
-    result += "(";
-
-    // Factor out of the main loop the first descendant as a special case
-    // because it does not add print ", "
-    auto descendant = individual.descendantsStart();
-    result += traverse(*descendant, fun);
-
-    while(--count) { // Predecrement because one descendant was processed
-        result += ", ";
-        descendant = individual.next(descendant); // Advance to the next descendant.
-        result += traverse(*descendant, fun);
-    }
-
-    result += ")";
-
-    return result;
-}

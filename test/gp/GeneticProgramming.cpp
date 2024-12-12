@@ -1,3 +1,4 @@
+#include "zoo/CyclingEngine.h"
 #include "zoo/remedies-17/iota.h"
 
 #include <array>
@@ -5,49 +6,6 @@
 #include <stack>
 
 #include <assert.h>
-
-namespace zoo {
-
-template <typename Iter>
-class CyclingEngine {
-public:
-    using result_type = typename std::iterator_traits<Iter>::value_type;
-
-    CyclingEngine(Iter first, Iter last)
-        : valuesBegin(first), valuesEnd(last), current(first) {
-        if (valuesBegin == valuesEnd) {
-            throw std::invalid_argument("CyclingEngine: Range cannot be empty.");
-        }
-    }
-
-    result_type operator()() {
-        result_type value = *current;
-        ++current;
-        if (current == valuesEnd) {
-            current = valuesBegin; // Wrap around
-        }
-        return value;
-    }
-
-    void seed(std::size_t newSeed) {
-        std::advance(current = valuesBegin, newSeed % std::distance(valuesBegin, valuesEnd));
-    }
-
-    static constexpr result_type min() {
-        return std::numeric_limits<result_type>::lowest();
-    }
-
-    static constexpr result_type max() {
-        return std::numeric_limits<result_type>::max();
-    }
-
-private:
-    Iter valuesBegin;
-    Iter valuesEnd;
-    Iter current;
-};
-
-}
 
 struct ArtificialAnt {
     constexpr static inline std::array Tokens {
@@ -119,10 +77,12 @@ struct Population {
 
     std::array<char *, Size> individuals_;
 
-    std::uniform_int_distribution<char>
-        terminals,
-        nonTerminals,
-        all;
+    struct Distributions {
+        std::uniform_int_distribution<char>
+            terminals,
+            nonTerminals,
+            all;
+    };
 
     struct GenerationReturnType {
         int realizedHeight;
@@ -135,19 +95,27 @@ struct Population {
         );
 
     template<typename G>
-    GenerationReturnType generate(int h, char *space, const char *tail, G &g) {
+    static GenerationReturnType generateFrontEnd(
+        Distributions &dists,
+        int h, char *space, const char *tail, G &g, void *recursionPtr
+    ) {
+        auto recursion =
+            reinterpret_cast<
+                GenerationReturnType
+                (*)(Distributions &, int, char *, const char *, G &, void *)
+            >(recursionPtr);
         auto spc = space;
         auto setToken = [&](char t) {
             *spc = t;
             auto he = std::to_string(h);
             auto to = ArtificialAnt::Tokens[t];
             assert(index < 1000);
-            tokens[index++] = he + ":" + to;
-            tokens[index] = "<->";
+            //tokens[index++] = he + ":" + to;
+            //tokens[index] = "<->";
         };
         auto onSpaceExhausted =
             [&]() -> GenerationReturnType {
-                auto t = terminals(g);
+                auto t = dists.terminals(g);
                 setToken(t);
                 return {0, 1};
             };
@@ -155,7 +123,7 @@ struct Population {
             // not enough space to select a non terminal guaranteed to fit.
             return onSpaceExhausted();
         }
-        auto choice = nonTerminals(g);
+        auto choice = dists.nonTerminals(g);
         setToken(choice);
         ++spc;
         auto currentDescendantMaxHeight = h - 1;
@@ -180,11 +148,24 @@ struct Population {
             // improve performance by not capturing all the invariant context.
             // Check that indeed the compilers generate a dumb recursion
             auto recurringResult =
-                generate(heights[ndx], spc, tailForDescendants, g);
+                recursion(
+                    dists, heights[ndx], spc, tailForDescendants, g,
+                    recursionPtr
+                );
             spc += recurringResult.weight;
             if(!--ndx) { break; }
         }
         return { h, int(spc - space) };
+    }
+
+    template<typename G>
+    auto generate(
+        Distributions &dists, int h, char *space, const char *tail, G &g
+    ) {
+        return
+            generateFrontEnd(
+                dists, h, space, tail, g, (void *)&generateFrontEnd<G>
+            );
     }
 
     char *allocate(const char *source, int weight) {
@@ -199,15 +180,24 @@ struct Population {
         int maxHeight,
         G &randomGenerator,
         GenerationStrategies strategy = Rampled
-    ):
+    )
+    #if 0
         terminals(0, Terminals - 1),
         nonTerminals(Terminals, Terminals + NonTerminals - 1),
         all(0, size(Language::ArgumentCount) - 1)
+        #endif
     {
         char generationBuffer[1000];
+        using D = decltype(Distributions::terminals);
+        Distributions dists{
+            D{0, Terminals - 1},
+            D{Terminals, Terminals + NonTerminals - 1},
+            D{0, LanguageSize - 1}
+        };
         for(auto ndx = Size; ndx--; ) {
             index = 0;
             auto gr = generate(
+                dists,
                 maxHeight,
                 generationBuffer,
                 generationBuffer + sizeof(generationBuffer),
