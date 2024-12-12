@@ -180,13 +180,7 @@ struct Population {
         int maxHeight,
         G &randomGenerator,
         GenerationStrategies strategy = Rampled
-    )
-    #if 0
-        terminals(0, Terminals - 1),
-        nonTerminals(Terminals, Terminals + NonTerminals - 1),
-        all(0, size(Language::ArgumentCount) - 1)
-        #endif
-    {
+    ) {
         char generationBuffer[1000];
         using D = decltype(Distributions::terminals);
         Distributions dists{

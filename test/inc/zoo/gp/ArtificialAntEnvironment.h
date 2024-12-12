@@ -1,7 +1,5 @@
-#include <cstdio>
-#include <iostream>
-#include <string>
-#include <functional>
+#ifndef ZOO_GP_ENVIRONMENT_H
+#define ZOO_GP_ENVIRONMENT_H
 
 enum Node {
     TurnLeft,
@@ -165,53 +163,6 @@ struct Environment {
     }
 };
 
-void artificialAntExecution(Environment &e, Individual &ind) {
-    if (e.atEnd()) {
-        return;
-    }
+void artificialAntExecution(Environment &e, Individual &ind);
 
-    switch (ind.node()) {
-    case TurnLeft:
-        e.turnLeft();
-        ++e.steps_;
-        break;
-
-    case TurnRight:
-        e.turnRight();
-        ++e.steps_;
-        break;
-
-    case Move:
-        e.moveForward();
-        e.consumeFood();
-        ++e.steps_;
-        break;
-
-    case IFA:
-        if (e.foodAhead()) {
-            auto descendant = ind.descendantsStart();
-            artificialAntExecution(e, **descendant);
-        }
-        break;
-
-    case Prog2: {
-        auto descendant = ind.descendantsStart();
-        artificialAntExecution(e, **descendant);
-        descendant = ind.next(descendant);
-        artificialAntExecution(e, **descendant);
-        break;
-    }
-
-    case Prog3: {
-        auto descendant = ind.descendantsStart();
-        artificialAntExecution(e, **descendant);
-        descendant = ind.next(descendant);
-        artificialAntExecution(e, **descendant);
-        descendant = ind.next(descendant);
-        artificialAntExecution(e, **descendant);
-        break;
-    }
-    }
-}
-
-
+#endif

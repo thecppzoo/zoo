@@ -128,7 +128,7 @@ else()
     )
     set(
         GENETIC_PROGRAMMING_SOURCES
-        gp/GeneticProgramming.cpp gp/environment.cpp
+        gp/GeneticProgramming.cpp gp/ArtificialAntEnvironment.cpp
     )
     set(
         ZOO_TEST_SOURCES
