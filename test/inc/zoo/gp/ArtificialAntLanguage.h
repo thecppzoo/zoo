@@ -4,6 +4,15 @@
 #include<array>
 #include <cstddef>
 
+enum ArtificialAntEnum: char {
+    TurnRight,
+    TurnLeft,
+    Move,
+    IFA,
+    Prog2,
+    Prog3
+};
+
 struct ArtificialAnt {
     constexpr static inline std::array Tokens {
         "TR", "TL", "Move", "IFA", "Prog", "P3"
@@ -11,15 +20,8 @@ struct ArtificialAnt {
     constexpr static inline std::array ArgumentCount {
         0, 0, 0, 1, 2, 3
     };
-};
 
-enum TokenEnum: char {
-    TurnRight,
-    TurnLeft,
-    Move,
-    IFA,
-    Prog2,
-    Prog3
+    using TokenEnum = ArtificialAntEnum;
 };
 
 template<typename T>

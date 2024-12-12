@@ -3,6 +3,7 @@
 
 #include <string>
 #include <assert.h>
+#include <stack>
 
 namespace zoo {
 
@@ -103,20 +104,25 @@ template<typename L>
 struct WeightedPreorder {
     char *space_ = nullptr;
 
-    WeightedPreorder(const char *p, size_t count) {
-        auto space = new char[count * 3];
-        conversionToWeightedElement<L>(space, p);
-        space_ = space;
+    WeightedPreorder(char *p): space_(p) {}
+
+    struct Proxy {
+        WeightedPreorder wp;
+        Proxy(char *p): wp(p) {}
+        WeightedPreorder &operator*() { return wp; }
+        WeightedPreorder &operator->() { return wp; }
+    };
+
+    Proxy descendantsStart() { return {space_ + 3}; }
+    
+    Proxy next(Proxy p) {
+        uint16_t currentLength;
+        memcpy(&currentLength, p.wp.space_, 2);
+        return {p.wp.space_ + 3 * currentLength};
     }
 
-    ~WeightedPreorder() { delete[] space_; }
-
-    char *descendantsStart() { return space_ + 3; }
-    
-    auto next(char *ptr) {
-        uint16_t currentLength;
-        memcpy(&currentLength, ptr, 2);
-        return ptr + 3 * currentLength;
+    typename L::TokenEnum node() {
+        return typename L::TokenEnum{space_[2]};
     }
 };
 

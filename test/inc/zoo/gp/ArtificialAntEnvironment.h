@@ -1,7 +1,7 @@
 #ifndef ZOO_GP_ENVIRONMENT_H
 #define ZOO_GP_ENVIRONMENT_H
 
-struct Environment {
+struct ArtificialAntEnvironment {
     static constexpr auto
         GridWidth = 32,
         GridHeight = 32,
@@ -117,7 +117,7 @@ struct Environment {
         return MaxSteps <= steps_;
     }
 
-    Environment() : steps_(0) {
+    ArtificialAntEnvironment() : steps_(0) {
         ant_.pos = Position{0, 0};
         ant_.dir = Position{1, 0};
         initializeFood();
@@ -125,6 +125,6 @@ struct Environment {
 };
 
 template<typename IType>
-void artificialAntExecution(Environment &e, IType &ind);
+void artificialAntExecution(ArtificialAntEnvironment &e, IType &ind);
 
 #endif
