@@ -83,86 +83,103 @@ if(MSVC)
         MESSAGE(FATAL_ERROR "CMAKE try_compile of non-problematic file did not succeed: ${MSVC_OK_OUTPUT}")
     endif()
 else()
-    # Non-MSVC specific configuration (original content)
+    # Non-MSVC specific configuration
     set(CMAKE_CXX_STANDARD 17)
-    set(CMAKE_CXX_FLAGS_UBSAN "-fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g")
-    set(CMAKE_CXX_FLAGS_ASAN "-fsanitize=address -fno-omit-frame-pointer")
 
+    # Add the third-party directory for dependencies
     add_subdirectory(third_party EXCLUDE_FROM_ALL)
-    enable_testing()
 
+    # Include directories for the project
     include_directories(
-        "${PROJECT_BINARY_DIR}"
-        ./inc
-        ../inc
-        ${TEST_THIRD_PARTY_INCLUDE_PATH}
+        "${PROJECT_BINARY_DIR}" ./inc ../inc ${TestThirdPartyIncludePath}
     )
 
     if("UBSAN" STREQUAL "${CMAKE_BUILD_TYPE}")
-        set(ADDITIONAL_SOURCES "ubsan.cpp")
+        set(AdditionalSources "ubsan.cpp")
     endif()
 
-    message(STATUS "Additional sources:" ${ADDITIONAL_SOURCES})
+    message(STATUS "Additional sources: ${AdditionalSources}")
 
-    set(CURRENT_EXECUTABLE "zooTest${CMAKE_BUILD_TYPE}")
+    # CMake policy for allowing arbitrary characters in test names
+    cmake_policy(SET CMP0110 NEW)
 
-    set(CATCH2_MAIN_SOURCE catch_main.cpp)
-    set(
-        TYPE_ERASURE_SOURCES
+    # Object libraries and executables
+    add_library(
+        Catch2Main OBJECT catch_main.cpp
+    )
+
+    # Helper function to create object libraries and executables
+    function(addTestTarget targetName sources)
+        add_library(${targetName} OBJECT ${sources})
+        add_executable(${targetName}_test $<TARGET_OBJECTS:${targetName}>)
+        target_link_libraries(${targetName}_test ${targetName} Catch2Main)
+
+        # Accumulate sources for the all-in-one target
+        list(APPEND AllInOneSources ${sources})
+        set(AllInOneSources "${AllInOneSources}" PARENT_SCOPE)
+    endfunction()
+
+    # Global variable to accumulate all sources
+    set(AllInOneSources "")
+
+    addTestTarget(
+        AlgorithmTest
+
+        algorithm/cfs.cpp algorithm/quicksort.cpp
+    )
+
+    addTestTarget(
+        TypeErasureTest
+
         any.cpp AlignedStorage.cpp AnyCallable.cpp AnyCallSignature.cpp
         AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp
     )
-    set(
-        SWAR_SOURCES
+
+    addTestTarget(
+        SWARTest
+
         swar/BasicOperations.cpp swar/sublanes.cpp
     )
-    set(
-        MAP_SOURCES
-        map/BasicMap.cpp map/RobinHood.test.cpp map/RobinHood.hybrid.test.cpp
+
+    addTestTarget(
+        GeneticProgramming
+        gp/GeneticProgramming.cpp gp/ArtificialAntEnvironment.cpp
     )
-    set(ALGORITHM_SOURCES algorithm/cfs.cpp algorithm/quicksort.cpp)
-    set(
-        MISCELLANEA_SOURCES
+
+    addTestTarget(
+        Uncategorized
+
         egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp root/mem.cpp
         compilation/Iota.cpp
     )
-    set(
-        GENETIC_PROGRAMMING_SOURCES
-        gp/GeneticProgramming.cpp gp/ArtificialAntEnvironment.cpp
-    )
-    set(
-        ZOO_TEST_SOURCES
-        ${CATCH2_MAIN_SOURCE} ${TYPE_ERASURE_SOURCES} ${ALGORITHM_SOURCES}
-        ${SWAR_SOURCES}
-        ${MISCELLANEA_SOURCES}
-        ${GENETIC_PROGRAMMING_SOURCES}
-    )
 
-    add_library(Catch2Main OBJECT ${CATCH2_MAIN_SOURCE})
-    add_library(AlgorithmTest OBJECT ${ALGORITHM_SOURCES})
-    add_library(TypeErasureTest OBJECT ${TYPE_ERASURE_SOURCES})
-    add_library(SWARTest OBJECT ${SWAR_SOURCES})
-    #add_library(MapTest OBJECT ${MAP_SOURCES})
-    add_library(Uncategorized OBJECT ${MISCELLANEA_SOURCES})
+    # Uncomment if needed
+    # addTestTarget(
+    #     MapTest
+    #
+    #     map/BasicMap.cpp map/RobinHood.test.cpp map/RobinHood.hybrid.test.cpp
+    # )
 
+    # Main executable
+    set(CurrentExecutable "zooTest${CMAKE_BUILD_TYPE}")
     add_executable(
-        ${CURRENT_EXECUTABLE} ${ADDITIONAL_SOURCES}
+        ${CurrentExecutable} ${AdditionalSources}
     )
-    target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasureTest SWARTest Uncategorized)
+    target_link_libraries(
+        ${CurrentExecutable}
 
-    add_executable(algorithm2 $<TARGET_OBJECTS:Catch2Main>)
-    target_link_libraries(algorithm2 AlgorithmTest)
-    add_executable(type_erasure $<TARGET_OBJECTS:Catch2Main>)
-    target_link_libraries(type_erasure TypeErasureTest)
-    add_executable(swar $<TARGET_OBJECTS:Catch2Main>)
-    target_link_libraries(swar SWARTest)
-    # add_executable(mapt $<TARGET_OBJECTS:Catch2Main>)
-    # target_link_libraries(mapt MapTest)
+        Catch2Main AlgorithmTest TypeErasureTest SWARTest Uncategorized
+    )
 
-    # CMake build: library tests
-    set(TEST_APP_NAME "${CURRENT_EXECUTABLE}Test")
-    add_executable(${TEST_APP_NAME} ${ZOO_TEST_SOURCES})
-    include_directories(${TEST_THIRD_PARTY_INCLUDE_PATH})
-    enable_testing()
-    ParseAndAddCatchTests(${TEST_APP_NAME})
+    # All-in-one test app
+    set(TestAppName "${CurrentExecutable}Test")
+    add_executable(
+        ${TestAppName}
+
+        ${AllInOneSources}
+        catch_main.cpp
+    )
+
+    # Use Catch2's `catch_discover_tests` for test integration
+    catch_discover_tests(${TestAppName})
 endif()
