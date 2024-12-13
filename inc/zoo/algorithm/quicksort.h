@@ -14,28 +14,51 @@
 
 namespace zoo {
 
+/// ImplicitPivotResult is returned by implicitPivotPartition and contains:
+/// - `pivot_`: An iterator to the pivot's final position.
+/// - `bias_`: A signed value indicating the relative sizes of the partitions.
 template<typename FI>
 struct ImplicitPivotResult {
     FI pivot_;
     long bias_;
 };
 
-/// \tparam FI is a forward iterator
-/// \pre b != e
-template<typename FI, typename Comparison>
+/// \brief Partitions the range `[b, e)` around an implicit pivot (the first
+/// element).
+///
+/// During partitioning:
+/// - Elements less than the pivot are moved to the left.
+/// - Elements greater than or equal to the pivot are moved to the right.
+/// - The pivot itself is placed in its final position.
+///
+/// The function also computes a bias value indicating the relative sizes of
+/// the two partitions:
+/// - `bias > 0`: More elements in the "greater-than-or-equal-to" partition.
+/// - `bias < 0`: More elements in the "less-than" partition.template<typename FI, typename Comparison>
+///
+/// /// @pre `b != e`.
+///
+/// @note This function operates in \(O(n)\) time complexity and requires \(O(1)\)
+/// additional space.
+///
+/// @throws Propagates exceptions thrown by `cmp` or `moveRotate`.
+///
+/// @example Example usage:
+/// ```cpp
+/// std::vector<int> data = {4, 7, 2, 8, 5};
+/// auto result =
+///     zoo::implicitPivotPartition(
+///         data.begin(),
+///         data.end(),
+///         std::less<>{}
+///     );
+/// assert(result.pivot_ == data.begin() + 2); // Final pivot position
+/// assert(*result.pivot_ == 4);               // Pivot value
 auto implicitPivotPartition(FI b, FI e, Comparison cmp) ->
     ImplicitPivotResult<FI> 
 {
     auto bias = 0;
     auto pivot = b++;
-    /*if(e == b) { return pivot; }
-    if(cmp(*b, *pivot)) {
-        auto third = next(b);
-        if(third == e) {
-            moveRotation(*pivot, *b);
-            return pivot;
-        }
-    }*/
     for(; b != e; ++b) {
         // invariant: ..., L0, P == *pivot, G0, G1, ... Gn, *b
         // where Lx means lower-than-pivot and Gx higher-equal-to-pivot
@@ -68,6 +91,11 @@ auto implicitPivotPartition(FI b, FI e, Comparison cmp) ->
     return {pivot, bias};
 }
 
+/// Implementation of quicksort.
+/// @param begin An iterator that satisfies the ForwardIterator concept,
+///    pointing to the beginning of the range to be sorted.
+/// @param end The end of the range (exclusive).
+/// @param cmp A callable object defining a strict weak ordering.
 template<typename I, typename Comparison = Less>
 void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     if(begin == end) { return; }
@@ -118,6 +146,10 @@ void quicksort(I begin, I end, Comparison cmp = Comparison{}) {
     }
 }
 
+/// is_sorted scans a range and returns wheter it is sorted.
+/// @param begin The beginning of the range to partition.
+/// @param end The end of the range to partition (exclusive).
+/// @param cmp The comparison function to compare elements.
 template<typename FI, typename Comparison = Less>
 bool is_sorted(FI begin, FI end, Comparison cmp = Comparison{}) {
     if(begin == end) { return true; }
@@ -127,6 +159,34 @@ bool is_sorted(FI begin, FI end, Comparison cmp = Comparison{}) {
         old = begin++;
     }
     return true;
+}
+
+/// quickselect implements the retrieval of the nth element
+/// @param begin A forward iterator indicating the beginning of the range.
+/// @param nth A forward iterator indicating the position of interest. Note
+///     that it also serves as pivot. Items to the left of it will precede
+///     it in cmp(). items to the right will succeed it.
+/// @param end A forward iterator indicating the end of the range 
+///     (exclusive).
+/// @param cmp A callable object defining a strict weak ordering.
+template<typename FI, typename Comparison = Less>
+void quickselect(FI begin, FI nth, FI end, Comparison cmp = Comparison{}) {
+    if (begin == end || nth == end) return;
+
+    while (true) {
+        auto result = implicitPivotPartition(begin, end, cmp);
+        auto pivot = result.pivot_;
+
+        if (pivot == nth) {
+            return; // Found the nth element
+        } else if (nth < pivot) {
+            // Focus on the lower partition
+            end = pivot;
+        } else {
+            // Focus on the higher partition
+            begin = std::next(pivot);
+        }
+    }
 }
 
 }
