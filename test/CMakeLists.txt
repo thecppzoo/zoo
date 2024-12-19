@@ -108,15 +108,16 @@ else()
         Catch2Main OBJECT catch_main.cpp
     )
 
-    # Helper function to create object libraries and executables
-    function(addTestTarget targetName sources)
+    function(addTestTarget targetName)
+        set(sources ${ARGN})
         add_library(${targetName} OBJECT ${sources})
         add_executable(${targetName}_test $<TARGET_OBJECTS:${targetName}>)
         target_link_libraries(${targetName}_test ${targetName} Catch2Main)
 
-        # Accumulate sources for the all-in-one target
+        # Accumulate sources for the all-in-one target directly in the parent scope
         list(APPEND AllInOneSources ${sources})
         set(AllInOneSources "${AllInOneSources}" PARENT_SCOPE)
+        message(STATUS "Added for ${targetName} \"${sources}\" resulting in ${AllInOneSources}")
     endfunction()
 
     # Global variable to accumulate all sources
@@ -144,6 +145,7 @@ else()
     addTestTarget(
         GeneticProgramming
         gp/GeneticProgramming.cpp gp/ArtificialAntEnvironment.cpp
+        gp/Population.cpp
     )
 
     addTestTarget(
@@ -171,6 +173,7 @@ else()
         Catch2Main AlgorithmTest TypeErasureTest SWARTest Uncategorized
     )
 
+    message(STATUS "All-in-one set: " "${AllInOneSources}")
     # All-in-one test app
     set(TestAppName "${CurrentExecutable}Test")
     add_executable(

@@ -2,7 +2,7 @@
 #define ZOO_GP_ARTIFICIAL_ANT_LANGUAGE_H
 
 #include<array>
-#include <cstddef>
+#include<cstddef>
 
 enum ArtificialAntEnum: char {
     TurnRight,
