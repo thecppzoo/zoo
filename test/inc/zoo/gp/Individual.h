@@ -126,6 +126,20 @@ struct WeightedPreorder {
     }
 };
 
+/// \details The environment tracks the fitness internally during the execution.
+template<
+    typename EvaluationFunction,
+    typename Environment,
+    typename Ind,
+    typename ImplementationArray
+>
+void evaluate(Environment &env, Ind &individual, ImplementationArray &ia) {
+    if(env.atEnd()) { return; }
+    auto evalFunction =
+        reinterpret_cast<EvaluationFunction>(ia[individual.node()]);
+    evalFunction(env, individual, ia);
 }
+
+} // namespace zoo
 
 #endif

@@ -1,12 +1,17 @@
 #include "zoo/gp/Population_impl_generate.h"
+#include "zoo/gp/ArtificialAntEnvironment.h"
 
+/*
 #include <cmath>
 #include <iterator>
-#include <numeric>
+
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
+*/
 #include <vector>
+#include <algorithm>
+#include <numeric>
 
 // Struct to hold the statistics
 struct StatisticsMoment {
@@ -106,4 +111,14 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
         '\n';
     }
     individuals.close();
+    char
+        simpleIndividual[] = { Prog2, IFA, Move, TurnRight },
+        conversion[sizeof(simpleIndividual) * 3];
+    zoo::conversionToWeightedElement<ArtificialAnt>(
+        conversion, simpleIndividual
+    );
+    zoo::WeightedPreorder<ArtificialAnt> indi(conversion);
+    ArtificialAntEnvironment e;
+    zoo::evaluate<AAEvaluationFunction>(e, indi, implementationArray);
+    REQUIRE(true);
 }

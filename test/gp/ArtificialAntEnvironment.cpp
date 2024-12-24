@@ -3,56 +3,75 @@
 
 #include "zoo/gp/Individual.h"
 
-template<typename IType>
-void artificialAntExecution(ArtificialAntEnvironment &e, IType &ind) {
-    if (e.atEnd()) {
-        return;
-    }
+void evalTurnLeft(
+    ArtificialAntEnvironment &env,
+    zoo::WeightedPreorder<ArtificialAnt> &,
+    ImplementationArray &
+) {
+    env.turnLeft();
+    ++env.steps_;
+}
 
-    switch(ind.node()) {
-    case TurnLeft:
-        e.turnLeft();
-        ++e.steps_;
-        break;
+void evalTurnRight(
+    ArtificialAntEnvironment &env,
+    zoo::WeightedPreorder<ArtificialAnt> &,
+    ImplementationArray &
+) {
+    env.turnRight();
+    ++env.steps_;
+}
 
-    case TurnRight:
-        e.turnRight();
-        ++e.steps_;
-        break;
+void evalMove(
+    ArtificialAntEnvironment &env,
+    zoo::WeightedPreorder<ArtificialAnt> &,
+    ImplementationArray &
+) {
+    env.moveForward();
+    env.consumeFood();
+    ++env.steps_;
+}
 
-    case Move:
-        e.moveForward();
-        e.consumeFood();
-        ++e.steps_;
-        break;
-
-    case IFA:
-        if (e.foodAhead()) {
-            auto descendant = ind.descendantsStart();
-            artificialAntExecution(e, *descendant);
-        }
-        break;
-
-    case Prog2: {
+void evalIFA(
+    ArtificialAntEnvironment &env,
+    zoo::WeightedPreorder<ArtificialAnt> &ind,
+    ImplementationArray &ia
+) {
+    if (env.foodAhead()) {
         auto descendant = ind.descendantsStart();
-        artificialAntExecution(e, *descendant);
-        descendant = ind.next(descendant);
-        artificialAntExecution(e, *descendant);
-        break;
-    }
-
-    case Prog3: {
-        auto descendant = ind.descendantsStart();
-        artificialAntExecution(e, *descendant);
-        descendant = ind.next(descendant);
-        artificialAntExecution(e, *descendant);
-        descendant = ind.next(descendant);
-        artificialAntExecution(e, *descendant);
-        break;
-    }
+        zoo::evaluate<AAEvaluationFunction>(env, *descendant, ia);
     }
 }
 
-static auto makeInstantiation =
-    &artificialAntExecution<zoo::WeightedPreorder<ArtificialAnt>>;
+void evalProg2(
+    ArtificialAntEnvironment &env,
+    zoo::WeightedPreorder<ArtificialAnt> &ind,
+    ImplementationArray &ia
+) {
+    auto descendant = ind.descendantsStart();
+    zoo::evaluate<AAEvaluationFunction>(env, *descendant, ia);
+    descendant = ind.next(descendant);
+    zoo::evaluate<AAEvaluationFunction>(env, *descendant, ia);
+}
+
+void evalProg3(
+    ArtificialAntEnvironment &env,
+    zoo::WeightedPreorder<ArtificialAnt> &ind,
+    ImplementationArray &ia
+) {
+    auto descendant = ind.descendantsStart();
+    zoo::evaluate<AAEvaluationFunction>(env, *descendant, ia);
+    descendant = ind.next(descendant);
+    zoo::evaluate<AAEvaluationFunction>(env, *descendant, ia);
+    descendant = ind.next(descendant);
+    zoo::evaluate<AAEvaluationFunction>(env, *descendant, ia);
+}
+
+ImplementationArray implementationArray = {
+    reinterpret_cast<void *>(evalTurnLeft),
+    reinterpret_cast<void *>(evalTurnRight),
+    reinterpret_cast<void *>(evalMove),
+    reinterpret_cast<void *>(evalIFA),
+    reinterpret_cast<void *>(evalProg2),
+    reinterpret_cast<void *>(evalProg3)
+};
 

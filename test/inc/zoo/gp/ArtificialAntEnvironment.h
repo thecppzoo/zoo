@@ -1,6 +1,12 @@
 #ifndef ZOO_GP_ENVIRONMENT_H
 #define ZOO_GP_ENVIRONMENT_H
 
+#include "ArtificialAntLanguage.h"
+
+#include "zoo/gp/Individual.h"
+
+#include <array>
+
 struct ArtificialAntEnvironment {
     static constexpr auto
         GridWidth = 32,
@@ -26,7 +32,7 @@ struct ArtificialAntEnvironment {
     bool food_[GridHeight][GridWidth];
     int steps_;
 
-    constexpr static inline bool InitialFoodMatrix[32][32] = {
+    constexpr static inline bool InitialFoodMatrix[GridHeight][GridWidth] = {
         #define F true
         #define _ false
         {_,F,F,F,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_},
@@ -124,7 +130,14 @@ struct ArtificialAntEnvironment {
     }
 };
 
-template<typename IType>
-void artificialAntExecution(ArtificialAntEnvironment &e, IType &ind);
+using ImplementationArray = const std::array<void *, 6>;
+extern ImplementationArray implementationArray;
+
+using AAEvaluationFunction =
+    void(*)(
+        ArtificialAntEnvironment &,
+        zoo::WeightedPreorder<ArtificialAnt> &,
+        ImplementationArray &
+    );
 
 #endif
