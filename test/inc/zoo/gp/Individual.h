@@ -65,38 +65,44 @@ template<typename L>
 auto conversionToWeightedElement(char *output, const char *input) {
     std::stack<ConversionFrame> frames;
 
-    auto writeWeight = [&](unsigned w) {
+    auto destination = output;
+
+    auto writeWeight = [&]() {
         // assumes little endian
         // memcpy would allow unaligned copying of the bytes
         // on the platforms that support it,
         // a "reinterpret_cast" might not respect necessary
         // alignment in some platforms
-        memcpy(frames.top().destination, &w, sizeof(uint16_t));
-        output += 2;
+        auto &ft = frames.top();
+        memcpy(ft.destination, &ft.weight, sizeof(uint16_t));
     };
 
-    frames.push({0, 1, output});
-    assert(0 < L::ArgumentCount[*input]);
-
     for(;;) {
-        auto &top = frames.top();
-        if(0 == top.remainingSiblings--) {
-            // No more siblings, thus completed the frame
-            writeWeight(top.weight);
-            frames.pop();
-            if(frames.empty()) { break; }
-            continue;
-        }
-        frames.top().weight += 1;
         auto current = *input++;
-        auto destination = frames.top().destination;
 
-        *frames.top().destination++ = current;
+        *destination++ = current;
         auto argumentCount = L::ArgumentCount[current];
+        
         if(0 < argumentCount) {
             // There are argumentCount descendants to convert,
             // create a new frame for them
-            frames.push({0, unsigned(argumentCount), destination + 2});
+            frames.push({0, unsigned(argumentCount), destination});
+        } else {
+            constexpr uint16_t one = 1;
+            memcpy(destination, &one, 2);
+            if(frames.empty()) { return; }
+        }
+        destination += 2;
+        auto ft = &frames.top();
+        ++ft->weight;
+        while(0 == ft->remainingSiblings--) {
+            // No more siblings, thus completed the frame
+            writeWeight();
+            auto written = frames.top().weight;
+            frames.pop();
+            if(frames.empty()) { return; }
+            ft = &frames.top();
+            ft->weight += written;
         }
     }
 }

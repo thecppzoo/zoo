@@ -83,8 +83,51 @@ static_assert(!zoo::RangeWithStreamableElements_v<std::vector<NotStreamable>>);
 #include "zoo/CyclingEngine.h"
 
 #include <fstream>
+#include <iostream>
 
 TEST_CASE("Genetic Programming", "[genetic-programming]") {
+    SECTION("Individual") {
+        auto verify = [](char *produced, auto &expected) {
+            constexpr auto L = std::extent_v<std::remove_reference_t<decltype(expected)>>;
+            static_assert(0 == L % 3);
+            std::string p, e;
+            for(auto ndx = 0; ndx < L; ndx += 3) {
+                p += ArtificialAnt::Tokens[produced[ndx]];
+                uint16_t u;
+                memcpy(&u, produced + ndx + 1, 2);
+                p += std::to_string(u);
+                e += ArtificialAnt::Tokens[expected[ndx]];
+                memcpy(&u, expected + ndx + 1, 2);
+                e += std::to_string(u);
+            }
+            CHECK(p == e);
+        };
+        constexpr char
+            Terminal[] = { Move },
+            ExpectedConversionTerminal[] = { Move, 1, 0 },
+            NonTerminal[] = { Prog3, TurnRight, Move, TurnRight },
+            ExpectedConversionNonTerminal[] = {
+                Prog3, 4, 0, TurnRight, 1, 0, Move, 1, 0, TurnRight, 1, 0
+            },
+            Recursive[] = { Prog2, IFA, Move, TurnLeft },
+            ExpectedConversionRecursive[] = {
+                Prog2, 4, 0,
+                    IFA, 2, 0,
+                        Move, 1, 0,
+                    TurnLeft, 1, 0
+            }
+        ;
+        char buffer[1000];
+        memset(buffer, '*', sizeof(buffer));
+        zoo::conversionToWeightedElement<ArtificialAnt>(buffer, Terminal);
+        verify(buffer, ExpectedConversionTerminal);
+        memset(buffer, '*', sizeof(buffer));
+        zoo::conversionToWeightedElement<ArtificialAnt>(buffer, NonTerminal);
+        verify(buffer, ExpectedConversionNonTerminal);
+        memset(buffer, '*', sizeof(buffer));
+        zoo::conversionToWeightedElement<ArtificialAnt>(buffer, Recursive);
+        verify(buffer, ExpectedConversionRecursive);
+    }
     std::mt19937_64 gennie(0xEdd1e);
     std::array<std::mt19937_64::result_type, 1000> other;
     for(auto ndx = 0; ndx < other.size(); ++ndx) {
@@ -119,6 +162,13 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     );
     zoo::WeightedPreorder<ArtificialAnt> indi(conversion);
     ArtificialAntEnvironment e;
+    void (*rec)(ArtificialAntEnvironment &, zoo::WeightedPreorder<ArtificialAnt> &, void *) =
+        [](ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i, void *r) {
+            std::cout << e.steps_ << std::endl;
+            eee(e, i, r);
+        };
+    eee(e, indi, reinterpret_cast<void *>(rec));
     zoo::evaluate<AAEvaluationFunction>(e, indi, implementationArray);
+    
     REQUIRE(true);
 }

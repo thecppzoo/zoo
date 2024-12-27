@@ -19,6 +19,10 @@ struct CursesWindow {
         mvwprintw(ptr_, x, y, chars);
     }
 
+    void put(int x, int y, char c) {
+        mvwaddch(ptr_, x, y, c);
+    }
+
     void refresh() { wrefresh(ptr_); }
 
     operator WINDOW *() { return ptr_; }
@@ -48,9 +52,23 @@ void drawEnvironment(
             w.print(y + 1, 1 + 2*x, "[]");
         }
     }
-
+    auto ant = env.ant_;
+    auto ad = ant.dir;
+    char direction;
+    switch(ad.x) {
+        case 1: direction = '>'; break;
+        case 0: ad.y = -1 ? '^' : 'v'; break;
+        case -1: direction = '<'; break;
+        default: __builtin_unreachable();
+    }
+    w.put(1 + ant.pos.y, 1 + ant.pos.x, direction);
     w.refresh();
 }
+
+CursesWindow *g_cw = nullptr;
+ArtificialAntEnvironment g_aae;
+
+#include <iostream>
 
 int main(int argc, const char *argv[]) {
     // Initialize ncurses
@@ -59,19 +77,46 @@ int main(int argc, const char *argv[]) {
     noecho();
     curs_set(0); // Hide cursor
 
+    auto updater = [](auto &e, auto &i, void *r) {
+        drawEnvironment(*g_cw, g_aae);
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+    };
+
+    char
+        simpleIndividual[] = { Prog2, IFA, Move, TurnRight },
+        conversion[sizeof(simpleIndividual) * 3];
+    zoo::conversionToWeightedElement<ArtificialAnt>(
+        conversion, simpleIndividual
+    );
+    zoo::WeightedPreorder<ArtificialAnt> indi(conversion);
+
     // Create a window for the simulation
     int winHeight = 40, winWidth = 80;
     {
         CursesWindow win(winHeight, winWidth, 0, 0);
-        ArtificialAntEnvironment aae;
+        g_cw = &win;
 
-        drawEnvironment(win, aae);
-
-        // Animation loop
-        while(true) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Delay
-        }
+        drawEnvironment(win, g_aae);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        do {
+            eee(
+                g_aae, indi,
+                reinterpret_cast<void *>(
+                    static_cast<
+                        void (*)
+                        (
+                            ArtificialAntEnvironment &,
+                            zoo::WeightedPreorder<ArtificialAnt> &,
+                            void *
+                        )
+                    >(updater)
+                )
+            );
+        } while(!g_aae.atEnd());
     }
+    g_cw = nullptr;
+
     endwin();
+    std::cout << "Off" << std::endl;
     return 0;
 }
