@@ -1,6 +1,7 @@
 #ifndef ZOO_GP_INDIVIDUAL_H
 #define ZOO_GP_INDIVIDUAL_H
 
+#include <string.h>
 #include <string>
 #include <assert.h>
 #include <stack>
@@ -110,7 +111,7 @@ struct WeightedPreorder {
         WeightedPreorder wp;
         Proxy(char *p): wp(p) {}
         WeightedPreorder &operator*() { return wp; }
-        WeightedPreorder &operator->() { return wp; }
+        WeightedPreorder *operator->() { return &wp; }
     };
 
     Proxy descendantsStart() { return {space_ + 3}; }

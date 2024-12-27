@@ -24,8 +24,7 @@ struct ArtificialAntEnvironment {
     };
 
     struct Ant {
-        Position pos;
-        Position dir;
+        Position pos, dir;
     };
 
     Ant ant_;
@@ -139,5 +138,8 @@ using AAEvaluationFunction =
         zoo::WeightedPreorder<ArtificialAnt> &,
         ImplementationArray &
     );
+
+void artificialAntEvaluation(ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i);
+void eee(ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i, void *);
 
 #endif

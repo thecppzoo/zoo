@@ -65,7 +65,10 @@ if(MSVC)
         OUTPUT_VARIABLE RESULT
     )
     if(MSVC_BUG_BUILD_RESULT)
-        MESSAGE(FATAL_ERROR "Compilation of MSVC bug file succeeded, was the compiler bug fixed? ${RESULT}")
+        MESSAGE(
+            FATAL_ERROR
+            "Compilation of MSVC bug file succeeded, was the compiler bug fixed? ${RESULT}"
+        )
     else()
         MESSAGE(STATUS "File with MSVC bug build failed as expected ${RESULT}")
     endif()
@@ -78,9 +81,14 @@ if(MSVC)
         OUTPUT_VARIABLE MSVC_OK_OUTPUT
     )
     if(MSVC_OK_BUILD_RESULT)
-        MESSAGE(STATUS "CMAKE try_compile succeeded as expected: ${MSVC_OK_OUTPUT}")
+        MESSAGE(
+            STATUS "CMAKE try_compile succeeded as expected: ${MSVC_OK_OUTPUT}"
+        )
     else()
-        MESSAGE(FATAL_ERROR "CMAKE try_compile of non-problematic file did not succeed: ${MSVC_OK_OUTPUT}")
+        MESSAGE(
+            FATAL_ERROR
+            "CMAKE try_compile of non-problematic file did not succeed: ${MSVC_OK_OUTPUT}"
+        )
     endif()
 else()
     # Non-MSVC specific configuration
@@ -142,10 +150,25 @@ else()
         swar/BasicOperations.cpp swar/sublanes.cpp
     )
 
+    set(
+        GeneticProgrammingSources
+        gp/ArtificialAntEnvironment.cpp
+        gp/Population.cpp
+    )
+
+    # Add the executable target
+    add_executable(
+        cursesSantaFeTrail
+        cursesSantaFe.cpp
+        ${GeneticProgrammingSources}
+    )
+
+    target_link_libraries(cursesSantaFeTrail PRIVATE ncurses)
+
     addTestTarget(
         GeneticProgramming
-        gp/GeneticProgramming.cpp gp/ArtificialAntEnvironment.cpp
-        gp/Population.cpp
+        gp/GeneticProgramming.cpp
+        ${GeneticProgrammingSources}
     )
 
     addTestTarget(
