@@ -90,7 +90,7 @@ auto conversionToWeightedElement(char *output, const char *input) {
         } else {
             constexpr uint16_t one = 1;
             memcpy(destination, &one, 2);
-            if(frames.empty()) { return; }
+            if(frames.empty()) { return destination - output + 2; }
         }
         destination += 2;
         auto ft = &frames.top();
@@ -100,7 +100,7 @@ auto conversionToWeightedElement(char *output, const char *input) {
             writeWeight();
             auto written = frames.top().weight;
             frames.pop();
-            if(frames.empty()) { return; }
+            if(frames.empty()) { return destination - output; }
             ft = &frames.top();
             ft->weight += written;
         }

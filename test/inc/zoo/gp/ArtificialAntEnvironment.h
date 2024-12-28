@@ -29,7 +29,9 @@ struct ArtificialAntEnvironment {
 
     Ant ant_;
     bool food_[GridHeight][GridWidth];
-    int steps_;
+    int
+        steps_,
+        eaten_;
 
     constexpr static inline bool InitialFoodMatrix[GridHeight][GridWidth] = {
         #define F true
@@ -100,12 +102,11 @@ struct ArtificialAntEnvironment {
         return food_[p.y][p.x];
     }
 
-    bool consumeFoodAt(Position p) {
-        if (hasFood(p)) {
+    void consumeFoodAt(Position p) {
+        if(hasFood(p)) {
+            ++eaten_;
             food_[p.y][p.x] = false;
-            return true;
         }
-        return false;
     }
 
     bool foodAhead() const {
@@ -114,12 +115,6 @@ struct ArtificialAntEnvironment {
 
     void moveForward() {
         ant_.pos = aheadPosition();
-        food_[ant_.pos.y][ant_.pos.x] = false;
-        ++steps_;
-    }
-
-    bool consumeFood() {
-        return consumeFoodAt(ant_.pos);
     }
 
     bool atEnd() const {

@@ -24,18 +24,4 @@ struct ArtificialAnt {
     using TokenEnum = ArtificialAntEnum;
 };
 
-template<typename T>
-constexpr auto TerminalsCount() {
-    for(size_t ndx = 0; ndx < size(T::ArgumentCount); ++ndx) {
-        if(T::ArgumentCount[ndx]) { return ndx; }
-    }
-    return size(T::ArgumentCount);
-}
-
-template<typename T>
-constexpr auto NonTerminalsCount() {
-    return size(T::ArgumentCount) - TerminalsCount<T>();
-}
-
-
 #endif

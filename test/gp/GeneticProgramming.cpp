@@ -1,5 +1,20 @@
-#include "zoo/gp/Population_impl_generate.h"
+#include "zoo/gp/Strip.h"
+#include "zoo/gp/PopulationGenerator_impl_generate.h"
+#include "zoo/gp/ArtificialAntLanguage.h"
 #include "zoo/gp/ArtificialAntEnvironment.h"
+#include "zoo/gp/Individual.h"
+#include "zoo/AliasSampling.h"
+
+namespace zoo {
+
+void add(Strip &s, const char *root, unsigned weight) {
+    auto &payload = s.payload;
+    auto initialLength = payload.size();
+    payload.resize(initialLength + 3*weight);
+    zoo::conversionToWeightedElement<ArtificialAnt>(payload.data() + initialLength, root);
+}
+
+}
 
 /*
 #include <cmath>
@@ -63,8 +78,8 @@ calculate_statistics(
 
 #include <catch2/catch.hpp>
 
-static_assert(3 == TerminalsCount<ArtificialAnt>());
-static_assert(3 == NonTerminalsCount<ArtificialAnt>());
+static_assert(3 == zoo::TerminalsCount<ArtificialAnt>());
+static_assert(3 == zoo::NonTerminalsCount<ArtificialAnt>());
 
 #include "zoo/gp/Individual.h"
 
@@ -136,7 +151,7 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     std::vector<int> a = { 1, 2, 3, 4, 5 };
     WARN(zoo::StreamableView{a});
     zoo::CyclingEngine engine(other.begin(), other.end());
-    zoo::Population<ArtificialAnt> p(7, gennie);
+    zoo::PopulationGenerator<ArtificialAnt> p(7, gennie);
     auto moments =
         calculate_statistics(
             p.individualWeights_.begin(),
@@ -145,15 +160,26 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
         );
     WARN(moments.count << ' ' << moments.sum << ' ' << moments.average << ' ' << moments.standard_deviation);
     //auto wholePopulation = new char[moments.sum * 3];
-    std::ofstream individuals{"/tmp/genetic-programming-individuals.lst"};
-    for(auto i = 0; i < p.individuals_.size(); ++i) {
-        individuals <<
-            to_string(
-                zoo::IndividualStringifier<ArtificialAnt>{p.individuals_[i]}
-            ) <<
-        '\n';
+    SECTION("Save individuals") {
+        std::ofstream individuals{"/tmp/genetic-programming-individuals.lst"};
+        for(auto i = 0; i < p.individuals_.size(); ++i) {
+            individuals <<
+                to_string(
+                    zoo::IndividualStringifier<ArtificialAnt>{p.individuals_[i]}
+                ) <<
+            '\n';
+        }
     }
-    individuals.close();
+    SECTION("Strip") {
+        zoo::Strip strip;
+        auto totalSize = 0;
+        for(auto i = p.individuals_.size(); i--; ) {
+            totalSize += p.individualWeights_[i];
+            add(strip, p.individuals_[i], p.individualWeights_[i]);
+            REQUIRE(strip.payload.size() == totalSize*3);
+        }
+    }
+    
     char
         simpleIndividual[] = { Prog2, IFA, Move, TurnRight },
         conversion[sizeof(simpleIndividual) * 3];
@@ -173,7 +199,6 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     while(e.steps_ < 40) {
         rec(e, indi, reinterpret_cast<void *>(rec));
     }
-    zoo::evaluate<AAEvaluationFunction>(e, indi, implementationArray);
     
     REQUIRE(true);
 }

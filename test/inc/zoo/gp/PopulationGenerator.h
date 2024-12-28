@@ -1,15 +1,27 @@
-#ifndef ZOO_GP_POPULATION_H
-#define ZOO_GP_POPULATION_H
+#ifndef ZOO_GP_POPULATION_GENERATOR_H
+#define ZOO_GP_POPULATION_GENERATOR_H
 
-#include "zoo/gp/ArtificialAntLanguage.h"
 #include "zoo/remedies-17/iota.h"
 
 #include <algorithm>
 
 namespace zoo {
 
+template<typename T>
+constexpr auto TerminalsCount() {
+    for(size_t ndx = 0; ndx < size(T::ArgumentCount); ++ndx) {
+        if(T::ArgumentCount[ndx]) { return ndx; }
+    }
+    return size(T::ArgumentCount);
+}
+
+template<typename T>
+constexpr auto NonTerminalsCount() {
+    return size(T::ArgumentCount) - TerminalsCount<T>();
+}
+
 template<typename Language, size_t Size = 1000>
-struct Population {
+struct PopulationGenerator {
     static_assert(size(Language::Tokens) == size(Language::ArgumentCount));
     static_assert(size(Language::Tokens) < 256);
 
@@ -111,7 +123,7 @@ struct Population {
     char *allocate(const char *source, int weight);
 
     template<typename G>
-    Population(
+    PopulationGenerator(
         int maxHeight,
         G &randomGenerator,
         GenerationStrategies strategy = Rampled

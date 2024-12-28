@@ -153,7 +153,6 @@ else()
     set(
         GeneticProgrammingSources
         gp/ArtificialAntEnvironment.cpp
-        gp/Population.cpp
     )
 
     # Add the executable target

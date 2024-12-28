@@ -1,14 +1,15 @@
-#ifndef ZOO_GP_POPULATION_IMPL_GENERATE_H
-#define ZOO_GP_POPULATION_IMPL_GENERATE_H
+#ifndef ZOO_GP_POPULATION_GENERATOR_IMPL_GENERATE_H
+#define ZOO_GP_POPULATION_GENERATOR_IMPL_GENERATE_H
 
-#include "zoo/gp/Population.h"
+#include "zoo/gp/PopulationGenerator.h"
 
 #include <assert.h>
 
 namespace zoo {
 
 template<typename Language, size_t Size>
-char *Population<Language, Size>::allocate(const char *source, int weight) {
+char *
+PopulationGenerator<Language, Size>::allocate(const char *source, int weight) {
     auto rv = new char[weight];
     assert(rv);
     memcpy(rv, source, weight);
@@ -17,8 +18,8 @@ char *Population<Language, Size>::allocate(const char *source, int weight) {
 
 template<typename Language, size_t Size>
 template<typename G>
-typename Population<Language, Size>::GenerationReturnType
-Population<Language, Size>::generateBackEnd(
+typename PopulationGenerator<Language, Size>::GenerationReturnType
+PopulationGenerator<Language, Size>::generateBackEnd(
     Distributions &dists,
     int h, char *space, const char *tail, G &g, void *recursionPtr
 ) {
@@ -74,10 +75,10 @@ Population<Language, Size>::generateBackEnd(
 
 template<typename Language, size_t Size>
 template<typename G>
-Population<Language, Size>::Population(
+PopulationGenerator<Language, Size>::PopulationGenerator(
     int maxHeight,
     G &randomGenerator,
-    typename Population<Language, Size>::GenerationStrategies strategy
+    typename PopulationGenerator<Language, Size>::GenerationStrategies strategy
 ) {
     char generationBuffer[1000];
     using D = decltype(Distributions::terminals);
@@ -113,5 +114,5 @@ Population<Language, Size>::Population(
 
 } // namespace zoo
 
-#endif // ZOO_GP_POPULATION_IMPL_GENERATE_H
+#endif // ZOO_GP_POPULATION_GENERATOR_IMPL_GENERATE_H
 

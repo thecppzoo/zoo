@@ -33,7 +33,7 @@ void evalMove(
     ImplementationArray &
 ) {
     env.moveForward();
-    env.consumeFood();
+    env.consumeFoodAt(env.ant_.pos);
     ++env.steps_;
 }
 
@@ -174,6 +174,7 @@ void recursiveEvaluationFrontEnd(Env &e, Indi &i, void *recursion) {
             break;
         case Move:
             e.moveForward();
+            e.consumeFoodAt(e.ant_.pos);
             break;
         case IFA:
             if(e.foodAhead()) {
