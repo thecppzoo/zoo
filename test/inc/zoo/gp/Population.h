@@ -37,7 +37,7 @@ struct Population {
     std::array<int, Size> individualWeights_;
 
     struct Distributions {
-        std::uniform_int_distribution<char>
+        std::uniform_int_distribution<>
             terminals,
             nonTerminals,
             all;
