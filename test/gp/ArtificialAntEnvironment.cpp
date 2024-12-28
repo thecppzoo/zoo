@@ -162,7 +162,7 @@ void evaluation(Env &e, Indi &i) {
 }
 #endif
 
-void eee(Env &e, Indi &i, void *recursion) {
+void recursiveEvaluationFrontEnd(Env &e, Indi &i, void *recursion) {
     auto rf = reinterpret_cast<void(*)(Env &, Indi &, void *)>(recursion);
     auto node = i.node();
     switch(node) {
@@ -197,5 +197,8 @@ void eee(Env &e, Indi &i, void *recursion) {
 }
 
 void artificialAntEvaluation(Env &e, Indi &i) {
-    eee(e, i, reinterpret_cast<void *>(eee));
+    recursiveEvaluationFrontEnd(
+        e, i,
+        reinterpret_cast<void *>(recursiveEvaluationFrontEnd)
+    );
 }

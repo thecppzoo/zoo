@@ -168,7 +168,7 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
             std::cout << a.pos.y << ',' << a.pos.x << ' ' << a.dir.y << ',' <<
                 a.dir.x << ' ' << ArtificialAnt::Tokens[i.node()] << ' ' <<
                 e.steps_ << std::endl;
-            eee(e, i, r);
+            recursiveEvaluationFrontEnd(e, i, r);
         };
     while(e.steps_ < 40) {
         rec(e, indi, reinterpret_cast<void *>(rec));

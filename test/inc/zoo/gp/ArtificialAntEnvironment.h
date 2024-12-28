@@ -143,7 +143,20 @@ using AAEvaluationFunction =
         ImplementationArray &
     );
 
-void artificialAntEvaluation(ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i);
-void eee(ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i, void *);
+using EvaluationRecursiveFunction =
+    void (*)(
+        ArtificialAntEnvironment &,
+        zoo::WeightedPreorder<ArtificialAnt> &,
+        void *
+    );
+
+void artificialAntEvaluation(
+    ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i
+);
+void recursiveEvaluationFrontEnd(
+    ArtificialAntEnvironment &e,
+    zoo::WeightedPreorder<ArtificialAnt> &i,
+    void *
+);
 
 #endif

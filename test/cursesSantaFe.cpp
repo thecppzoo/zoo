@@ -62,7 +62,6 @@ void drawEnvironment(
         default: __builtin_unreachable();
     }
     w.put(1 + ant.pos.y, 1 + 2*ant.pos.x, direction);
-    w.refresh();
 }
 
 CursesWindow *g_cw = nullptr;
@@ -85,7 +84,7 @@ int main(int argc, const char *argv[]) {
         g_cw->print(0, 50, ArtificialAnt::Tokens[i.node()]);
         g_cw->refresh();
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        eee(e, i, r);
+        recursiveEvaluationFrontEnd(e, i, r);
     };
     FP recursion = updater;
 
