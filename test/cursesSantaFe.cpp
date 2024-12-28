@@ -57,16 +57,16 @@ void drawEnvironment(
     char direction;
     switch(ad.x) {
         case 1: direction = '>'; break;
-        case 0: ad.y = -1 ? '^' : 'v'; break;
+        case 0: direction = -1 == ad.y ? '^' : 'v'; break;
         case -1: direction = '<'; break;
         default: __builtin_unreachable();
     }
-    w.put(1 + ant.pos.y, 1 + ant.pos.x, direction);
+    w.put(1 + ant.pos.y, 1 + 2*ant.pos.x, direction);
     w.refresh();
 }
 
 CursesWindow *g_cw = nullptr;
-ArtificialAntEnvironment g_aae;
+auto number = 0;
 
 #include <iostream>
 
@@ -77,10 +77,17 @@ int main(int argc, const char *argv[]) {
     noecho();
     curs_set(0); // Hide cursor
 
+    using FP =
+        void (*)(ArtificialAntEnvironment &, zoo::WeightedPreorder<ArtificialAnt> &, void *);
     auto updater = [](auto &e, auto &i, void *r) {
-        drawEnvironment(*g_cw, g_aae);
-        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+        drawEnvironment(*g_cw, e);
+        g_cw->print(0, 35, std::to_string(number++).c_str());
+        g_cw->print(0, 50, ArtificialAnt::Tokens[i.node()]);
+        g_cw->refresh();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        eee(e, i, r);
     };
+    FP recursion = updater;
 
     char
         simpleIndividual[] = { Prog2, IFA, Move, TurnRight },
@@ -95,24 +102,12 @@ int main(int argc, const char *argv[]) {
     {
         CursesWindow win(winHeight, winWidth, 0, 0);
         g_cw = &win;
-
-        drawEnvironment(win, g_aae);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        ArtificialAntEnvironment aae;
         do {
-            eee(
-                g_aae, indi,
-                reinterpret_cast<void *>(
-                    static_cast<
-                        void (*)
-                        (
-                            ArtificialAntEnvironment &,
-                            zoo::WeightedPreorder<ArtificialAnt> &,
-                            void *
-                        )
-                    >(updater)
-                )
+            updater(
+                aae, indi, reinterpret_cast<void *>(recursion)
             );
-        } while(!g_aae.atEnd());
+        } while(!aae.atEnd());
     }
     g_cw = nullptr;
 

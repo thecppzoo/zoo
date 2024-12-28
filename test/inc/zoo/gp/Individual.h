@@ -124,12 +124,12 @@ struct WeightedPreorder {
     
     Proxy next(Proxy p) {
         uint16_t currentLength;
-        memcpy(&currentLength, p.wp.space_, 2);
+        memcpy(&currentLength, p.wp.space_ + 1, 2);
         return {p.wp.space_ + 3 * currentLength};
     }
 
     typename L::TokenEnum node() {
-        return typename L::TokenEnum{space_[2]};
+        return typename L::TokenEnum{space_[0]};
     }
 };
 

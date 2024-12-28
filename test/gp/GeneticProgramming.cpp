@@ -164,10 +164,15 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     ArtificialAntEnvironment e;
     void (*rec)(ArtificialAntEnvironment &, zoo::WeightedPreorder<ArtificialAnt> &, void *) =
         [](ArtificialAntEnvironment &e, zoo::WeightedPreorder<ArtificialAnt> &i, void *r) {
-            std::cout << e.steps_ << std::endl;
+            auto &a = e.ant_;
+            std::cout << a.pos.y << ',' << a.pos.x << ' ' << a.dir.y << ',' <<
+                a.dir.x << ' ' << ArtificialAnt::Tokens[i.node()] << ' ' <<
+                e.steps_ << std::endl;
             eee(e, i, r);
         };
-    eee(e, indi, reinterpret_cast<void *>(rec));
+    while(e.steps_ < 40) {
+        rec(e, indi, reinterpret_cast<void *>(rec));
+    }
     zoo::evaluate<AAEvaluationFunction>(e, indi, implementationArray);
     
     REQUIRE(true);

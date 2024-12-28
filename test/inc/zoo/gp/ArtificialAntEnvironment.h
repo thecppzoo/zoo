@@ -82,12 +82,14 @@ struct ArtificialAntEnvironment {
         int oldX = ant_.dir.x;
         int oldY = ant_.dir.y;
         ant_.dir = Position{-oldY, oldX};
+        ++steps_;
     }
 
     void turnRight() {
         int oldX = ant_.dir.x;
         int oldY = ant_.dir.y;
         ant_.dir = Position{oldY, -oldX};
+        ++steps_;
     }
 
     Position aheadPosition() const {
@@ -112,6 +114,8 @@ struct ArtificialAntEnvironment {
 
     void moveForward() {
         ant_.pos = aheadPosition();
+        food_[ant_.pos.y][ant_.pos.x] = false;
+        ++steps_;
     }
 
     bool consumeFood() {
