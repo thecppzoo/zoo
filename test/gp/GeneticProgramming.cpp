@@ -1,4 +1,4 @@
-#include "zoo/gp/Strip.h"
+#include "zoo/gp/Population.h"
 #include "zoo/gp/PopulationGenerator_impl_generate.h"
 #include "zoo/gp/ArtificialAntLanguage.h"
 #include "zoo/gp/ArtificialAntEnvironment.h"
