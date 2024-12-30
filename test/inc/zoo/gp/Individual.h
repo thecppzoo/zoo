@@ -1,10 +1,13 @@
 #ifndef ZOO_GP_INDIVIDUAL_H
 #define ZOO_GP_INDIVIDUAL_H
 
+#include "zoo/gp/PopulationGenerator.h"
+
 #include <string.h>
 #include <string>
 #include <assert.h>
 #include <stack>
+#include <stdint.h>
 
 namespace zoo {
 

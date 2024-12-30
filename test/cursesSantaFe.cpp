@@ -16,7 +16,10 @@ struct CursesWindow {
     ~CursesWindow() { delwin(ptr_); }
 
     void print(int x, int y, const char *chars) {
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wformat-security"
         mvwprintw(ptr_, x, y, chars);
+        #pragma GCC diagnostic pop
     }
 
     void put(int x, int y, char c) {

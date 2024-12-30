@@ -4,6 +4,7 @@
 #include "zoo/gp/PopulationGenerator.h"
 
 #include <assert.h>
+#include <string.h>
 
 namespace zoo {
 
