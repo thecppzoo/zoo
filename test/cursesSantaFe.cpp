@@ -1,8 +1,7 @@
 #include "zoo/gp/ArtificialAntEnvironment.h"
 
 #include <ncurses.h>
-//#include <vector>
-//#include <utility>
+
 #include <thread>
 #include <chrono>
 

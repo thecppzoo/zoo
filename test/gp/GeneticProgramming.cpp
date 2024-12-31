@@ -16,14 +16,6 @@ void add(Strip &s, const char *root, unsigned weight) {
 
 }
 
-/*
-#include <cmath>
-#include <iterator>
-
-#include <stdexcept>
-#include <tuple>
-#include <type_traits>
-*/
 #include <vector>
 #include <algorithm>
 #include <numeric>
@@ -38,22 +30,17 @@ struct StatisticsMoment {
 };
 
 // Stand-alone function template
-template<typename Iterator, typename ToNumberFunc>
+template<typename Iterator, typename NumberProjector>
 StatisticsMoment
 calculate_statistics(
-    Iterator begin, Iterator end, ToNumberFunc to_number
+    Iterator begin, Iterator end, NumberProjector &&numberProjector
 ) {
-    // Check if the range is valid
-    if (begin == end) {
-        throw std::invalid_argument("Range cannot be empty.");
-    }
-
     // Prepare variables
     std::vector<double> numbers;
     numbers.reserve(std::distance(begin, end));
 
     // Transform the range to numeric values
-    std::transform(begin, end, std::back_inserter(numbers), to_number);
+    std::transform(begin, end, std::back_inserter(numbers), numberProjector);
 
     // Calculate count
     auto count = numbers.size();
@@ -62,14 +49,18 @@ calculate_statistics(
     auto
         sum = std::accumulate(numbers.begin(), numbers.end(), 0.0),
         average = sum / count,
-        variance = std::accumulate(numbers.begin(), numbers.end(), 0.0, [average](double acc, double value) {
-        double diff = value - average;
-        return acc + diff * diff;
-    }) / count;
-    auto standard_deviation = std::sqrt(variance);
+        sumOfSquaredDeviations =
+            std::accumulate(
+                numbers.begin(), numbers.end(), 0.0,
+                [average](double acc, double value) {
+                    double diff = value - average;
+                    return acc + diff * diff;
+                }
+            );
+    auto standardDeviation = std::sqrt(sumOfSquaredDeviations / count);
 
     // Return the result
-    return {count, sum, average, standard_deviation};
+    return {count, sum, average, standardDeviation};
 }
 
 
