@@ -95,6 +95,7 @@ std::string treeToMarkdown(const char *tree) {
 
 #include "zoo/gp/ArtificialAntLanguage.h"
 
+#if !(defined(ZOO_NO_TESTS) && ZOO_NO_TESTS)
 #include "catch2/catch.hpp"
 
 auto transformToTokens(const std::string &input) {
@@ -203,4 +204,4 @@ TEST_CASE("Cross operation correctness", "[cross]") {
         );
     }
 }
-
+#endif

@@ -162,6 +162,10 @@ else()
         cursesSantaFe.cpp
         ${GeneticProgrammingSources}
     )
+    target_compile_definitions(
+        cursesSantaFeTrail
+        PRIVATE ZOO_NO_TESTS=1
+    )
 
     target_link_libraries(cursesSantaFeTrail PRIVATE ncurses)
 
