@@ -31,6 +31,7 @@ struct ArtificialAntEnvironment {
     bool food_[GridHeight][GridWidth];
     int
         steps_,
+        thinking_,
         eaten_;
 
     constexpr static inline bool InitialFoodMatrix[GridHeight][GridWidth] = {
@@ -102,26 +103,25 @@ struct ArtificialAntEnvironment {
         return food_[p.y][p.x];
     }
 
-    void consumeFoodAt(Position p) {
-        if(hasFood(p)) {
-            ++eaten_;
-            food_[p.y][p.x] = false;
-        }
-    }
-
     bool foodAhead() const {
         return hasFood(aheadPosition());
     }
 
     void moveForward() {
         ant_.pos = aheadPosition();
+        if(hasFood(ant_.pos)) {
+            ++eaten_;
+            food_[ant_.pos.y][ant_.pos.x] = false;
+        }
+        ++steps_;
     }
 
     bool atEnd() const {
-        return MaxSteps <= steps_;
+        return (MaxSteps * 16) <= (this->thinking_ + this->steps_ * 16);
+        // return MaxSteps <= steps_;
     }
 
-    ArtificialAntEnvironment() : steps_(0) {
+    ArtificialAntEnvironment() : steps_(0), thinking_(0), eaten_(0) {
         ant_.pos = Position{0, 0};
         ant_.dir = Position{1, 0};
         initializeFood();

@@ -20,7 +20,7 @@ constexpr auto NonTerminalsCount() {
     return size(T::ArgumentCount) - TerminalsCount<T>();
 }
 
-template<typename Language, size_t Size = 1000>
+template<typename Language, size_t Size_ = 1000>
 struct PopulationGenerator {
     static_assert(size(Language::Tokens) == size(Language::ArgumentCount));
     static_assert(size(Language::Tokens) < 256);
@@ -33,7 +33,8 @@ struct PopulationGenerator {
     constexpr static inline auto
         LanguageSize = size(Language::ArgumentCount),
         NonTerminals = NonTerminalsCount<Language>(),
-        Terminals = LanguageSize - NonTerminals;
+        Terminals = LanguageSize - NonTerminals,
+        Size = Size_;
 
     constexpr static inline auto MaxArgumentCount = []() constexpr {
         auto rv = 2;

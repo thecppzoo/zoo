@@ -1,4 +1,5 @@
 #include "zoo/gp/Population.h"
+#include "zoo/gp/to_string.h"
 
 #include <stack>
 
@@ -203,5 +204,117 @@ TEST_CASE("Cross operation correctness", "[cross]") {
             firstCrossedTreeSize
         );
     }
+}
+#endif
+
+#include "zoo/gp/PopulationGenerator.h"
+#include "zoo/gp/ArtificialAntEnvironment.h"
+
+namespace zoo {
+
+//template<typename PG>
+using PG = PopulationGenerator<ArtificialAnt>;
+using E = ArtificialAntEnvironment;
+std::array<float, PG::Size>
+populationEvaluation(PG &pg, void (*notify)(int, E &, void *), void *ctx) {
+    using L = ArtificialAnt;
+    std::array<float, PG::Size> rv;
+    for(auto ndx = PG::Size; ndx--; ) {
+        auto genome = pg.individuals_[ndx];
+        auto flattened = zoo::flat<ArtificialAnt>(genome, pg.individualWeights_[ndx]);
+        WARN(flattened);
+        WARN(ndx << ' ' << to_string(zoo::IndividualStringifier<ArtificialAnt>{genome}));
+        E env;
+        std::string forConversion('*', pg.individualWeights_[ndx] * 3);
+        conversionToWeightedElement<L>(
+            forConversion.data(), pg.individuals_[ndx]
+        );
+        WeightedPreorder<L> ind(forConversion.data());
+        do {
+            artificialAntEvaluation(env, ind);
+        } while(!env.atEnd());
+        notify(ndx, env, ctx);
+    }
+}
+
+}
+
+#if !(defined(ZOO_NO_TESTS) && ZOO_NO_TESTS)
+#include "zoo/StatisticsMoments.h"
+
+#include <chrono>
+#include <random>
+
+template<typename Container, typename Range>
+Container appendEveryThird(Container &container, const Range &range) {
+    auto ndx = 0;
+    std::copy_if(
+        begin(container),
+        end(container),
+        std::back_inserter(container),
+        [ndx](const auto &) mutable { return ndx++ % 3 == 0; }
+    );
+}
+
+TEST_CASE("Whole Population", "[genetic-programming][benchmark]") {
+    SECTION("Clocks") {
+        namespace chrono = std::chrono;
+        using namespace std::chrono_literals;
+        using Clock = chrono::steady_clock;
+        using Period = Clock::period;
+        auto pre = Clock::now();
+        WARN(Period::num << ' ' << log(Period::den)/log(10));
+        auto after = Clock::now();
+        auto elapsed = after - pre;
+        WARN(elapsed.count() << ' ' << chrono::duration_cast<chrono::nanoseconds>(elapsed).count());
+    }
+    //auto seed = std::random_device{}();
+    auto seed = 329421841;
+    WARN("Seed used " << seed);
+    std::mt19937_64 gennie(seed);
+    zoo::PopulationGenerator<ArtificialAnt> p(6, gennie);
+
+    for(auto ndx = decltype(p)::Size; ndx--; ) {
+        auto individualGenes = p.individuals_[ndx];
+        auto weight = zoo::treeSize<ArtificialAnt>(individualGenes);
+        REQUIRE(weight == p.individualWeights_[ndx]);
+        std::string forConversion(weight, '*');
+        zoo::conversionToWeightedElement<ArtificialAnt>(
+            forConversion.data(), individualGenes
+        );
+        auto conversionCursor = forConversion.data();
+        auto geneCursor = individualGenes;
+        for(auto ndx = weight; ndx; --ndx) {
+            zoo::WeightedPreorder<ArtificialAnt> n(conversionCursor);
+            REQUIRE(*geneCursor == n.node());
+            REQUIRE(zoo::treeSize<ArtificialAnt>(geneCursor) == n.weight());
+        }
+    }
+    zoo::StatisticsMoments
+        moments {
+            p.individualWeights_.begin(),
+            p.individualWeights_.end(),
+            [](auto i) { return i; }
+        };
+    WARN(moments.count << ' ' << moments.sum << ' ' << moments.average << ' ' << moments.standardDeviation);
+    struct Sampler {
+        decltype(std::chrono::steady_clock::now()) sampleStart_;
+        std::vector<long> durations_;
+        Sampler(): sampleStart_(std::chrono::steady_clock::now()) {}
+    };
+    Sampler smplr;
+    auto sampleCollector = [](int ndx, ArtificialAntEnvironment &e, void *ctx) {
+        Sampler *sp = static_cast<Sampler *>(ctx);
+        auto d = std::chrono::steady_clock::now() - sp->sampleStart_;
+        sp->durations_.push_back(d.count());
+        if(ndx % 100 == 99) {
+            auto micros = std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+            WARN(ndx << ' ' << e.eaten_ << ' ' << e.steps_ << ' ' << micros);
+        }
+        sp->sampleStart_ = std::chrono::steady_clock::now();
+    };
+    auto results = populationEvaluation(p, sampleCollector, &smplr);
+    zoo::StatisticsMoments times{begin(smplr.durations_), end(smplr.durations_), [](auto i) { return i; }};
+    WARN(times.count << ' ' << times.sum << ' ' << times.average << ' ' << times.standardDeviation);
 }
 #endif

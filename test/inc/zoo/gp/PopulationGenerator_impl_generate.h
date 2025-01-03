@@ -74,12 +74,12 @@ PopulationGenerator<Language, Size>::generateBackEnd(
     return { h, int(spc - space) };
 }
 
-template<typename Language, size_t Size>
+template<typename Language, size_t Size_>
 template<typename G>
-PopulationGenerator<Language, Size>::PopulationGenerator(
+PopulationGenerator<Language, Size_>::PopulationGenerator(
     int maxHeight,
     G &randomGenerator,
-    typename PopulationGenerator<Language, Size>::GenerationStrategies strategy
+    GenerationStrategies strategy
 ) {
     char generationBuffer[1000];
     using D = decltype(Distributions::terminals);

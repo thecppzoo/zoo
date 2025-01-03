@@ -93,6 +93,9 @@ if(MSVC)
 else()
     # Non-MSVC specific configuration
     set(CMAKE_CXX_STANDARD 17)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        add_compile_options(-Wno-shorten-64-to-32)
+    endif()
 
     # Add the third-party directory for dependencies
     add_subdirectory(third_party EXCLUDE_FROM_ALL)

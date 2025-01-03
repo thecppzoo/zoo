@@ -33,7 +33,6 @@ void evalMove(
     ImplementationArray &
 ) {
     env.moveForward();
-    env.consumeFoodAt(env.ant_.pos);
     ++env.steps_;
 }
 
@@ -165,6 +164,7 @@ void evaluation(Env &e, Indi &i) {
 void recursiveEvaluationFrontEnd(Env &e, Indi &i, void *recursion) {
     auto rf = reinterpret_cast<void(*)(Env &, Indi &, void *)>(recursion);
     auto node = i.node();
+    ++e.thinking_;
     switch(node) {
         case TurnRight:
             e.turnRight();
@@ -174,7 +174,6 @@ void recursiveEvaluationFrontEnd(Env &e, Indi &i, void *recursion) {
             break;
         case Move:
             e.moveForward();
-            e.consumeFoodAt(e.ant_.pos);
             break;
         case IFA:
             if(e.foodAhead()) {

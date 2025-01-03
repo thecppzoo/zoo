@@ -16,54 +16,6 @@ void add(Strip &s, const char *root, unsigned weight) {
 
 }
 
-#include <vector>
-#include <algorithm>
-#include <numeric>
-
-// Struct to hold the statistics
-struct StatisticsMoment {
-    std::size_t count;
-    double
-        sum,
-        average,
-        standard_deviation;
-};
-
-// Stand-alone function template
-template<typename Iterator, typename NumberProjector>
-StatisticsMoment
-calculate_statistics(
-    Iterator begin, Iterator end, NumberProjector &&numberProjector
-) {
-    // Prepare variables
-    std::vector<double> numbers;
-    numbers.reserve(std::distance(begin, end));
-
-    // Transform the range to numeric values
-    std::transform(begin, end, std::back_inserter(numbers), numberProjector);
-
-    // Calculate count
-    auto count = numbers.size();
-
-    // Calculate average
-    auto
-        sum = std::accumulate(numbers.begin(), numbers.end(), 0.0),
-        average = sum / count,
-        sumOfSquaredDeviations =
-            std::accumulate(
-                numbers.begin(), numbers.end(), 0.0,
-                [average](double acc, double value) {
-                    double diff = value - average;
-                    return acc + diff * diff;
-                }
-            );
-    auto standardDeviation = std::sqrt(sumOfSquaredDeviations / count);
-
-    // Return the result
-    return {count, sum, average, standardDeviation};
-}
-
-
 #include <string>
 #include <stack>
 
@@ -87,6 +39,7 @@ static_assert(!zoo::Streamable_v<NotStreamable>);
 static_assert(!zoo::RangeWithStreamableElements_v<std::vector<NotStreamable>>);
 
 #include "zoo/CyclingEngine.h"
+#include "zoo/StatisticsMoments.h"
 
 #include <fstream>
 #include <iostream>
@@ -139,17 +92,17 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     for(auto ndx = 0; ndx < other.size(); ++ndx) {
         other[ndx] = gennie();
     }
-    std::vector<int> a = { 1, 2, 3, 4, 5 };
-    WARN(zoo::StreamableView{a});
+    //std::vector<int> a = { 1, 2, 3, 4, 5 };
+    //WARN(zoo::StreamableView{a});
     zoo::CyclingEngine engine(other.begin(), other.end());
     zoo::PopulationGenerator<ArtificialAnt> p(7, gennie);
-    auto moments =
-        calculate_statistics(
+    zoo::StatisticsMoments
+        moments {
             p.individualWeights_.begin(),
             p.individualWeights_.end(),
             [](auto i) { return i; }
-        );
-    WARN(moments.count << ' ' << moments.sum << ' ' << moments.average << ' ' << moments.standard_deviation);
+        };
+    WARN(moments.count << ' ' << moments.sum << ' ' << moments.average << ' ' << moments.standardDeviation);
     //auto wholePopulation = new char[moments.sum * 3];
     SECTION("Save individuals") {
         std::ofstream individuals{"/tmp/genetic-programming-individuals.lst"};
@@ -170,7 +123,8 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
             REQUIRE(strip.payload.size() == totalSize*3);
         }
     }
-    
+
+    #if 0
     char
         simpleIndividual[] = { Prog2, IFA, Move, TurnRight },
         conversion[sizeof(simpleIndividual) * 3];
@@ -190,6 +144,5 @@ TEST_CASE("Genetic Programming", "[genetic-programming]") {
     while(e.steps_ < 40) {
         rec(e, indi, reinterpret_cast<void *>(rec));
     }
-    
-    REQUIRE(true);
+    #endif
 }

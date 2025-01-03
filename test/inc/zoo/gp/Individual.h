@@ -1,6 +1,7 @@
 #ifndef ZOO_GP_INDIVIDUAL_H
 #define ZOO_GP_INDIVIDUAL_H
 
+#include "zoo/gp/to_string.h"
 #include "zoo/gp/PopulationGenerator.h"
 
 #include <string.h>
@@ -10,54 +11,6 @@
 #include <stdint.h>
 
 namespace zoo {
-
-template<typename Language>
-struct IndividualStringifier {
-    const char *inorderRepresentation;
-
-    struct Conversion {
-        std::string str;
-
-        const char *convert(const char *source) {
-            return converter(this, source, (void *)&converter);
-        }
-
-        static const char *converter(
-            Conversion *thy,
-            const char *source,
-            void *ptrToConverter
-        ) {
-            auto recursion =
-                reinterpret_cast<
-                    const char *(*)(Conversion *, const char *, void *)
-                >(ptrToConverter);
-            auto head = *source++;
-            assert(unsigned(head) < size(ArtificialAnt::ArgumentCount));
-            thy->str += Language::Tokens[head];
-            if(head < TerminalsCount<Language>()) {
-                return source;
-            }
-            thy->str += "(";
-            source = recursion(thy, source, ptrToConverter);
-            for(
-                auto remainingCount = Language::ArgumentCount[head] - 1;
-                remainingCount--;
-            ) {
-                thy->str += ", ";
-                source = recursion(thy, source, ptrToConverter);
-            }
-            thy->str += ")";
-            return source;
-        }
-    };
-};
-
-template<typename Language>
-std::string to_string(const IndividualStringifier<Language> &i) {
-    typename IndividualStringifier<Language>::Conversion c;
-    c.convert(i.inorderRepresentation);
-    return c.str;
-};
 
 struct ConversionFrame {
     unsigned weight, remainingSiblings;
@@ -133,6 +86,12 @@ struct WeightedPreorder {
 
     typename L::TokenEnum node() {
         return typename L::TokenEnum{space_[0]};
+    }
+
+    auto weight() const noexcept {
+        uint16_t rv;
+        memcpy(&rv, space_ + 1, 2);
+        return rv;
     }
 };
 
