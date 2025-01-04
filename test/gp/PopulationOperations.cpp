@@ -227,6 +227,7 @@ populationEvaluation(PG &pg, void (*notify)(int, E &, void *), void *ctx) {
         WARN(ndx << ' ' << to_string(zoo::IndividualStringifier<ArtificialAnt>{genome}));
         E env;
         std::string forConversion('*', pg.individualWeights_[ndx] * 3);
+        REQUIRE(forConversion.size() == 3*pg.individualWeights_[ndx]);
         conversionToWeightedElement<L>(
             forConversion.data(), pg.individuals_[ndx]
         );
@@ -282,6 +283,7 @@ TEST_CASE("Whole Population", "[genetic-programming][benchmark]") {
         auto weight = zoo::treeSize<ArtificialAnt>(individualGenes);
         REQUIRE(weight == p.individualWeights_[ndx]);
         std::string forConversion(weight, '*');
+        REQUIRE(weight == forConversion.size());
         zoo::conversionToWeightedElement<ArtificialAnt>(
             forConversion.data(), individualGenes
         );
