@@ -234,7 +234,9 @@ populationEvaluation(PG &pg, void (*notify)(int, E &, void *), void *ctx) {
             artificialAntEvaluation(env, ind);
         } while(!env.atEnd());
         notify(ndx, env, ctx);
+        rv[ndx] = env.eaten_;
     }
+    return rv;
 }
 
 }
