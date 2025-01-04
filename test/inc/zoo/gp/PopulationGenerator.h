@@ -130,6 +130,12 @@ struct PopulationGenerator {
         GenerationStrategies strategy = Rampled
     );
 
+    ~PopulationGenerator() {
+	for(auto ndx = Size; ndx--; ) {
+	    delete[] individuals_[ndx];
+	}
+    }
+
     static GenerationReturnType height(const char *root) {
         auto p = root;
         auto tag = *p++;
