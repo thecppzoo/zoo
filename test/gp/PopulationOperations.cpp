@@ -1,6 +1,7 @@
 #include "zoo/gp/Population.h"
 #include "zoo/gp/to_string.h"
 
+#include <string.h>
 #include <stack>
 
 namespace zoo {
