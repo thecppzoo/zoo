@@ -497,30 +497,25 @@ static_assert([] {
 template <int NB, typename T>
 constexpr
 MultiplicationResult<NB, T>
-fullMultiplication(SWAR<NB, T> multiplicand,
-                                        SWAR<NB, T> multiplier) {
-  using S = SWAR<NB, T>;
-  using D = SWAR<NB * 2, T>;
+fullMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+  using S = SWAR<NB, T>; using D = SWAR<NB * 2, T>;
 
-  // even LANES not even bits lol
-  // these have type SWAR
   auto [l_even, l_odd] = doublePrecision(multiplicand);
   auto [r_even, r_odd] = doublePrecision(multiplier);
-  static_assert(std::is_same<decltype(l_even), D>());
-  static_assert(std::is_same<decltype(l_odd), D>());
-  D res_even = multiplication_OverflowUnsafe(l_even, r_even);
-  D res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
+  auto res_even = multiplication_OverflowUnsafe(l_even, r_even);
+  auto res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
 
-  // Half a double lane?
+  // Into the double precision world
   constexpr auto HalfLane = S::NBits;
   constexpr auto UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
-  auto over_even = (res_even.value() & UpperHalfOfLanes) >> HalfLane;
-  auto over_odd = (res_odd.value() & UpperHalfOfLanes) >> HalfLane;
-
-  auto overflow_values = halvePrecision(D{over_even}, D{over_odd});
-  auto did_overflow = ~(zoo::swar::equals(overflow_values, S{0}));
-
   auto res = halvePrecision(res_even, res_odd);
+
+  auto over_even = D{(res_even.value() & UpperHalfOfLanes) >> HalfLane};
+  auto over_odd = D{(res_odd.value() & UpperHalfOfLanes) >> HalfLane};
+  auto overflow_values = halvePrecision(over_even, over_odd);
+
+  // back to normal precision world
+  auto did_overflow = ~(zoo::swar::equals(overflow_values, S{0}));
 
   return {res, did_overflow};
 }
