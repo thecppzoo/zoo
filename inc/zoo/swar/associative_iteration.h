@@ -508,15 +508,6 @@ template <int NB, typename T> struct MultiplicationResult {
    BooleanSWAR<NB, T> overflowed;
 };
 
-// static_assert([] {
-//    using D = SWAR<8, u32>;
-//    using S = SWAR<4, u32>;
-//    using H = SWAR<2, u32>;
-//    constexpr auto UpperHalfOfLanes = S::oddLaneMask().value();
-//    static_assert(UpperHalfOfLanes == 0xF0F0'F0F0);
-//    return true;
-// }());
-
 template <int NB, typename T>
 constexpr MultiplicationResult<NB, T>
 fullMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
@@ -543,6 +534,7 @@ fullMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
 }
 
 using S = SWAR<4, u32>;
+
 static_assert(S::oddLaneMask().value() == 0xF0F0'F0F0);
 static_assert(S::evenLaneMask().value() == 0x0F0F'0F0F);
 
