@@ -2,6 +2,7 @@
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
 #include "zoo/swar/SWAR.h"
+#include <type_traits>
 #include <utility>
 
 // #define ZOO_DEVELOPMENT_DEBUGGING
@@ -479,41 +480,83 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
   return evenHalf | oddHalf;
 }
 
+template <int NB, typename T> struct MultiplicationResult {
+  SWAR<NB, T> result;
+  BooleanSWAR<NB, T> overflowed;
+};
+
+static_assert([] {
+  using D = SWAR<8, u32>;
+  using S = SWAR<4, u32>;
+  using H = SWAR<2, u32>;
+  constexpr auto UpperHalfOfLanes = S::oddLaneMask().value();
+  static_assert(UpperHalfOfLanes == 0xF0F0'F0F0);
+  return true;
+}());
+
 template <int NB, typename T>
 constexpr
-ArithmeticResultTriplet<NB, T>
+MultiplicationResult<NB, T>
 fullMultiplication(SWAR<NB, T> multiplicand,
-                                  SWAR<NB, T> multiplier) {
+                                        SWAR<NB, T> multiplier) {
   using S = SWAR<NB, T>;
   using D = SWAR<NB * 2, T>;
-  constexpr auto UpperHalfOfLanes = SWAR<NB / 2, T>::oddLaneMask().value();
 
   // even LANES not even bits lol
+  // these have type SWAR
   auto [l_even, l_odd] = doublePrecision(multiplicand);
   auto [r_even, r_odd] = doublePrecision(multiplier);
-
-  auto res_even = multiplication_OverflowUnsafe(l_even, r_even);
-  auto res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
+  static_assert(std::is_same<decltype(l_even), D>());
+  static_assert(std::is_same<decltype(l_odd), D>());
+  D res_even = multiplication_OverflowUnsafe(l_even, r_even);
+  D res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
 
   // Half a double lane?
   constexpr auto HalfLane = S::NBits;
+  constexpr auto UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
   auto over_even = (res_even.value() & UpperHalfOfLanes) >> HalfLane;
   auto over_odd = (res_odd.value() & UpperHalfOfLanes) >> HalfLane;
-  auto overflow_values = halvePrecision(D{over_even}, D{over_odd});
 
-  auto did_overflow = ~zoo::swar::equals(overflow_values, S{0});
+  auto overflow_values = halvePrecision(D{over_even}, D{over_odd});
+  auto did_overflow = ~(zoo::swar::equals(overflow_values, S{0}));
 
   auto res = halvePrecision(res_even, res_odd);
 
-  return {res, did_overflow, did_overflow};
+  return {res, did_overflow};
 }
 
-using S = SWAR<4, u64>;
-static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032}).result.value() ==
-              0x0008'0034);
+using S = SWAR<4, u32>;
 
-static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032}).result.value() ==
-              0x0008'0034);
+static_assert(S::oddLaneMask().value() == 0xF0F0'F0F0);
+static_assert(S::evenLaneMask().value() == 0x0F0F'0F0F);
+
+static_assert(fullMultiplication(S{0x0009'0000}, S{0x0009'0000})
+                  .result.value() == 0x0001'0000);
+static_assert(fullMultiplication(S{0x0003'0000}, S{0x0007'0000})
+                  .result.value() == 0x0005'0000);
+
+static_assert(fullMultiplication(S{0x0002'0000}, S{0x0008'0000})
+                  .overflowed.value() == 0x0008'0000);
+
+static_assert(fullMultiplication(S{0x0008'0000}, S{0x0008'0000})
+                  .overflowed.value() == 0x0008'0000);
+
+static_assert(fullMultiplication(S{0x0001'0000}, S{0x0008'0000})
+                  .overflowed.value() == 0x0000'0000);
+
+// static_assert([] {
+//     // fullMultiplication(S{0x0008'0012}, S{0x0007'0032}).result.value()
+//     ==0x0008'0034 auto r = fullMultiplication(S{0x0003'0012},
+//     S{0x0003'0032}); if (r.result.value() != 0x0009'0034) { return false; }
+//     if (r.overflow.value() != 0x0000'0000) { return false; }
+//     return true;
+// }());
+
+static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
+                  .result.value() == 0x0008'0034);
+
+static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
+                  .result.value() == 0x0008'0034);
 
 } // namespace zoo::swar
 
