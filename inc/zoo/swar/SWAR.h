@@ -70,6 +70,8 @@ constexpr __uint128_t lsbIndex(__uint128_t v) noexcept {
 }
 #endif
 
+
+
 /// Core abstraction around SIMD Within A Register (SWAR).  Specifies 'lanes'
 /// of NBits width against a type T, and provides an abstraction for performing
 /// SIMD operations against that primitive type T treated as a SIMD register.
@@ -106,6 +108,17 @@ struct SWAR {
             result = (result << NBits) | *first;
         }
         return result;
+    }
+
+    constexpr static auto evenLaneMask() {
+        using S = SWAR<NBits, T>;
+        static_assert(0 == S::Lanes % 2, "Only even number of elements supported");
+        using D = SWAR<NBits * 2, T>;
+        return S{(D::LeastSignificantBit << S::NBits) - D::LeastSignificantBit};
+    }
+
+    constexpr static auto oddLaneMask() {
+        return SWAR<NBits, T>{static_cast<T>(~evenLaneMask().value())};
     }
 
     template <typename Range>
@@ -594,5 +607,8 @@ static_assert(
     logarithmFloor(SWAR<8>{0xFF7F3F1F0F070301ull}).value() ==
     0x0706050403020100ull
 );
+
+static_assert(SWAR<4, u16>::evenLaneMask().value() == 0b0000'1111'0000'1111);
+static_assert(SWAR<4, u16>::oddLaneMask().value()  == 0b1111'0000'1111'0000);
 
 }}

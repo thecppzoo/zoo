@@ -1,0 +1,23 @@
+// n log n
+void quicksort(begin, end) {
+
+    for (;;) {
+        pivot = pick_pivot(begin, end)
+        pivot_pos = partition(begin, end, pivot)
+
+        if begin != pivot_pos {
+            quicksort(begin, pivot_pos)
+
+            if greater.empty() {
+                return;
+            }
+            begin = next(pivot_pos)
+        } else { // small is empty
+
+            if end == pivot_pos + 1 {
+                return;
+            }
+            begin = pivot_pos + 1
+        }
+    }
+}
