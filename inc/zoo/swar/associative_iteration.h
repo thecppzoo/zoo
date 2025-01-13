@@ -476,14 +476,6 @@ struct SWAR_Pair{
 };
 
 template<int NB, typename T>
-constexpr SWAR<NB, T> doublingMask() {
-    using S = SWAR<NB, T>;
-    static_assert(0 == S::Lanes % 2, "Only even number of elements supported");
-    using D = SWAR<NB * 2, T>;
-    return S{(D::LeastSignificantBit << NB) - D::LeastSignificantBit};
-}
-
-template<int NB, typename T>
 constexpr auto doublePrecision(SWAR<NB, T> input) {
     using S = SWAR<NB, T>;
     static_assert(
@@ -491,7 +483,7 @@ constexpr auto doublePrecision(SWAR<NB, T> input) {
         "Precision can only be doubled for SWARs of even element count"
     );
     using RV = SWAR<NB * 2, T>;
-    constexpr auto DM = doublingMask<NB, T>();
+    constexpr auto DM = SWAR<NB, T>::evenLaneMask();
     return SWAR_Pair<NB * 2, T>{
         RV{(input & DM).value()},
         RV{(input.value() >> NB) & DM.value()}
@@ -503,7 +495,7 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     using S = SWAR<NB, T>;
     static_assert(0 == NB % 2, "Only even lane-bitcounts supported");
     using RV = SWAR<NB/2, T>;
-    constexpr auto HalvingMask = doublingMask<NB/2, T>();
+    constexpr auto HalvingMask = SWAR<NB/2, T>::evenLaneMask();
     auto
         evenHalf = RV{even.value()} & HalvingMask,
         oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};

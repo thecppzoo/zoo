@@ -211,7 +211,7 @@ static_assert(BooleanSWAR{Literals<4, u16>,
 namespace Multiplication {
 
 static_assert(~int64_t(0) == negate(S4_64{S4_64::LeastSignificantBit}).value());
-static_assert(0x0F0F0F0F == doublingMask<4, uint32_t>().value());
+static_assert(0x0F0F0F0F == SWAR<4, uint32_t>::evenLaneMask().value());
 
 constexpr auto PrecisionFixtureTest = 0x89ABCDEF;
 constexpr auto Doubled =
