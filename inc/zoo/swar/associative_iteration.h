@@ -543,7 +543,6 @@ fullMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
 }
 
 using S = SWAR<4, u32>;
-
 static_assert(S::oddLaneMask().value() == 0xF0F0'F0F0);
 static_assert(S::evenLaneMask().value() == 0x0F0F'0F0F);
 
@@ -560,14 +559,6 @@ static_assert(fullMultiplication(S{0x0008'0000}, S{0x0008'0000})
 
 static_assert(fullMultiplication(S{0x0001'0000}, S{0x0008'0000})
                   .overflowed.value() == 0x0000'0000);
-
-// static_assert([] {
-//     // fullMultiplication(S{0x0008'0012}, S{0x0007'0032}).result.value()
-//     ==0x0008'0034 auto r = fullMultiplication(S{0x0003'0012},
-//     S{0x0003'0032}); if (r.result.value() != 0x0009'0034) { return false; }
-//     if (r.overflow.value() != 0x0000'0000) { return false; }
-//     return true;
-// }());
 
 static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
                   .result.value() == 0x0008'0034);
