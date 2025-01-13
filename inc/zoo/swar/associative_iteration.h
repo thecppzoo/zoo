@@ -510,6 +510,79 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     return evenHalf | oddHalf;
 }
 
+
+template <int NB, typename T> struct MultiplicationResult {
+   SWAR<NB, T> result;
+   BooleanSWAR<NB, T> overflowed;
+};
+
+// static_assert([] {
+//    using D = SWAR<8, u32>;
+//    using S = SWAR<4, u32>;
+//    using H = SWAR<2, u32>;
+//    constexpr auto UpperHalfOfLanes = S::oddLaneMask().value();
+//    static_assert(UpperHalfOfLanes == 0xF0F0'F0F0);
+//    return true;
+// }());
+
+template <int NB, typename T>
+constexpr MultiplicationResult<NB, T>
+fullMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   using S = SWAR<NB, T>; using D = SWAR<NB * 2, T>;
+
+   auto [l_even, l_odd] = doublePrecision(multiplicand);
+   auto [r_even, r_odd] = doublePrecision(multiplier);
+   auto res_even = multiplication_OverflowUnsafe(l_even, r_even);
+   auto res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
+
+   // Into the double precision world
+   constexpr auto HalfLane = S::NBits;
+   constexpr auto UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
+   auto res = halvePrecision(res_even, res_odd);
+
+   auto over_even = D{(res_even.value() & UpperHalfOfLanes) >> HalfLane};
+   auto over_odd = D{(res_odd.value() & UpperHalfOfLanes) >> HalfLane};
+   auto overflow_values = halvePrecision(over_even, over_odd);
+
+   // back to normal precision world
+   auto did_overflow = ~(zoo::swar::equals(overflow_values, S{0}));
+
+   return {res, did_overflow};
+}
+
+using S = SWAR<4, u32>;
+
+static_assert(S::oddLaneMask().value() == 0xF0F0'F0F0);
+static_assert(S::evenLaneMask().value() == 0x0F0F'0F0F);
+
+static_assert(fullMultiplication(S{0x0009'0000}, S{0x0009'0000})
+                  .result.value() == 0x0001'0000);
+static_assert(fullMultiplication(S{0x0003'0000}, S{0x0007'0000})
+                  .result.value() == 0x0005'0000);
+
+static_assert(fullMultiplication(S{0x0002'0000}, S{0x0008'0000})
+                  .overflowed.value() == 0x0008'0000);
+
+static_assert(fullMultiplication(S{0x0008'0000}, S{0x0008'0000})
+                  .overflowed.value() == 0x0008'0000);
+
+static_assert(fullMultiplication(S{0x0001'0000}, S{0x0008'0000})
+                  .overflowed.value() == 0x0000'0000);
+
+// static_assert([] {
+//     // fullMultiplication(S{0x0008'0012}, S{0x0007'0032}).result.value()
+//     ==0x0008'0034 auto r = fullMultiplication(S{0x0003'0012},
+//     S{0x0003'0032}); if (r.result.value() != 0x0009'0034) { return false; }
+//     if (r.overflow.value() != 0x0000'0000) { return false; }
+//     return true;
+// }());
+
+static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
+                  .result.value() == 0x0008'0034);
+
+static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
+                  .result.value() == 0x0008'0034);
+
 }
 
 #endif
