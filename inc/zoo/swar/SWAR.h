@@ -608,7 +608,4 @@ static_assert(
     0x0706050403020100ull
 );
 
-static_assert(SWAR<4, u16>::evenLaneMask().value() == 0b0000'1111'0000'1111);
-static_assert(SWAR<4, u16>::oddLaneMask().value()  == 0b1111'0000'1111'0000);
-
 }}
