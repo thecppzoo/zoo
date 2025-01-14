@@ -512,10 +512,10 @@ constexpr
 auto saturatedMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    using S = SWAR<NB, T>;
    constexpr auto One = S{S::LeastSignificantBit};
-   auto [res, overflow] = wideningMultiplication(multiplicand, multiplier);
+   auto [result, overflow] = wideningMultiplication(multiplicand, multiplier);
    auto did_overflow = zoo::swar::greaterEqual(overflow, One);
    auto lane_mask = did_overflow.MSBtoLaneMask();
-   auto saturated = res | lane_mask;
+   auto saturated = result | lane_mask;
    return S{saturated};
 }
 
