@@ -514,9 +514,9 @@ auto saturatedMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    constexpr auto One = S{S::LeastSignificantBit};
    auto [res, overflow] = wideningMultiplication(multiplicand, multiplier);
    auto did_overflow = zoo::swar::greaterEqual(overflow, One);
-   auto laneMask = did_overflow.MSBtoLaneMask();
-   auto res_saturated = res | laneMask;
-   return S{res_saturated};
+   auto lane_mask = did_overflow.MSBtoLaneMask();
+   auto saturated = res | lane_mask;
+   return S{saturated};
 }
 
 
@@ -527,6 +527,10 @@ constexpr auto saturatingExponentiation(
     SWAR<NB, T> exponent
 ) {
     using S = SWAR<NB, T>;
+    constexpr auto NumBitsPerLane = S::NBits;
+    constexpr auto
+        MSB = S{S::MostSignificantBit},
+        LSB = S{S::LeastSignificantBit};
 
     auto operation = [](auto left, auto right, auto counts) {
       auto mask = makeLaneMaskFromMSB(counts);
@@ -534,18 +538,16 @@ constexpr auto saturatingExponentiation(
       return (product & mask) | (left & ~mask);
     };
 
-    // halver should work same as multiplication... i think...
     auto halver = [](auto counts) {
         auto msbCleared = counts & ~S{S::MostSignificantBit};
         return S{static_cast<T>(msbCleared.value() << 1)};
     };
 
-    constexpr auto NumBitsPerLane = S::NBits;
     return associativeOperatorIterated_regressive(
         x,
-        S{S::LeastSignificantBit},
+        LSB,
         exponent,
-        S{S::MostSignificantBit},
+        MSB,
         operation,
         NumBitsPerLane,
         halver
