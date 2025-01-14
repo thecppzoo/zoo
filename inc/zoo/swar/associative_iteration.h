@@ -1,7 +1,10 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
+#include "SWAR.h"
 #include "zoo/swar/SWAR.h"
+#include <assert.h>
+#include <cstdint>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -426,38 +429,6 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     return product;
 }
 
-// TODO(Jamie): Add tests from other PR.
-template<int ActualBits, int NB, typename T>
-constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
-    SWAR<NB, T> x,
-    SWAR<NB, T> exponent
-) {
-    using S = SWAR<NB, T>;
-
-    auto operation = [](auto left, auto right, auto counts) {
-      const auto mask = makeLaneMaskFromMSB(counts);
-      const auto product =
-        multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
-      return (product & mask) | (left & ~mask);
-    };
-
-    // halver should work same as multiplication... i think...
-    auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{static_cast<T>(msbCleared.value() << 1)};
-    };
-
-    exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
-    return associativeOperatorIterated_regressive(
-        x,
-        S{meta::BitmaskMaker<T, 1, NB>().value}, // neutral is lane wise..
-        exponent,
-        S{S::MostSignificantBit},
-        operation,
-        ActualBits,
-        halver
-    );
-}
 
 template<int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe(
@@ -509,51 +480,89 @@ template <int NB, typename T> struct MultiplicationResult {
 };
 
 template <int NB, typename T>
-constexpr MultiplicationResult<NB, T>
-fullMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+constexpr auto
+doublingMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    using S = SWAR<NB, T>; using D = SWAR<NB * 2, T>;
-
    auto [l_even, l_odd] = doublePrecision(multiplicand);
    auto [r_even, r_odd] = doublePrecision(multiplier);
-   auto res_even = multiplication_OverflowUnsafe(l_even, r_even);
-   auto res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
-
-   // Into the double precision world
-   constexpr auto HalfLane = S::NBits;
-   constexpr auto UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
-   auto res = halvePrecision(res_even, res_odd);
-
-   auto over_even = D{(res_even.value() & UpperHalfOfLanes) >> HalfLane};
-   auto over_odd = D{(res_odd.value() & UpperHalfOfLanes) >> HalfLane};
-   auto overflow_values = halvePrecision(over_even, over_odd);
-
-   return {res, overflow_values};
+   auto
+       res_even = multiplication_OverflowUnsafe(l_even, r_even),
+       res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
+   return SWAR_Pair<NB * 2, T>{res_even, res_odd};
 }
 
-using S = SWAR<4, u32>;
+template <int NB, typename T>
+constexpr MultiplicationResult<NB, T>
+wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   using S = SWAR<NB, T>; using D = SWAR<NB * 2, T>;
+   constexpr auto
+       HalfLane = S::NBits,
+       UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
+   auto [res_even, res_odd] = doublingMultiplication(multiplicand, multiplier);
+   auto result = halvePrecision(res_even, res_odd);
+   auto
+       over_even = D{(res_even.value() & UpperHalfOfLanes) >> HalfLane},
+       over_odd = D{(res_odd.value() & UpperHalfOfLanes) >> HalfLane};
+   auto upper_lanes_overflow = halvePrecision(over_even, over_odd);
+   return {result, upper_lanes_overflow};
+}
 
-static_assert(S::oddLaneMask().value() == 0xF0F0'F0F0);
-static_assert(S::evenLaneMask().value() == 0x0F0F'0F0F);
+template <int NB, typename T>
+constexpr
+auto saturatedMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   using S = SWAR<NB, T>;
+   constexpr auto One = S{S::LeastSignificantBit};
+   auto [res, overflow] = wideningMultiplication(multiplicand, multiplier);
+   auto did_overflow = zoo::swar::greaterEqual(overflow, One);
+   auto laneMask = did_overflow.MSBtoLaneMask();
+   auto res_saturated = res | laneMask;
+   return S{res_saturated};
+}
 
-static_assert(fullMultiplication(S{0x0009'0000}, S{0x0009'0000})
-                  .result.value() == 0x0001'0000);
-static_assert(fullMultiplication(S{0x0003'0000}, S{0x0007'0000})
-                  .result.value() == 0x0005'0000);
 
-// static_assert(fullMultiplication(S{0x0002'0000}, S{0x0008'0000})
-//                   .overflowed.value() == 0x0008'0000);
-//
-// static_assert(fullMultiplication(S{0x0008'0000}, S{0x0008'0000})
-//                   .overflowed.value() == 0x0008'0000);
-//
-// static_assert(fullMultiplication(S{0x0001'0000}, S{0x0008'0000})
-//                   .overflowed.value() == 0x0000'0000);
+// TODO(Jamie): Add tests from other PR.
+template<int NB, typename T>
+constexpr auto saturatingExponentiation(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    using S = SWAR<NB, T>;
 
-static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
-                  .result.value() == 0x0008'0034);
+    auto operation = [](auto left, auto right, auto counts) {
+      auto mask = makeLaneMaskFromMSB(counts);
+      auto product = saturatedMultiplication(left, right);
+      return (product & mask) | (left & ~mask);
+    };
 
-static_assert(fullMultiplication(S{0x0008'0012}, S{0x0007'0032})
-                  .result.value() == 0x0008'0034);
+    // halver should work same as multiplication... i think...
+    auto halver = [](auto counts) {
+        auto msbCleared = counts & ~S{S::MostSignificantBit};
+        return S{static_cast<T>(msbCleared.value() << 1)};
+    };
+
+    constexpr auto NumBitsPerLane = S::NBits;
+    return associativeOperatorIterated_regressive(
+        x,
+        S{S::LeastSignificantBit},
+        exponent,
+        S{S::MostSignificantBit},
+        operation,
+        NumBitsPerLane,
+        halver
+    );
+}
+
+using S4 = SWAR<4, u32>;
+using S8 = SWAR<8, u32>;
+static_assert(S4::oddLaneMask().value() == 0xF0F0'F0F0);
+static_assert(S4::evenLaneMask().value() == 0x0F0F'0F0F);
+static_assert(wideningMultiplication(S4{0x0009'0000}, S4{0x0009'0000}).result.value() == 0x0001'0000);
+static_assert(wideningMultiplication(S4{0x0003'0000}, S4{0x0007'0000}).result.value() == 0x0005'0000);
+static_assert(wideningMultiplication(S4{0x0008'0012}, S4{0x0007'0032}).result.value() == 0x0008'0034);
+static_assert(wideningMultiplication(S4{0x0008'0012}, S4{0x0007'0032}).result.value() == 0x0008'0034);
+static_assert(saturatedMultiplication(S8{0x09'40'03'01}, S8{0x37'03'C0'01}).value() == 0xFF'C0'FF'01);
+static_assert(saturatedMultiplication(S4{0x0009'0001}, S4{0x0009'0001}).value() == 0x000F'0001);
+static_assert(saturatingExponentiation(S4{0x9000'0432}, S4{0x1000'0221}).value() == 0x9111'1F92);
 
 }
 
