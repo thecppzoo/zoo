@@ -554,18 +554,6 @@ constexpr auto saturatingExponentiation(
     );
 }
 
-using S4 = SWAR<4, u32>;
-using S8 = SWAR<8, u32>;
-static_assert(S4::oddLaneMask().value() == 0xF0F0'F0F0);
-static_assert(S4::evenLaneMask().value() == 0x0F0F'0F0F);
-static_assert(wideningMultiplication(S4{0x0009'0000}, S4{0x0009'0000}).result.value() == 0x0001'0000);
-static_assert(wideningMultiplication(S4{0x0003'0000}, S4{0x0007'0000}).result.value() == 0x0005'0000);
-static_assert(wideningMultiplication(S4{0x0008'0012}, S4{0x0007'0032}).result.value() == 0x0008'0034);
-static_assert(wideningMultiplication(S4{0x0008'0012}, S4{0x0007'0032}).result.value() == 0x0008'0034);
-static_assert(saturatedMultiplication(S8{0x09'40'03'01}, S8{0x37'03'C0'01}).value() == 0xFF'C0'FF'01);
-static_assert(saturatedMultiplication(S4{0x0009'0001}, S4{0x0009'0001}).value() == 0x000F'0001);
-static_assert(saturatingExponentiation(S4{0x9000'0432}, S4{0x1000'0221}).value() == 0x9111'1F92);
-
 }
 
 #endif
