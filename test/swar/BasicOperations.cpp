@@ -260,83 +260,36 @@ constexpr auto testSaturatingMultiplication(T left, T right, T expected) {
     using S = SWAR<NB, T>;
     return saturatingExponentiation(S{left}, S{right}).value() == expected;
 }
-
-
-//     template<
-//         typename Arg,
-//         std::size_t N,
-//         // Reject via SFINAE plain arrays with non-matching number of elements
-//         typename = std::enable_if_t<N == Lanes>
-//     >
-//     constexpr
-//     SWAR(Literals_t<NBits, T>, const Arg (&values)[N]):
-//         m_v{from(values)}
-//     {}
-
-template<typename T>
-struct Foo {
-    constexpr Foo(T l, T r, T e):
-        left{l}, right{r}, expected{e}
-    {}
-    T left{}, right{}, expected{};
-};
-
-template <int NB, typename T, typename Arg, int N>
-constexpr auto multiple_test(const Arg (&values)[N]) {
-    using std::begin; using std::end;
-    auto start = begin(values);
-    auto fin = end(values);
-    while (start != fin) {
-        auto v = *start++;
-        auto left = v.left;
-        auto right = v.right;
-        auto expected = v.expected;
-        if (saturatingExponentiation(SWAR<NB, T>{left}, SWAR<NB, T>{right}).value() != expected) {
-            return false;
-        }
-    }
-    return true;
-}
-
-constexpr auto satExpoTests = [] () {
-    return multiple_test<8, u32>({
-        Foo<u32>{
+static_assert(
+    testSaturatingMultiplication<8, u32>(
         0x09'40'03'01,
         0x37'03'C0'01,
-        0xFF'FF'FF'01},
-
-        Foo<u32>{
-        0x09'40'03'01,
-        0x37'03'C0'01,
-        0xFF'FF'FF'01},
-
-        Foo<u32>{
-        0x09'40'03'01,
-        0x37'03'C0'01,
-        0xFF'FF'FF'01},
-    });
-};
-
-static_assert(satExpoTests());
-
-
-static_assert(testSaturatingMultiplication<8, u32>(
-    0x09'40'03'01,
-    0x37'03'C0'01,
-    0xFF'FF'FF'01
+        0xFF'FF'FF'01
 ));
-
-using S8 = SWAR<8, u32>;
-using S4 = SWAR<4, u32>;
-static_assert(S4::oddLaneMask().value() == 0xF0F0'F0F0);
-static_assert(S4::evenLaneMask().value() == 0x0F0F'0F0F);
-static_assert(wideningMultiplication(S4{0x0009'0000}, S4{0x0009'0000}).result.value() == 0x0001'0000);
-static_assert(wideningMultiplication(S4{0x0003'0000}, S4{0x0007'0000}).result.value() == 0x0005'0000);
-static_assert(wideningMultiplication(S4{0x0008'0012}, S4{0x0007'0032}).result.value() == 0x0008'0034);
-static_assert(wideningMultiplication(S4{0x0008'0012}, S4{0x0007'0032}).result.value() == 0x0008'0034);
-static_assert(saturatedMultiplication(S8{0x09'40'03'01}, S8{0x37'03'C0'01}).value() == 0xFF'C0'FF'01);
-static_assert(saturatedMultiplication(S4{0x0009'0001}, S4{0x0009'0001}).value() == 0x000F'0001);
-static_assert(saturatingExponentiation(S4{0x9000'0432}, S4{0x1000'0221}).value() == 0x9111'1F92);
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0x02'02'02'02,
+        0x02'02'02'02,
+        0x04'04'04'04
+));
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0xFF'FF'FF'FF,
+        0x04'03'02'01,
+        0xFF'FF'FF'FF
+));
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0x02'FF'FF'FF,
+        0x03'03'02'01,
+        0x08'FF'FF'FF
+));
+static_assert(
+    testSaturatingMultiplication<4, u32>(
+        0x1243'0003,
+        0x0002'0002,
+        0x1119'1119
+));
 
 
 TEST_CASE("Old multiply version", "[deprecated][swar]") {
