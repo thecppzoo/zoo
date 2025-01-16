@@ -396,8 +396,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     };
 
     auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        return swar::consumeMSB(counts);
     };
 
     auto shifted = S{multiplier.value() << (NB - ActualBits)};
@@ -539,8 +538,7 @@ constexpr auto saturatingExponentiation(
     };
 
     auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{static_cast<T>(msbCleared.value() << 1)};
+        return swar::consumeMSB(counts);
     };
 
     return associativeOperatorIterated_regressive(

@@ -258,6 +258,12 @@ constexpr auto horizontalEquality(SWAR<NBits, T> left, SWAR<NBits, T> right) {
     return left.m_v == right.m_v;
 }
 
+template <int NBits, typename T>
+constexpr static auto consumeMSB(SWAR<NBits, T> s) noexcept {
+    using S = SWAR<NBits, T>;
+    auto msbCleared = s & ~S{S::MostSignificantBit};
+    return S{static_cast<T>(msbCleared.value() << 1)};
+}
 
 
 #if ZOO_USE_LEASTNBITSMASK
