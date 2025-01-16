@@ -479,15 +479,16 @@ template <int NB, typename T> struct MultiplicationResult {
 };
 
 template <int NB, typename T>
-constexpr auto
-doublingMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
-   using S = SWAR<NB, T>; using D = SWAR<NB * 2, T>;
-   auto [l_even, l_odd] = doublePrecision(multiplicand);
-   auto [r_even, r_odd] = doublePrecision(multiplier);
+constexpr
+auto
+doublePrecisionMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    auto
-       res_even = multiplication_OverflowUnsafe(l_even, r_even),
-       res_odd = multiplication_OverflowUnsafe(l_odd, r_odd);
-   return SWAR_Pair<NB * 2, T>{res_even, res_odd};
+       icand = doublePrecision(multiplicand),
+       plier  = doublePrecision(multiplier);
+   auto
+       lower = multiplication_OverflowUnsafe(icand.even, plier.even),
+       upper = multiplication_OverflowUnsafe(icand.odd, plier.odd);
+   return SWAR_Pair<NB * 2, T>{lower, upper};
 }
 
 template <int NB, typename T>
@@ -497,7 +498,7 @@ wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    constexpr auto
        HalfLane = S::NBits,
        UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
-   auto [lower, upper] = doublingMultiplication(multiplicand, multiplier);
+   auto [lower, upper] = doublePrecisionMultiplication(multiplicand, multiplier);
    auto result = halvePrecision(lower, upper);
    auto
        over_even = D{(lower.value() & UpperHalfOfLanes) >> HalfLane},
