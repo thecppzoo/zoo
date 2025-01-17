@@ -508,13 +508,14 @@ wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    constexpr auto
        HalfLane = S::NBits,
        UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
-   auto [lower, upper] = doublePrecisionMultiplication(multiplicand, multiplier);
-   auto result = halvePrecision(lower, upper);
+   auto [even, odd] = doublePrecisionMultiplication(multiplicand, multiplier);
    auto
-       over_even = D{(lower.value() & UpperHalfOfLanes) >> HalfLane},
-       over_odd = D{(upper.value() & UpperHalfOfLanes) >> HalfLane};
-   auto upper_lanes_overflow = halvePrecision(over_even, over_odd);
-   return {result, upper_lanes_overflow};
+       upper_even = even.shiftIntraLaneRight(HalfLane, D{UpperHalfOfLanes}),
+       upper_odd = odd.shiftIntraLaneRight(HalfLane, D{UpperHalfOfLanes});
+   auto
+       lower = halvePrecision(even, odd), // throws away the upper bits
+       upper = halvePrecision(upper_even, upper_odd); // preserve the upper bits
+   return {lower, upper};
 }
 
 template <int NB, typename T>
@@ -525,8 +526,7 @@ auto saturatingMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) 
    auto [result, overflow] = wideningMultiplication(multiplicand, multiplier);
    auto did_overflow = zoo::swar::greaterEqual(overflow, One);
    auto lane_mask = did_overflow.MSBtoLaneMask();
-   auto saturated = result | lane_mask;
-   return S{saturated};
+   return S{result | lane_mask};
 }
 
 template<int NB, typename T, typename MultiplicationFn>

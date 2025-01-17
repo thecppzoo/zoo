@@ -258,7 +258,7 @@ HE(2, u8, 0xAA, 0x2);
 template<int NB, typename T>
 constexpr auto testSaturatingMultiplication(T left, T right, T expected) {
     using S = SWAR<NB, T>;
-    return exponentation_Saturating(S{left}, S{right}).value() == expected;
+    return saturatingExponentation(S{left}, S{right}).value() == expected;
 }
 static_assert(
     testSaturatingMultiplication<8, u32>(
