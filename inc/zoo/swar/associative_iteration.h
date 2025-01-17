@@ -18,6 +18,8 @@ inline std::ostream &binary(std::ostream &out, uint64_t input, int count) {
     return out;
 }
 
+
+
 template<int NB, typename B>
 std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
     using S = zoo::swar::SWAR<NB, B>;
@@ -43,6 +45,14 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 #endif
 
 namespace zoo::swar {
+
+template <int NBits, typename T>
+constexpr static auto consumeMSB(SWAR<NBits, T> s) noexcept {
+    using S = SWAR<NBits, T>;
+    auto msbCleared = s & ~S{S::MostSignificantBit};
+    return S{static_cast<T>(msbCleared.value() << 1)};
+}
+
 
 template<typename S>
 constexpr auto parallelSuffix(S input) {
@@ -509,7 +519,7 @@ wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
 
 template <int NB, typename T>
 constexpr
-auto saturatedMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+auto saturatingMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    using S = SWAR<NB, T>;
    constexpr auto One = S{S::LeastSignificantBit};
    auto [result, overflow] = wideningMultiplication(multiplicand, multiplier);
@@ -519,12 +529,11 @@ auto saturatedMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    return S{saturated};
 }
 
-
-// TODO(Jamie): Add tests from other PR.
-template<int NB, typename T>
-constexpr auto saturatingExponentiation(
+template<int NB, typename T, typename MultiplicationFn>
+constexpr auto exponentiation (
     SWAR<NB, T> x,
-    SWAR<NB, T> exponent
+    SWAR<NB, T> exponent,
+    MultiplicationFn&& multiplicationFn
 ) {
     using S = SWAR<NB, T>;
     constexpr auto NumBitsPerLane = S::NBits;
@@ -532,9 +541,9 @@ constexpr auto saturatingExponentiation(
         MSB = S{S::MostSignificantBit},
         LSB = S{S::LeastSignificantBit};
 
-    auto operation = [](auto left, auto right, auto counts) {
+    auto operation = [&multiplicationFn](auto left, auto right, auto counts) {
       auto mask = makeLaneMaskFromMSB(counts);
-      auto product = saturatedMultiplication(left, right);
+      auto product = multiplicationFn(left, right);
       return (product & mask) | (left & ~mask);
     };
 
@@ -550,6 +559,30 @@ constexpr auto saturatingExponentiation(
         operation,
         NumBitsPerLane,
         halver
+    );
+}
+
+template<int NB, typename T>
+constexpr auto saturatingExponentation(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    return exponentiation(
+        x,
+        exponent,
+        saturatingMultiplication<NB, T>
+    );
+}
+
+template<int NB, typename T>
+constexpr auto exponentiation_OverflowUnsafe(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    return exponentiation(
+        x,
+        exponent,
+        multiplication_OverflowUnsafe<NB, T>
     );
 }
 
