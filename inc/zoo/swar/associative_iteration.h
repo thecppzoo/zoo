@@ -5,6 +5,7 @@
 #include "zoo/swar/SWAR.h"
 #include <assert.h>
 #include <cstdint>
+#include <utility>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
@@ -450,6 +451,7 @@ constexpr auto multiplication_OverflowUnsafe(
         );
 }
 
+
 template<int NB, typename T>
 struct SWAR_Pair{
     SWAR<NB, T> even, odd;
@@ -479,6 +481,7 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     auto
         evenHalf = RV{even.value()} & HalvingMask,
         oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};
+
     return evenHalf | oddHalf;
 }
 
@@ -502,19 +505,46 @@ doublePrecisionMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) 
 }
 
 template <int NB, typename T>
-constexpr MultiplicationResult<NB, T>
-wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
-   using S = SWAR<NB, T>; using D = SWAR<NB * 2, T>;
+constexpr auto deinterleaveLanesOfPair = [](auto even, auto odd) {
+   using S = SWAR<NB, T>;
+   using H = SWAR<NB / 2, T>;
    constexpr auto
-       HalfLane = S::NBits,
-       UpperHalfOfLanes = SWAR<S::NBits, T>::oddLaneMask().value();
-   auto [even, odd] = doublePrecisionMultiplication(multiplicand, multiplier);
-   auto
-       upper_even = even.shiftIntraLaneRight(HalfLane, D{UpperHalfOfLanes}),
-       upper_odd = odd.shiftIntraLaneRight(HalfLane, D{UpperHalfOfLanes});
-   auto
+       HalfLane = H::NBits,
+       UpperHalfOfLanes = H::oddLaneMask().value();
+    auto
+       upper_even = even.shiftIntraLaneRight(HalfLane, S{UpperHalfOfLanes}),
+       upper_odd = odd.shiftIntraLaneRight(HalfLane, S{UpperHalfOfLanes});
+    auto
        lower = halvePrecision(even, odd), // throws away the upper bits
        upper = halvePrecision(upper_even, upper_odd); // preserve the upper bits
+   return std::make_pair(lower, upper);
+};
+
+namespace test_deinterleaving {
+
+template <int NB, typename T>
+auto test = [](auto a, auto b, auto expected_lower, auto expected_upper) {
+    auto [lower, upper] = deinterleaveLanesOfPair<NB, T>(a, b);
+    auto lower_ok = lower.value() == expected_lower.value();
+    auto upper_ok = upper.value() == expected_upper.value();
+    return lower_ok && upper_ok;
+};
+
+using S = SWAR<8, uint32_t>;
+static_assert(test<8, uint32_t>(
+    S{0xFDFCFBFA}, // input a
+    S{0xF4F3F2F1}, // input b
+    S{0x4D3C2B1A}, // expected lower
+    S{0xFFFFFFFF}  // expected upper
+));
+
+} // namespace test_deinterleaving
+
+template <int NB, typename T>
+constexpr MultiplicationResult<NB, T>
+wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   auto [even, odd] = doublePrecisionMultiplication(multiplicand, multiplier);
+   auto [lower, upper] = deinterleaveLanesOfPair<NB * 2, T>(even, odd);
    return {lower, upper};
 }
 

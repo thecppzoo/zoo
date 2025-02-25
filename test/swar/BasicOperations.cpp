@@ -291,6 +291,31 @@ static_assert(
         0x1119'1119
 ));
 
+namespace test_deinterleaving {
+
+template <int NB, typename T>
+auto test = [](auto a, auto b, auto expected_lower, auto expected_upper) {
+    auto [lower, upper] = deinterleaveLanesOfPair<NB, T>(a, b);
+    auto lower_ok = lower.value() == expected_lower.value();
+    auto upper_ok = upper.value() == expected_upper.value();
+    return lower_ok && upper_ok;
+};
+
+
+// notice the vertical groups becomes horizontal pairs
+using S = SWAR<8, uint32_t>;
+static_assert(test<8, uint32_t>(
+    S{0xFDFCFBFA}, // input a
+    S{0xF4F3F2F1}, // input b
+/*         C   A
+           3   1
+*/  S{0x4D3C2B1A}, // expected lower
+/*        3C  1A           */
+    S{0xFFFFFFFF}  // expected upper
+));
+
+} // namespace test_deinterleaving
+
 
 TEST_CASE("Old multiply version", "[deprecated][swar]") {
     SWAR<8, u32> Micand{0x5030201};
