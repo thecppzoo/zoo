@@ -45,7 +45,7 @@ template <int NBits, typename T>
 constexpr static auto consumeMSB(SWAR<NBits, T> s) noexcept {
     using S = SWAR<NBits, T>;
     auto msbCleared = s & ~S{S::MostSignificantBit};
-    return S{static_cast<T>(msbCleared.value() << 1)};
+    return S{msbCleared.value() << 1};
 }
 
 template<typename S>
