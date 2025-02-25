@@ -1,11 +1,7 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
-#include "SWAR.h"
 #include "zoo/swar/SWAR.h"
-#include <assert.h>
-#include <cstdint>
-#include <utility>
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
