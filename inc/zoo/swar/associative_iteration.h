@@ -41,6 +41,13 @@ std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
 
 namespace zoo::swar {
 
+template <int NBits, typename T>
+constexpr static auto consumeMSB(SWAR<NBits, T> s) noexcept {
+    using S = SWAR<NBits, T>;
+    auto msbCleared = s & ~S{S::MostSignificantBit};
+    return S{msbCleared.value() << 1};
+}
+
 template<typename S>
 constexpr auto parallelSuffix(S input) {
     auto
@@ -393,8 +400,7 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
     };
 
     auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
+        return swar::consumeMSB(counts);
     };
 
     auto shifted = S{multiplier.value() << (NB - ActualBits)};
@@ -426,38 +432,6 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount_deprecated(
     return product;
 }
 
-// TODO(Jamie): Add tests from other PR.
-template<int ActualBits, int NB, typename T>
-constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
-    SWAR<NB, T> x,
-    SWAR<NB, T> exponent
-) {
-    using S = SWAR<NB, T>;
-
-    auto operation = [](auto left, auto right, auto counts) {
-      const auto mask = makeLaneMaskFromMSB(counts);
-      const auto product =
-        multiplication_OverflowUnsafe_SpecificBitCount<ActualBits>(left, right);
-      return (product & mask) | (left & ~mask);
-    };
-
-    // halver should work same as multiplication... i think...
-    auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{static_cast<T>(msbCleared.value() << 1)};
-    };
-
-    exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
-    return associativeOperatorIterated_regressive(
-        x,
-        S{meta::BitmaskMaker<T, 1, NB>().value}, // neutral is lane wise..
-        exponent,
-        S{S::MostSignificantBit},
-        operation,
-        ActualBits,
-        halver
-    );
-}
 
 template<int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe(
@@ -476,14 +450,6 @@ struct SWAR_Pair{
 };
 
 template<int NB, typename T>
-constexpr SWAR<NB, T> doublingMask() {
-    using S = SWAR<NB, T>;
-    static_assert(0 == S::Lanes % 2, "Only even number of elements supported");
-    using D = SWAR<NB * 2, T>;
-    return S{(D::LeastSignificantBit << NB) - D::LeastSignificantBit};
-}
-
-template<int NB, typename T>
 constexpr auto doublePrecision(SWAR<NB, T> input) {
     using S = SWAR<NB, T>;
     static_assert(
@@ -491,7 +457,7 @@ constexpr auto doublePrecision(SWAR<NB, T> input) {
         "Precision can only be doubled for SWARs of even element count"
     );
     using RV = SWAR<NB * 2, T>;
-    constexpr auto DM = doublingMask<NB, T>();
+    constexpr auto DM = SWAR<NB, T>::evenLaneMask();
     return SWAR_Pair<NB * 2, T>{
         RV{(input & DM).value()},
         RV{(input.value() >> NB) & DM.value()}
@@ -503,11 +469,123 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     using S = SWAR<NB, T>;
     static_assert(0 == NB % 2, "Only even lane-bitcounts supported");
     using RV = SWAR<NB/2, T>;
-    constexpr auto HalvingMask = doublingMask<NB/2, T>();
+    constexpr auto HalvingMask = SWAR<NB/2, T>::evenLaneMask();
     auto
         evenHalf = RV{even.value()} & HalvingMask,
         oddHalf = RV{(RV{odd.value()} & HalvingMask).value() << NB/2};
+
     return evenHalf | oddHalf;
+}
+
+
+template <int NB, typename T> struct MultiplicationResult {
+   SWAR<NB, T> lower;
+   SWAR<NB, T> upper;
+};
+
+template <int NB, typename T>
+constexpr
+auto
+doublePrecisionMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   auto
+       icand = doublePrecision(multiplicand),
+       plier  = doublePrecision(multiplier);
+   auto
+       lower = multiplication_OverflowUnsafe(icand.even, plier.even),
+       upper = multiplication_OverflowUnsafe(icand.odd, plier.odd);
+   return std::make_pair(lower, upper);
+}
+
+template <int NB, typename T>
+constexpr auto deinterleaveLanesOfPair = [](auto even, auto odd) {
+   using S = SWAR<NB, T>;
+   using H = SWAR<NB / 2, T>;
+   constexpr auto
+       HalfLane = H::NBits,
+       UpperHalfOfLanes = H::oddLaneMask().value();
+    auto
+       upper_even = even.shiftIntraLaneRight(HalfLane, S{UpperHalfOfLanes}),
+       upper_odd = odd.shiftIntraLaneRight(HalfLane, S{UpperHalfOfLanes});
+    auto
+       lower = halvePrecision(even, odd), // throws away the upper bits
+       upper = halvePrecision(upper_even, upper_odd); // preserve the upper bits
+   return std::make_pair(lower, upper);
+};
+
+template <int NB, typename T>
+constexpr auto
+wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   auto [even, odd] = doublePrecisionMultiplication(multiplicand, multiplier);
+   auto [lower, upper] = deinterleaveLanesOfPair<NB * 2, T>(even, odd);
+   return std::make_pair(lower, upper);
+}
+
+template <int NB, typename T>
+constexpr
+auto saturatingMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
+   using S = SWAR<NB, T>;
+   constexpr auto One = S{S::LeastSignificantBit};
+   auto [result, overflow] = wideningMultiplication(multiplicand, multiplier);
+   auto did_overflow = zoo::swar::greaterEqual(overflow, One);
+   auto lane_mask = did_overflow.MSBtoLaneMask();
+   return S{result | lane_mask};
+}
+
+template<int NB, typename T, typename MultiplicationFn>
+constexpr auto exponentiation (
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent,
+    MultiplicationFn&& multiplicationFn
+) {
+    using S = SWAR<NB, T>;
+    constexpr auto NumBitsPerLane = S::NBits;
+    constexpr auto
+        MSB = S{S::MostSignificantBit},
+        LSB = S{S::LeastSignificantBit};
+
+    auto operation = [&multiplicationFn](auto left, auto right, auto counts) {
+      auto mask = makeLaneMaskFromMSB(counts);
+      auto product = multiplicationFn(left, right);
+      return (product & mask) | (left & ~mask);
+    };
+
+    auto halver = [](auto counts) {
+        return swar::consumeMSB(counts);
+    };
+
+    return associativeOperatorIterated_regressive(
+        x,
+        LSB,
+        exponent,
+        MSB,
+        operation,
+        NumBitsPerLane,
+        halver
+    );
+}
+
+template<int NB, typename T>
+constexpr auto saturatingExponentation(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    return exponentiation(
+        x,
+        exponent,
+        saturatingMultiplication<NB, T>
+    );
+}
+
+template<int NB, typename T>
+constexpr auto exponentiation_OverflowUnsafe(
+    SWAR<NB, T> x,
+    SWAR<NB, T> exponent
+) {
+    return exponentiation(
+        x,
+        exponent,
+        multiplication_OverflowUnsafe<NB, T>
+    );
 }
 
 }
