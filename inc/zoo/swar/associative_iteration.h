@@ -15,8 +15,6 @@ inline std::ostream &binary(std::ostream &out, uint64_t input, int count) {
     return out;
 }
 
-
-
 template<int NB, typename B>
 std::ostream &operator<<(std::ostream &out, zoo::swar::SWAR<NB, B> s) {
     using S = zoo::swar::SWAR<NB, B>;
