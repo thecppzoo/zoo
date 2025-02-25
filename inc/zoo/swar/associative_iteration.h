@@ -444,7 +444,6 @@ constexpr auto multiplication_OverflowUnsafe(
         );
 }
 
-
 template<int NB, typename T>
 struct SWAR_Pair{
     SWAR<NB, T> even, odd;
@@ -494,7 +493,7 @@ doublePrecisionMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) 
    auto
        lower = multiplication_OverflowUnsafe(icand.even, plier.even),
        upper = multiplication_OverflowUnsafe(icand.odd, plier.odd);
-   return SWAR_Pair<NB * 2, T>{lower, upper};
+   return std::make_pair(lower, upper);
 }
 
 template <int NB, typename T>
@@ -514,11 +513,11 @@ constexpr auto deinterleaveLanesOfPair = [](auto even, auto odd) {
 };
 
 template <int NB, typename T>
-constexpr MultiplicationResult<NB, T>
+constexpr auto
 wideningMultiplication(SWAR<NB, T> multiplicand, SWAR<NB, T> multiplier) {
    auto [even, odd] = doublePrecisionMultiplication(multiplicand, multiplier);
    auto [lower, upper] = deinterleaveLanesOfPair<NB * 2, T>(even, odd);
-   return {lower, upper};
+   return std::make_pair(lower, upper);
 }
 
 template <int NB, typename T>
