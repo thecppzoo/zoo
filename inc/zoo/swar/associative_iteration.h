@@ -48,7 +48,6 @@ constexpr static auto consumeMSB(SWAR<NBits, T> s) noexcept {
     return S{static_cast<T>(msbCleared.value() << 1)};
 }
 
-
 template<typename S>
 constexpr auto parallelSuffix(S input) {
     auto
