@@ -1,1 +1,27 @@
+Consider how effortlessly we use **containers** and **iterators** from the Standard Template Library (STL) to traverse collections of data—whether it’s a `std::vector`, `std::set`, or `std::unordered_set`, despite them being very different containers, we can use the **same iteration logic without concerning ourselves with the details** of the containers and their iterators.  This is "polymorphism", working with things that have very different details through an interface that represents an abstraction.  Because it is the compiler the thing that resolves the abstract interface to the details of the specific types, we call this "compile-time" polymorphism.
+
+This abstract interface principle that relieves us from having to know the details of the specific objects is also very valuable at *runtime*, especially if our application is going to produce objects that **we don't know what they are** before running the program.  Other programming languages don't have as good compile-time polymorphism as we have in C++, thus, they focus exclusively on runtime polymorphism, to the point that for most of the Software Engineering community "polymorphism" simply means "runtime polymorphism".  Furthermore, for them, polymorphism and **subclassing** are the same thing: the only practical way to get (runtime) polymorphism is via inheritance, and what we call "`virtual` overrides", and this is the fundamental mechanism of abstraction in those langauges, Object Oriented Interfaces.  It turns out what we can still do that, and have the option of doing MUCH BETTER in C++.  In the same way that we can achieve ease of programming with containers and iterators that are not related by inheritance, while at the same time getting optimal or nearly optimal performance, we can devise runtime polymorphism with the equivalent ease of programming and performance, efficiency, much, much better than through subclassing.  This is what this presentation is about, ultimately, both working less and achieving objectively better performance.
+
+It is not even difficult per se, you'll see in the solutions we have already coded that they are not that complicated, however, what we must do is to ground our work on **fundamentally superior principles** so that our path to do better is revealed.
+
+What we want to achieve is **substitutability** as that means in the "Liskov Substitution Principle".
+
+
+
+This works because **template-based polymorphism** lets the compiler generate type-specific code while preserving a common interface for iteration. The abstraction shields us from low-level details while the compiler resolves the specifics at compile time, leading to both flexibility and high performance.
+
+This is a textbook example of **compile-time polymorphism**—the compiler knows all the types involved and can optimize accordingly. The abstraction is still strong: we work through iterators without knowing or caring if the underlying container is a vector or a list. But crucially, the exact types are locked in during compilation.
+
+However, there are situations where the exact type of the object cannot be determined until **runtime**. This is where **runtime polymorphism** comes into play. It addresses the need for **late binding**, where method calls are resolved based on the actual object’s type at runtime rather than at compile time. For instance, when designing systems with **plugin architectures**, dynamic user interactions, or state-driven behaviors, compile-time knowledge is insufficient—the program must defer decision-making until execution.
+
+The conceptual anchor here is the **Liskov Substitution Principle (LSP)**, which asserts that objects of a superclass should be replaceable with objects of a subclass without affecting the correctness of the program. In compile-time polymorphism, this is often satisfied structurally via templates and overloads, where the compiler enforces substitutability. In **runtime polymorphism**, however, LSP takes on a more dynamic role—substitutability is verified and enacted at runtime, often through **interfaces**, **virtual functions**, or **dynamic dispatch** mechanisms.
+
+But it’s essential to recognize that **substitutability** isn’t limited to inheritance hierarchies. In C++, runtime polymorphism can also be achieved through **type erasure** (e.g., `std::function`, `std::any`), **function pointers**, or even dynamic composition patterns. This broader view decouples the concept of polymorphism from strict subclassing and ties it instead to the ability of different concrete types to fulfill a contract at runtime.
+
+In essence:
+
+- **Compile-time polymorphism** offers performance and type safety, leveraging abstraction where all types are known at compile time.
+- **Runtime polymorphism** introduces flexibility, allowing the program to operate on abstract interfaces without prior knowledge of the concrete types involved, using **late binding** to defer decision-making.
+
+The common thread is abstraction and substitutability—the difference lies in **when** the substitution happens.
 
