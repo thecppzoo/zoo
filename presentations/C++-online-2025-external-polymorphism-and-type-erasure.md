@@ -1,10 +1,11 @@
+
 # External Polymorphism and Type Erasure: A Very Useful Dance of Design Patterns
 
 ## Motivation for this document
 
 The work of Edward Tufte shows the issues with what we call "slideware".  The subject matter is theoretical enough, that I think we should make a combination of a presentation with a proper long form text for detailed, in depth reading.  In that way, the presentation provides the "big picture" and this resource the details and tighter logical arguments.
 
-### Introduction to substitutability
+## Introduction to substitutability
 
 Consider how effortlessly we use **containers** and **iterators** from the Standard Template Library (STL) to traverse collections of data—whether it’s a `std::vector`, `std::set`, or `std::unordered_set`, despite them being very different containers, we can use the **same iteration logic without concerning ourselves with the details** of the containers and their iterators.  This is "polymorphism", working with things that have very different details through an interface that represents an abstraction that allows us to accomplish useful things.  In the case of iteration, because it is the compiler the thing that resolves the abstract interface to the details of the specific types, we call this "compile-time" polymorphism.
 
@@ -24,13 +25,18 @@ For example, `std::vector` and `std::map` both map a key to a value (in the case
 
 Now, here’s the exciting part: we can translate powerful compile-time subtyping mechanisms, specific to C++, into the runtime domain.  For example, we will see how relatively easy it is to produce types with both "value semantics" and runtime polymorphism, something that hugely popular languages such as Java and C# fundamentally can't do, no matter the effort.
 
-### Summary
+## Summary
 
 In essence, this presentation is the following:
 
 1. Runtime Polymorphism through subclassing totally sucks.
 2. External Polymorphism is how to get (runtime) polymorphism without subclassing: translating compile time polymorphism to runtime.
 3. And, if you also want that your "polymorphism without subclassing" would manage the objects, their lifetime, i.e., "*owns*" them, then you probably want "Type Erasure".
+4. There are many subtle mistakes and important possibilities that have been missed
+
+## Other Resources
+
+The interested reader can consult the excellent book "C++ Software Design: Design Principles and Patterns for High-Quality Software" by Klaus Iglberger.  It covers the material in this presentation, in a comprehensive way.  Its approach is very well designed for the readers to be able to understand the topic.  I chose to follow a different approach to direct the attention of the audience and the reader to the unconventional, to surface the errors and missed opportunities.
 
 ### Potential
 
@@ -40,13 +46,13 @@ Bot the errors and the possibilities will be made clear by using superior founda
 
 By the end I hope you see how these contrapositions, that empower us, form a dance of design patterns.  Hence the title "EP and TE: A very useful dance of Design Patterns".
 
-### External Polymorphism
+## External Polymorphism
 
-#### Innovation chain
+### Innovation chain
 
 External polymorphism is a set of ideas that were floating around by 1997; Chris Cleeland, Douglas C. Schmidt and T. Harrison articulated it and gave it the name.  The most recent version of this paper seems to be Cleeland and Schmidt's "External Polymorphism", readily available at [Schmidt's Vanderbilt](https://www.dre.vanderbilt.edu/~schmidt/PDF/C++-EP.pdf).  This paper does not seem to have been particularly influential, other than having been cited by Kevlin Henney in his very important article "Valued Conversions", that appeared in the [C++ Report magazine in July-August 2000](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=4610004b383e5c4f2dffbea0019c85847e18fff4)  That is the paper that proposes `any`, which was then followed by Doug McGregor's `boost::function` component, starting in 2001, that is essentially what we have today in the standard library as `std::function`.
 
-#### Giving polymorphism to types that don't have it
+### Giving polymorphism to types that don't have it
 
 I will explain EP in a different way to how it is normally explained:
 Adapters for objects so the objects can be used through a runtime-polymorphic interface, without participating in ownership of the objects.
@@ -57,7 +63,7 @@ If we knew all the possible types of the objects that we want to give polymorphi
 
 #### EP, first try, as an specific form of "Adapter"
 
-But, if we don't know all the possible subtypes when we are writing the code, we have to do something different that would support an unbounded set of potential subtypes.  Let's start with the [`Adapter`] (https://en.wikipedia.org/wiki/Adapter_pattern) Design Pattern, the normal way EP is presented:
+But, if we don't know all the possible subtypes when we are writing the code, we have to do something different that would support an unbounded set of potential subtypes.  Let's start with the [`Adapter`](https://en.wikipedia.org/wiki/Adapter_pattern) Design Pattern, the normal way EP is presented:
 
 Let's call our interface, the abstraction that will give us the runtime-polymorphism capabilities of insertion to stream and getting the type-index, `SerializableAdapter`, we would get something like this:
 
@@ -72,7 +78,7 @@ struct SerializableAdapter {
 };
 ```
 
-We create the adapter root, and then proceed to create the implementations for each possible T that we want to be "serializable":
+We create the adapter root, and then proceed to create the implementations for each possible `T` that we want to be "serializable":
 
 ```c++
 template<typename T>
@@ -92,7 +98,7 @@ Notice that the mapping between compile time polymorphism and runtime polymorphi
 1. `output << *ptr`: this is where overload resolution, and potentially template instantiation of `operator<<`, occurs; this compile-time polymorphism is made available through `virtual` overrides of the "concept" or base class "SerializableAdapter".
 2. `typeid(T)` and implicit conversion to `std::type_index`.
 
-#### EP without any subclassing
+### EP without any subclassing
 
 But if examine this, we are solving the complete lack of runtime polymorphism by synthetizing subclassing.  Fortunately, this is not necessary.
 
@@ -157,7 +163,7 @@ We have converted or mapped the compile-time ability of building a value of the 
 
 We can do other things for this mapping.  In particular, we can use a mix of compile time polymorphism and runtime-polymorphism; it depends on exactly what's best in each scenario.  There is a continuum between non-EP Adapters and "pure" EP.  Just like there are many techniques to design&implement Adapters, there are also many for EP.
 
-#### Already getting ahead
+### Already getting ahead
 
 Please do not be intimidated by the boilerplate, the need to forward declare and reorder the pieces, because this **polymorphism without subclassing** is already **something that can not be expressed in just about any other programming language** except C++, Rust, D and very few others.
 
@@ -221,40 +227,83 @@ out(std::ostream&, ISerializable&):
 
 Why the difference?
 
-This is important: **because in our External Polymorphism we have the freedom to design the functions in the virtual table for maximum performance, or anything else we care about**, if we use the language feature for polymorphism through subclassing, we have to accept rigid language defaults.
+This is important: **because in our External Polymorphism we have the freedom to design the functions in the virtual table for maximum performance, or anything else we care about**, if we use the language feature for polymorphism through subclassing, we have to accept rigid language rules.
 
-In this example, that the `this` pointer is always the first argument in the ABI, thus, when invoking `serialize`, the first argument is the address of the wrapper.  Immediately invoking `o << i_`, the `ostream` binary interface will require the `ostream` to be the first argument, thus the swap of parameter order must happen.
+In this example, that the `this` pointer is always the first argument in the ABI.  When invoking `ISerializable::serialize`, the first argument is the address of the wrapper, but we are providing in `out` the `std::ostream &` as first argument, then the parameter order must be swapped.
 
 Knowing this, I deliberately made, at the virtual table definition, that the order would be to first have the `ostream`, and then the External Polymorphism handle.  Despite there being, conceptually, one extra indirection, at the point of invocation the object code is half as long.  The use of EP halves the size of the object code.  Negative cost abstraction.  Of course, once you invoke the function in our vtable then the extra indirection is resolved and the actual invocaton to `operator<<` happens, but this is object code on a per-type basis, if there are 1 million invocations, this EP example would halve the size of each invocation a million times for the cost of the object code of the virtual table for `int` **once**, plus the virtual table for each other type.
 
-### Type Erasure
+If you're systematically attentive to issues like this, you can get significant performance improvements.
+
+See for example Fedor Pikus' C++ Now 2024 presentation ["Type Erasure Demystified"](https://www.youtube.com/watch?v=p-qaf6OS_f4) where he explains techniques that may give up to 50% performance, crediting our work and these "zoo" libraries.  Or you can delve deeper into the design of APIs for performance watching our former coworker Oleksandr Bacherikov's CPPCon 2024 ["Hidden Overhead of a Function API"](https://www.youtube.com/watch?v=PCP3ckEqYK8)
+
+## Type Erasure
 
 What if we want our mechanism for EP to also participate in the ownership of the object?
 
 The primordial difference between EP and TE, in my view, is that in TE the wrapper "owns" the object.  For this reason, a lot of interesting things become possible.  The most important, IMO, would be so-called "Value Semantics".  But there may be others.
 
+Introducing Type Erasure allows us to discuss the problems of using subclassing.  There is a great presentation by Sean Parent on this topic, "Inheritance Is The Base Class Of Evil".  I believe this is still the best resource available to understand the problems of subclassing.  Sean Parent, without mentioning it explicitly, solves those problems in his draft solution using Type Erasure.  In terms of this presentation, the External Polymorphism is implemented as the Adapter design pattern we discussed early.
+
+See the slide deck for the summary of the problems of subclassing.
+
 Just like there is no precise boundary between an application of the Adapter design pattern and External Polymorphism, there is no precise boundary between EP and TE.  One component in this intermediate design space is `std::function_ref`.
 
-For the rest of this document, we will focus on TE when the "wrapper" owns the polymorphic object.
+For the rest of this document, we will focus on TE when the "wrapper" truly owns the polymorphic object.
 
 At top level, we can say that, if we add to the EP that implements a polymorphic interface the capabilities to destroy, move, and perhaps copy the object, then we are doing Type Erasure.
 
-And that's enough.
+And that's enough for very fruitful programming.
 
 ### `any`
-There is an interesting twist to this story:  What if we have External Polymorphism of only the ownership capabilities? -- then we would have a container, something like `std::any`, that is not useful by itself, but that has all the runtime polymorphism for ownership.  One way to use that owned object is to be able to see it, this is what `any_cast` does for `std::any`.
+There is an interesting twist to this story:  What if we have External Polymorphism of only the ownership capabilities? --then we would have a container, something like `std::any`, that is not useful by itself, but that has all the runtime polymorphism for ownership.  One way to use that owned object is to be able to see it, this is what `any_cast` does for `std::any`.
 
 Unfortunately, the performance of `any_cast` is terrible, because of design decisions, but we are studying and designing our mechanisms for Type Erasure, then this deficiency in `std::any` and `any_cast` must not prevent us from using the idea when it is useful.
 
-Why would we want to use a container that only give us ownership?
+Do you want to see just how bad?
+```c++
+#include <any>
 
-Perhaps because the scenario of subtyping/substitutability is truly complex.
+int *viewAsInt(std::any &a) {
+    return std::any_cast<int *>(a);
+}
+```
+becomes
+```
+viewAsInt(std::__1::any&):              # @viewAsInt(std::__1::any&)
+        push    rax
+        mov     rax, qword ptr [rdi]
+        test    rax, rax
+        je      .LBB0_5
+        mov     rsi, rdi
+        mov     ecx, offset typeinfo for int*
+        mov     r8d, offset std::__1::__any_imp::__unique_typeinfo<int*>::__id
+        mov     edi, 3
+        xor     edx, edx
+        call    rax
+        test    rax, rax
+        je      .LBB0_5
+        mov     rax, qword ptr [rax]
+        pop     rcx
+        ret
+.LBB0_5:
+        call    std::__1::__throw_bad_any_cast()
+        mov     rdi, rax
+        call    __clang_call_terminate
+```
+along with a lot of other garbage.  This example in the [compiler explorer](https://godbolt.org/z/v4YhPWcsY)
 
-"How would you like to pay for that?" is the way that Kevlin Henney started his article "Valued Conversions", the one in which he invents what eventually became `std::any`.  This ought to be one of the most insightful ledes in all of software design literature.
+Back to the question of usability, why would we want to use a container that only give us ownership?
 
-Keeping only ownership allows us to not have to commit to any superficial subtyping relation.  For example, a "payment" can be money; that would be easy to represent in code.  But it may also be some bartering, that would be harder.  It could still be some other thing, like a payment in labor; and each of these *categories* of payments have myriads of subtypes themselves.  This is when normal subtyping would break down, let alone subclassing.
+Perhaps because the scenario of subtyping/substitutability may be truly complex.
 
-I think this is paradoxical: removing all runtime polymorphism except what is required for ownership results in greater modeling power!
+"How would you like to pay for that?" is the way that Kevlin Henney started his article "Valued Conversions" we mentioned before, the one in which he invents what eventually became `std::any`.  This ought to be one of the most insightful ledes in all of software design literature.
+
+Keeping only ownership allows us to not have to commit to any superficial subtyping relation, we can write logic that, at runtime, discovers what is the applicable subtyping relation form to use.  For example, a "payment" can be money; that would be easy to represent in code, but there may be complications such as the conversions between currencies.  But it may also be some bartering, that would be harder.  It could still be some other thing, like a payment in labor; and each of these *categories* of payments have myriads of subtypes themselves.  This is when normal subtyping would break down, let alone subclassing.
+
+I think this is paradoxical: **removing all runtime polymorphism except what is required for ownership results in greater modeling power!**
+
+### `std::function`
 
 What if we had one clear subtyping relation with only one function in the interface? that's what the standard library gives us in the form of `std::function`: ownership plus one function in the non-ownership polymorphic interface.
 
@@ -262,18 +311,58 @@ This begs the question, why does it support interfaces of only one function and 
 
 Because it was not designed properly.
 
-Why is `std::function` not based on `std::any`? because it was not designed properly.
+Why is `std::function` not based on `std::any` if it only adds one polymorphic function to the ownership given by `any`? again, because it was not designed properly.
 
 Why do we have no control over the way in which `std::any` and `std::function` own the owned object? (like when the object is local to the container or referenced at the heap, for example)? because of their misdesign.
 
 ## Identifying and solving some design issues in Type Erasure implementations
 
- --in progress--
+One fundamental problem of implementations is that they fail to articulate that Type Erasure is EP + Ownership.  This perspective will clearly indicate that only one mechanism for ownership would be a one-size-fits-all design that in practice fits no-one, forcing users to do lots of efforts to work around the "take it or leave it" nature of the one choice for ownership implemented.  For example, Facebook's `Folly::Function` has as its most differentiating feature over `std::function` that it does not require copyability, that it is "move-only".
+
+I've shown multiple times before, at conferences, how `zoo::AnyContainer` and `zoo::Function` solve those clear issues related to ownership:
+
+See for example these two examples:
+```c++
+using MyInterface = zoo::AnyContainer<zoo::Policy<void *[3], zoo::Destroy, zoo::Move, zoo::Copyable, UserPolymorphicInterface>>;
+```
+That would give the user a type-erasure container that has local space of three `void *` and alignment of `void *` to locally hold the objects it owns.  That container will have the capabilities of normal destruction, movability and copyability.  Additionally, objects of this container type will be able to do whatever the user specifies in `UserPolymorphicInterface`.
+```c++
+using MyFunction =
+    zoo::Function<zoo::AnyContainer<zoo::Policy<void *[2], zoo::Destroy, zoo::Move>>, int(std::string)>;
+```
+That indicates a type erasure container that uses a move-only `AnyContainer` of local buffer of two `void *` for all the type erasure needs, and extends that with the ability to invoke them with `int operator()(std::string)`.
+
+These examples show very many (and not all) of the capabilities of a type erasure framework that has been used in production at applications such as Snapchat for at least five years.
+
+Let us look closer into these realized possibilities:
+
+### Local Buffer or Heap Allocation?
+
+`zoo::AnyContainer` relies on Alexandrescu's "Policy" pattern to indicate the configuration of the local buffer, in terms of size and alignment.  If the type "fits" within the local buffer, it will be stored locally.  This is mislabelled as "Small Buffer Optimization", SBO.  I think this is an essential ownership consideration (local buffer versus heap allocation).  If the type does not fit, then the object will be allocated on the heap.  Also, to make the moving operations `noexcept` when the concrete type of object being managed is "may-throw" move, they are allocated on the heap, regardless of whether they otherwise fit in the local buffer--remember to make your move operations `noexcept`!
+
+The richess of considerations concerning ownership are not restricted merely to shaping the "local buffer", or even considerations about whether to completely disable heap allocations (making them compilation errors), are just the tipping point.  See for example Arthur O'Dwyer's article ["The space of design choices for `std::function`"](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/)
+
+This is just the proberbial "tip of the iceberg".
+
+There are plenty more of things to think about:  For example, what about using memory pools for allocation? what if at the same time we get polymorphism we get more sophisticated semantics such as "copy on write"?  It turns out all of this is possible!
+
+Think about it: as long as we satisfy the actual polymorphic interface that the user specifies, a type-erasure container might not even maintain objects of the type given; it can transform them underneath to whatever it wants, again, as long as the user-specified capabilities are respected!
+
+### Value Manager
+
+In my opinion, it is that we have a totally not-articulated concept of generalized ownership, that I call, the Generic Programming concept of Value Management.
+
+It turns out that "Value Management" is a concept that appears, as its name indicates, at every single place where value management happens.  Take for example `std::optional`.  `std::optional`, by itself, won't need to allocate: it can simply make its internal buffer suitable to host a value of what it is optional of.  But what if the `std::optional` may contain a `std::vector<ComplicatedType>`?
+If we wanted to communicate from the outside the `optional` the allocator to be used *inside* the optional, by the managed values, then we would have to make something like a template-wrapper of `optional` that takes the allocator, and "injects" it into the contained object.  It turns out this is very important for an organization as large as Bloomberg: they have internal systems that rely on at least two different types of memory, then they need to communicate which type of memory to use, via allocators.  This has forced them to go over practically all of the standard library to comb for all the places where allocation needs to be communicated and making this adaptation.  A lot of work!
+
+And their solution only applies to the value management concern of allocation.
+
+In the experimental work I've done at AnyContainer value management, I've already been able to implement things like "reference counting", "copy on write", memory pools (a generalizaton of allocators).  It is clear that the concept of value management applies to all containers in C++.
+
+Why did I discover/identified this? because of the approach grounded on superior principles:  Looking at Type Erasure as EP + Ownership, primed me to deeply inspect the world of possibilities of how to express ownership.
 
 ## Unexplored possibilities
 
-Because in Type Erasure everything that can be done with the object is specified at the level of the polymorphic interface, this gives Type Erasure the freedom to, potentially, not having an object of the same type as what was given at the moment of initialization (construction, assignment), but something else that is capable of having the same behavior, constrained to the polymorphic interface, as the original object type.
+I am very interested in "Data Orientation", which requires the conversion of "collections of structs" to "structs of arrays".  Maintaining the "scattered" representation of objects (as an structure of arrays with the fields) is quite effort intensive, so, we need to invent or devise the ways to provide this support in abstract, and general ways.
 
-I am very interested in "Data Orientation", which requires the conversion of "collections of structs" to "structs of arrays".  I've done work into scattering.
-
---in progress--
+I am beginning to speculate now, but perhaps those abstract ways are a natural occasion to apply runtime polymorphism.  Through Type Erasure we are not forced to keep the objects in their original representation, we have the freedom to "scatter" them into "structs of arrays".  The early work in this direction is promising; there is the potential to capture performance in the order of over 10x improvement.
