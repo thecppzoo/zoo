@@ -358,19 +358,23 @@ Even O'Dwyer's article merely hints at some ice in the distance, there's a mount
 
 There are plenty more things to think about:  What about using memory pools for allocation? what if at the same time we get polymorphism we get more sophisticated semantics such as "copy on write"?  It turns out all of this is possible!
 
+Also notice that any new powers with regards to Type Erasure in `zoo::AnyContainer` framework directly benefits `zoo::Function`, for no extra effort, for no performance loss!
+
+`zoo::Function` adds one function call signature.  But this is not limitative, both `zoo::AnyContainer` and `zoo::Function` can be refined, infinitely, by a "policy" builder that takes something that provides type erasure in the style of `zoo::AnyContainer` and adds even more user specified polymorphic interfaces.  To show you how this is done is outside of the scope of this document; but, in principle, this could be just one mechanism to give more call interfaces to the equivalent of `std::function`.  There are others!
+
 ### Why Type Erasure is "Internal External Polymorphism"
 
 Think about it: as long as we satisfy the actual polymorphic interface that the user specifies, a type-erasure container might not even maintain objects of the type given; it can transform them underneath to whatever it wants, again, as long as the user-specified capabilities are respected!
 
 In EP, the design pattern had to use the objects in their original types, because the objects are external to it (it's in the name).
 
-Type Erasure does not have that restriction: It has 'internalized' what it is giving "external polymorphism" to.  Because this is internal, and the only visibility to the outside world is the polymorphic interface, Type Erasure can represent the values it handles in whichever way it wants!
+Type Erasure does not have that restriction: It has 'internalized' what it is giving "external polymorphism" to.  Because this is internal, and the only things visible to the outside world are the polymorphic interfaces, Type Erasure can represent the values it handles in whichever way it wants!
 
 I've never seen any of these powers unlocked.  I'm beginning to take advantage of this, "stay tuned".
 
 ### Value Manager
 
-In my opinion, these errors and missed opportunities have happened because we have a totally not-articulated concept of generalized ownership, that I call the Generic Programming concept of "Value Manager".
+In my opinion, these errors and missed opportunities have happened because we, in the community, have a totally not-articulated concept of generalized ownership, that I call the Generic Programming concept of "Value Manager".
 
 It turns out that "Value Management" is a concept that appears, as its name indicates, at every single place where value management happens.  Take for example `std::optional`.  `std::optional`, by itself, won't need to allocate: it can simply make its internal buffer suitable to host a value of what it is optional of.  But what if the `std::optional` may contain a `std::vector<ComplicatedType>`?
 
@@ -380,12 +384,14 @@ It turns out this is very important for an organization as large as Bloomberg: t
 
 And their solution only applies to the value management concern of allocation.
 
-In the experimental work I've done at `AnyContainer` value management, I've already been able to implement things like "reference counting", "copy on write", memory pools (a generalizaton of allocators).  It is clear that the concept of value management applies to all containers in C++.
+The code in `zoo::AnyContainer` refers to value management in identifiers and comments, the names of `ByValue` and `ByReference` are supposed to abbreviate `ManagementByValue` and `ManagementByReference`, and this makes clear that there could be other managers.  But these mechanisms belong to the 2nd generation of the framework.  These managers are reifications of a more abstract concept of "manager", which in the first generation I named as `Container`.  The identification/articulation of Value Manager happened gradually while devising the 2nd. Generation of the framework.
 
 Why did I discover/identified this? because of the approach grounded on superior principles:  Looking at Type Erasure as EP + Ownership, primed me to deeply inspect the world of possibilities concerning ownership, and the question of how to express them.
 
+In the experimental work I've done at `AnyContainer` value management, I've already been able to implement things like "reference counting", "copy on write", memory pools (a generalizaton of allocators).  I've been redesigning the `zoo` type erasure framework to allow very radical ways of Value Management possible, I'd say that I am about at generation "2.5", and I'm proceeding slowly because I'm dealing with concepts, ideas, that I have never heard about before.  For example, it is clear that the concept of value management applies to all containers in C++; while at Bloomberg they are solving for just the value management concern of allocation, I'm working on a framework for generalized value management concerns, in which metaprogramming is essential.
+
 ## Unexplored possibilities
 
-I am very interested in "Data Orientation", which requires the conversion of "collections of structs" to "structs of arrays".  Maintaining the "scattered" representation of objects (as an structure of arrays with the fields) is quite effort intensive, so, we need to invent or devise the ways to provide this support in abstract, and general ways.
+I am very interested in "Data Orientation", which requires the conversion of "collections of structs" to "structs of arrays of homogenous data".  Maintaining the "scattered" representation of objects (as an structure of arrays with the fields) is quite effort intensive, so, we need to invent or devise the ways to provide this support in abstract, and general ways.
 
-I am beginning to speculate now, but perhaps those abstract ways are a natural occasion to apply runtime polymorphism, scattering requires changing the runtime, and this can be seen as a polymorphic interface for types that are not aware that they are "scattered".  Through Type Erasure we are not forced to keep the objects in their original representation, we have the freedom to "scatter" them into "structs of arrays".  The early work in this direction is promising.  Organizing the data of applications in ways that you can get the full benefits of Data Orientation could be in the order of over 10x improvement; there is a very big prize for this endeavor.
+I am beginning to speculate now, but perhaps those abstract ways are a natural occasion to apply runtime polymorphism, scattering requires changing the runtime, and this can be seen as a polymorphic interface for types that are not aware that they are "scattered" inside Type Erasure.  Through Type Erasure we are not forced to keep the objects in their original representation, we have the freedom to "scatter" them into "structs of arrays".  The early work in this direction is promising.  Organizing the data of applications in ways that you can get the full benefits of Data Orientation could be in the order of over 10x improvement; there is a very big prize for this endeavor.
