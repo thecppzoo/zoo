@@ -321,16 +321,28 @@ One fundamental problem of implementations is that they fail to articulate that 
 
 I've shown multiple times before, at conferences, how `zoo::AnyContainer` and `zoo::Function` solve those clear issues related to ownership:
 
-See for example these two examples:
+See these two examples:
 ```c++
-using MyInterface = zoo::AnyContainer<zoo::Policy<void *[3], zoo::Destroy, zoo::Move, zoo::Copyable, UserPolymorphicInterface>>;
+using MyInterface =
+    zoo::AnyContainer< // zoo::AnyContainer is the component that provides Type Erasure, and nothing more.
+        // zoo::Policy is a component that allows the specification of how the containers are going to be, for example,
+        // the size, alignment of the local buffer, the capabilities.  There are other configuration builders not zoo::Policy,
+        // beyond the scope of this document.  This is, in Design Patterns, a *strategy*
+        zoo::Policy<
+            void *[3], // This type is the 'model' for the local storage: something with the alignment and size to host void *[3]
+            zoo::Destroy, zoo::Move, zoo::Copy, // these three types are "affordances", capabilities of the container
+            UserPolymorphicInterface // this is the specification of a polymorphic interface from the user, on top of the ownership
+                // interface.  May contain lots of APIs, not just one.
+            // Here the user might specify more interfaces.
+        >
+    >;
 ```
 That would give the user a type-erasure container that has local space of three `void *` and alignment of `void *` to locally hold the objects it owns.  That container will have the capabilities of normal destruction, movability and copyability.  Additionally, objects of this container type will be able to do whatever the user specifies in `UserPolymorphicInterface`.
 ```c++
 using MyFunction =
     zoo::Function<zoo::AnyContainer<zoo::Policy<void *[2], zoo::Destroy, zoo::Move>>, int(std::string)>;
 ```
-That indicates a type erasure container that uses a move-only `AnyContainer` of local buffer of two `void *` for all the type erasure needs, and extends that with the ability to invoke them with `int operator()(std::string)`.
+That indicates a type erasure container that uses a move-only `AnyContainer` (notice it does not include `zoo::Copy`) with a local buffer of two `void *` for all the type erasure needs, and extends that with the ability to invoke them with a member `int operator()(std::string)`.
 
 These examples show very many (and not all) of the capabilities of a type erasure framework that has been used in production at applications such as Snapchat for at least five years.
 
@@ -338,31 +350,42 @@ Let us look closer into these realized possibilities:
 
 ### Local Buffer or Heap Allocation?
 
-`zoo::AnyContainer` relies on Alexandrescu's "Policy" pattern to indicate the configuration of the local buffer, in terms of size and alignment.  If the type "fits" within the local buffer, it will be stored locally.  This is mislabelled as "Small Buffer Optimization", SBO.  I think this is an essential ownership consideration (local buffer versus heap allocation).  If the type does not fit, then the object will be allocated on the heap.  Also, to make the moving operations `noexcept` when the concrete type of object being managed is "may-throw" move, they are allocated on the heap, regardless of whether they otherwise fit in the local buffer--remember to make your move operations `noexcept`!
+`zoo::AnyContainer` relies on Alexandrescu's "Policy" pattern to indicate the configuration of the local buffer, in terms of size and alignment.  If the type "fits" within the local buffer, it will be stored locally.  This is mislabelled in the discussion of Type Erasure by the community as "Small Buffer Optimization", SBO.  I think this is an essential ownership consideration (local buffer versus heap allocation).  If the type does not fit, then the object will be allocated on the heap.  Also, to make the moving operations `noexcept` when the concrete type of object being managed is "may-throw" move, they are allocated on the heap, regardless of whether they otherwise fit in the local buffer--remember to make your move operations `noexcept`!
 
-The richess of considerations concerning ownership are not restricted merely to shaping the "local buffer", or even considerations about whether to completely disable heap allocations (making them compilation errors), are just the tipping point.  See for example Arthur O'Dwyer's article ["The space of design choices for `std::function`"](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/)
+The richess of considerations concerning ownership are not restricted merely to shaping the "local buffer", or even considerations about whether to completely disable heap allocations (making them compilation errors), these considerations are just the tipping point.  See for example Arthur O'Dwyer's article ["The space of design choices for `std::function`"](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/)
 
-This is just the proberbial "tip of the iceberg".
+Even O'Dwyer's article merely hints at some ice in the distance, there's a mountain of ice:
 
-There are plenty more of things to think about:  For example, what about using memory pools for allocation? what if at the same time we get polymorphism we get more sophisticated semantics such as "copy on write"?  It turns out all of this is possible!
+There are plenty more things to think about:  What about using memory pools for allocation? what if at the same time we get polymorphism we get more sophisticated semantics such as "copy on write"?  It turns out all of this is possible!
+
+### Why Type Erasure is "Internal External Polymorphism"
 
 Think about it: as long as we satisfy the actual polymorphic interface that the user specifies, a type-erasure container might not even maintain objects of the type given; it can transform them underneath to whatever it wants, again, as long as the user-specified capabilities are respected!
 
+In EP, the design pattern had to use the objects in their original types, because the objects are external to it (it's in the name).
+
+Type Erasure does not have that restriction: It has 'internalized' what it is giving "external polymorphism" to.  Because this is internal, and the only visibility to the outside world is the polymorphic interface, Type Erasure can represent the values it handles in whichever way it wants!
+
+I've never seen any of these powers unlocked.  I'm beginning to take advantage of this, "stay tuned".
+
 ### Value Manager
 
-In my opinion, it is that we have a totally not-articulated concept of generalized ownership, that I call, the Generic Programming concept of Value Management.
+In my opinion, these errors and missed opportunities have happened because we have a totally not-articulated concept of generalized ownership, that I call the Generic Programming concept of "Value Manager".
 
 It turns out that "Value Management" is a concept that appears, as its name indicates, at every single place where value management happens.  Take for example `std::optional`.  `std::optional`, by itself, won't need to allocate: it can simply make its internal buffer suitable to host a value of what it is optional of.  But what if the `std::optional` may contain a `std::vector<ComplicatedType>`?
-If we wanted to communicate from the outside the `optional` the allocator to be used *inside* the optional, by the managed values, then we would have to make something like a template-wrapper of `optional` that takes the allocator, and "injects" it into the contained object.  It turns out this is very important for an organization as large as Bloomberg: they have internal systems that rely on at least two different types of memory, then they need to communicate which type of memory to use, via allocators.  This has forced them to go over practically all of the standard library to comb for all the places where allocation needs to be communicated and making this adaptation.  A lot of work!
+
+If we wanted to communicate from the outside the `optional` the allocator to be used *inside*, by the managed values, then we would have to make something like a template-wrapper of `optional` that takes the allocator, and "injects" it into the contained object, this would be an "allocator aware" `optional`.
+
+It turns out this is very important for an organization as large as Bloomberg: they have internal systems that rely on at least two different types of memory, then they need to communicate which type of memory to use, via allocators.  This has forced them to go over practically all of the standard library to comb for all the places where allocation needs to be communicated and making this adaptation.  A lot of work!
 
 And their solution only applies to the value management concern of allocation.
 
-In the experimental work I've done at AnyContainer value management, I've already been able to implement things like "reference counting", "copy on write", memory pools (a generalizaton of allocators).  It is clear that the concept of value management applies to all containers in C++.
+In the experimental work I've done at `AnyContainer` value management, I've already been able to implement things like "reference counting", "copy on write", memory pools (a generalizaton of allocators).  It is clear that the concept of value management applies to all containers in C++.
 
-Why did I discover/identified this? because of the approach grounded on superior principles:  Looking at Type Erasure as EP + Ownership, primed me to deeply inspect the world of possibilities of how to express ownership.
+Why did I discover/identified this? because of the approach grounded on superior principles:  Looking at Type Erasure as EP + Ownership, primed me to deeply inspect the world of possibilities concerning ownership, and the question of how to express them.
 
 ## Unexplored possibilities
 
 I am very interested in "Data Orientation", which requires the conversion of "collections of structs" to "structs of arrays".  Maintaining the "scattered" representation of objects (as an structure of arrays with the fields) is quite effort intensive, so, we need to invent or devise the ways to provide this support in abstract, and general ways.
 
-I am beginning to speculate now, but perhaps those abstract ways are a natural occasion to apply runtime polymorphism.  Through Type Erasure we are not forced to keep the objects in their original representation, we have the freedom to "scatter" them into "structs of arrays".  The early work in this direction is promising; there is the potential to capture performance in the order of over 10x improvement.
+I am beginning to speculate now, but perhaps those abstract ways are a natural occasion to apply runtime polymorphism, scattering requires changing the runtime, and this can be seen as a polymorphic interface for types that are not aware that they are "scattered".  Through Type Erasure we are not forced to keep the objects in their original representation, we have the freedom to "scatter" them into "structs of arrays".  The early work in this direction is promising.  Organizing the data of applications in ways that you can get the full benefits of Data Orientation could be in the order of over 10x improvement; there is a very big prize for this endeavor.
