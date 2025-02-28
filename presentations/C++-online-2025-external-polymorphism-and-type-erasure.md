@@ -346,6 +346,8 @@ That indicates a type erasure container that uses a move-only `AnyContainer` (no
 
 These examples show very many (and not all) of the capabilities of a type erasure framework that has been used in production at applications such as Snapchat for at least five years.
 
+If you're interested in seeing how a user-made `zoo` type erasure *affordance* (a polymorphic interface) looks like, you might want to look at this [document](https://gist.github.com/thecppzoo/58496f06dc9126900ecf9a7246a81549), a comparison of how things are done in `zoo`, and their results, to Facebook's `Folly::Poly`, which I think is the best mainstream design and implementation for type erasure.
+
 Let us look closer into these realized possibilities:
 
 ### Local Buffer or Heap Allocation?
