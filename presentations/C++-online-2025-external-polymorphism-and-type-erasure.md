@@ -50,14 +50,14 @@ By the end I hope you see how these contrapositions, that empower us, form a dan
 
 ### Innovation chain
 
-External polymorphism is a set of ideas that were floating around by 1997; Chris Cleeland, Douglas C. Schmidt and T. Harrison articulated it and gave it the name.  The most recent version of this paper seems to be Cleeland and Schmidt's "External Polymorphism", readily available at [Schmidt's Vanderbilt](https://www.dre.vanderbilt.edu/~schmidt/PDF/C++-EP.pdf).  This paper does not seem to have been particularly influential, other than having been cited by Kevlin Henney in his very important article "Valued Conversions", that appeared in the [C++ Report magazine in July-August 2000](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=4610004b383e5c4f2dffbea0019c85847e18fff4)  That is the paper that proposes `any`, which was then followed by Doug McGregor's `boost::function` component, starting in 2001, that is essentially what we have today in the standard library as `std::function`.
+External polymorphism is a set of ideas that were floating around by 1997; Chris Cleeland, Douglas C. Schmidt and T. Harrison articulated it and gave it the name.  The most recent version of this paper seems to be Cleeland and Schmidt's "External Polymorphism", readily available at [Schmidt's Vanderbilt](https://www.dre.vanderbilt.edu/~schmidt/PDF/C++-EP.pdf).  This paper does not seem to have been particularly influential, other than having been cited by Kevlin Henney in his very important article "Valued Conversions", that appeared in the [C++ Report magazine in July-August 2000](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=4610004b383e5c4f2dffbea0019c85847e18fff4)  That is the paper that proposes `any`, which was then followed by Doug McGregor's `boost::function` component, starting in 2001, that eventually became `std::function` without changes of significance.
 
 ### Giving polymorphism to types that don't have it
 
 I will explain EP in a different way to how it is normally explained:
-Adapters for objects so the objects can be used through a runtime-polymorphic interface, without participating in ownership of the objects.
+Adapters for objects so the objects can be used through a runtime-polymorphic interface, without participating in ownership of the objects.  The essence of EP is to map the compile-time polymorphism of C++ to the runtime.
 
-The motivation for EP was to simplify debugging: the authors wanted to easily "dump" or trace the state of objects of arbitrary types, that would not necessarily have that feature of dumping.  Let's rephrase a little bit that requirement in the way most practitioners refer to this, as *serialization*, futhermore, let's be happy to simply "insert" into an `std::ostream`.  Just to make the example more complete, let's say we would also want to be able to get the `std::type_index` of the object.  Notice that we would want to be able to do this even for objects of types such as `int`, `double`, that have no runtime-polymorphism capabilities of their own.
+The motivation for EP, according to the paper, was to simplify debugging: the authors wanted to easily "dump" or trace the state of objects of arbitrary types, that would not necessarily have that feature of dumping.  Let's rephrase a little bit that requirement in the way most practitioners refer to this, as *serialization*, furthermore, let's be happy to simply "insert" into an `std::ostream`.  Just to make the example more complete, let's say we would also want to be able to get the `std::type_index` of the object.  Notice that we would want to be able to do this even for objects of types such as `int`, `double`, that have no runtime-polymorphism capabilities of their own.
 
 If we knew all the possible types of the objects that we want to give polymorphism to them, we could use `std::variant`, or the older techniques of "type switching" that we still see today in plain C code that deals with polymorphism.
 
@@ -73,12 +73,12 @@ WARNING: I am using "modern" language, not the same as in the EP paper.  In mode
 struct SerializableAdapter {
     virtual std::ostream &serialize(std::ostream &) const = 0;
     virtual std::type_index typeIndex() const noexcept = 0;
-    virtual ~SerializableAdapter();
+    virtual ~SerializableAdapter() {}
     // other members ommitted to focus the explanation
 };
 ```
 
-We create the adapter root, and then proceed to create the implementations for each possible `T` that we want to be "serializable":
+We create the adapter root, and then proceed to create the implementations for each possible `T` that we want to make "serializable":
 
 ```c++
 template<typename T>
@@ -114,7 +114,7 @@ struct Serializable_EP_Concept {
 
 We know we can achieve this by imitating the way the language itself implements subclassing:
 
-We can create a virtual table class with all the things needed to implement the interface; and we can make values of type "virtual table", each with the reification for each type:
+We can create a virtual table class with all the things needed to implement the interface; and we can make values of type "virtual table", each with the reification for one type:
 
 ```c++
 struct Serializable_EP_Concept;
@@ -227,7 +227,7 @@ out(std::ostream&, ISerializable&):
 
 Why the difference?
 
-This is important: **because in our External Polymorphism we have the freedom to design the functions in the virtual table for maximum performance, or anything else we care about**, if we use the language feature for polymorphism through subclassing, we have to accept rigid language rules.
+This is important: **in our External Polymorphism we have the freedom to design the functions in the virtual table for maximum performance, or anything else we care about**, if we use the language feature for polymorphism through subclassing, we have to accept rigid language rules.
 
 In this example, that the `this` pointer is always the first argument in the ABI.  When invoking `ISerializable::serialize`, the first argument is the address of the wrapper, but we are providing in `out` the `std::ostream &` as first argument, then the parameter order must be swapped.
 
@@ -293,7 +293,7 @@ viewAsInt(std::__1::any&):              # @viewAsInt(std::__1::any&)
 ```
 along with a lot of other garbage.  This example in the [compiler explorer](https://godbolt.org/z/v4YhPWcsY)
 
-Back to the question of usability, why would we want to use a container that only give us ownership?
+Back to the question of usability, why would we want to use a container that only gives us ownership?
 
 Perhaps because the scenario of subtyping/substitutability may be truly complex.
 
@@ -311,11 +311,11 @@ This begs the question, why does it support interfaces of only one function and 
 
 Because it was not designed properly.
 
-Why is `std::function` not based on `std::any` if it only adds one polymorphic function to the ownership given by `any`? again, because it was not designed properly.
+Why is `std::function` not based on `std::any` if it only adds one polymorphic function to the ownership given by `any`? again, because they were not designed properly.
 
 Why do we have no control over the way in which `std::any` and `std::function` own the owned object? (like when the object is local to the container or referenced at the heap, for example)? because of their misdesign.
 
-## Identifying and solving some design issues in Type Erasure implementations
+## Identifying and solving some design issues in Type Erasure designs
 
 One fundamental problem of implementations is that they fail to articulate that Type Erasure is EP + Ownership.  This perspective will clearly indicate that only one mechanism for ownership would be a one-size-fits-all design that in practice fits no-one, forcing users to do lots of efforts to work around the "take it or leave it" nature of the one choice for ownership implemented.  For example, Facebook's `Folly::Function` has as its most differentiating feature over `std::function` that it does not require copyability, that it is "move-only".
 
@@ -354,13 +354,13 @@ Let us look closer into these realized possibilities:
 
 `zoo::AnyContainer` relies on Alexandrescu's "Policy" pattern to indicate the configuration of the local buffer, in terms of size and alignment.  If the type "fits" within the local buffer, it will be stored locally.  This is mislabelled in the discussion of Type Erasure by the community as "Small Buffer Optimization", SBO.  I think this is an essential ownership consideration (local buffer versus heap allocation).  If the type does not fit, then the object will be allocated on the heap.  Also, to make the moving operations `noexcept` when the concrete type of object being managed is "may-throw" move, they are allocated on the heap, regardless of whether they otherwise fit in the local buffer--remember to make your move operations `noexcept`!
 
-The richess of considerations concerning ownership are not restricted merely to shaping the "local buffer", or even considerations about whether to completely disable heap allocations (making them compilation errors), these considerations are just the tipping point.  See for example Arthur O'Dwyer's article ["The space of design choices for `std::function`"](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/)
+The richess of considerations concerning ownership are not restricted merely to shaping the "local buffer", or even considerations about whether to completely disable heap allocations (making them compilation errors), these considerations are just the tipping point of a large set of choices.  See for example Arthur O'Dwyer's article ["The space of design choices for `std::function`"](https://quuxplusone.github.io/blog/2019/03/27/design-space-for-std-function/)
 
 Even O'Dwyer's article merely hints at some ice in the distance, there's a mountain of ice:
 
 There are plenty more things to think about:  What about using memory pools for allocation? what if at the same time we get polymorphism we get more sophisticated semantics such as "copy on write"?  It turns out all of this is possible!
 
-Also notice that any new powers with regards to Type Erasure in `zoo::AnyContainer` framework directly benefits `zoo::Function`, for no extra effort, for no performance loss!
+Also notice that any new powers with regards to Type Erasure in the  `zoo::AnyContainer` framework directly benefits `zoo::Function`, for no extra effort, for no performance loss!
 
 `zoo::Function` adds one function call signature.  But this is not limitative, both `zoo::AnyContainer` and `zoo::Function` can be refined, infinitely, by a "policy" builder that takes something that provides type erasure in the style of `zoo::AnyContainer` and adds even more user specified polymorphic interfaces.  To show you how this is done is outside of the scope of this document; but, in principle, this could be just one mechanism to give more call interfaces to the equivalent of `std::function`.  There are others!
 
@@ -380,7 +380,7 @@ In my opinion, these errors and missed opportunities have happened because we, i
 
 It turns out that "Value Management" is a concept that appears, as its name indicates, at every single place where value management happens.  Take for example `std::optional`.  `std::optional`, by itself, won't need to allocate: it can simply make its internal buffer suitable to host a value of what it is optional of.  But what if the `std::optional` may contain a `std::vector<ComplicatedType>`?
 
-If we wanted to communicate from the outside the `optional` the allocator to be used *inside*, by the managed values, then we would have to make something like a template-wrapper of `optional` that takes the allocator, and "injects" it into the contained object, this would be an "allocator aware" `optional`.
+If we wanted to communicate from the outside the `optional` the allocator to be used *inside*, by the managed types, then we would have to make something like a template-wrapper of `optional` that takes the allocator, and "injects" it into the contained object, this would be an "allocator aware" `optional`.
 
 It turns out this is very important for an organization as large as Bloomberg: they have internal systems that rely on at least two different types of memory, then they need to communicate which type of memory to use, via allocators.  This has forced them to go over practically all of the standard library to comb for all the places where allocation needs to be communicated and making this adaptation.  A lot of work!
 
@@ -392,7 +392,7 @@ Why did I discover/identified this? because of the approach grounded on superior
 
 In the experimental work I've done at `AnyContainer` value management, I've already been able to implement things like "reference counting", "copy on write", memory pools (a generalizaton of allocators).  I've been redesigning the `zoo` type erasure framework to allow very radical ways of Value Management possible, I'd say that I am about at generation "2.5", and I'm proceeding slowly because I'm dealing with concepts, ideas, that I have never heard about before.  For example, it is clear that the concept of value management applies to all containers in C++; while at Bloomberg they are solving for just the value management concern of allocation, I'm working on a framework for generalized value management concerns, in which metaprogramming is essential.
 
-All of these new ideas emerge because of the epistemic tension in the paradox of "Internal External Polymorphism".  As a matter of fact, a few years back I noticed that this tension induces a phenomenon of emergence of complexity.  I even went and prepared a presentation for the C++ Münich User's Group, that despite all the effort and preparation, failed to match the audience.  I personally believe the emergence of complexity in this case is very beautiful, it has allowed me to understand in a very different way vast tracts of Software Engineering, and is asking me questions that are tantalizing.  These are the things that I'm trying to evoke by the metaphor of "dancing".
+All of these new ideas emerge because of the epistemic tension in the paradox of "Internal External Polymorphism".  As a matter of fact, a few years back I noticed that this tension induces a phenomenon of emergence of complexity.  I even went and prepared a presentation for the C++ Münich User's Group, that despite all the effort and preparation, failed to match the audience, neither my understanding was good enough to convey this, nor the audience ready for its depth.  I personally believe the emergence of complexity in this case is very beautiful, it has allowed me to understand in a very different way vast tracts of Software Engineering, and is asking me questions that are tantalizing.  These are the things that I'm trying to evoke by the metaphor of "dancing".
 
 ## Unexplored possibilities
 
