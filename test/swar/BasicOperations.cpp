@@ -211,7 +211,7 @@ static_assert(BooleanSWAR{Literals<4, u16>,
 namespace Multiplication {
 
 static_assert(~int64_t(0) == negate(S4_64{S4_64::LeastSignificantBit}).value());
-static_assert(0x0F0F0F0F == doublingMask<4, uint32_t>().value());
+static_assert(0x0F0F0F0F == SWAR<4, uint32_t>::evenLaneMask().value());
 
 constexpr auto PrecisionFixtureTest = 0x89ABCDEF;
 constexpr auto Doubled =
@@ -254,6 +254,68 @@ HE(8, u16, 0x0808, 0x8);
 HE(3, u8, 0xFF, 0x7);
 HE(2, u8, 0xAA, 0x2);
 #undef HE
+
+template<int NB, typename T>
+constexpr auto testSaturatingMultiplication(T left, T right, T expected) {
+    using S = SWAR<NB, T>;
+    return saturatingExponentation(S{left}, S{right}).value() == expected;
+}
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0x09'40'03'01,
+        0x37'03'C0'01,
+        0xFF'FF'FF'01
+));
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0x02'02'02'02,
+        0x02'02'02'02,
+        0x04'04'04'04
+));
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0xFF'FF'FF'FF,
+        0x04'03'02'01,
+        0xFF'FF'FF'FF
+));
+static_assert(
+    testSaturatingMultiplication<8, u32>(
+        0x02'FF'FF'FF,
+        0x03'03'02'01,
+        0x08'FF'FF'FF
+));
+static_assert(
+    testSaturatingMultiplication<4, u32>(
+        0x1243'0003,
+        0x0002'0002,
+        0x1119'1119
+));
+
+namespace test_deinterleaving {
+
+template <int NB, typename T>
+auto test = [](auto a, auto b, auto expected_lower, auto expected_upper) {
+    auto [lower, upper] = deinterleaveLanesOfPair<NB, T>(a, b);
+    auto lower_ok = lower.value() == expected_lower.value();
+    auto upper_ok = upper.value() == expected_upper.value();
+    return lower_ok && upper_ok;
+};
+
+
+// notice the vertical groups becomes horizontal pairs
+using S = SWAR<8, uint32_t>;
+static_assert(test<8, uint32_t>(
+    S{0xFDFCFBFA}, // input a
+    S{0xF4F3F2F1}, // input b
+/*         C   A
+           3   1
+*/  S{0x4D3C2B1A}, // expected lower
+/*        3C  1A           */
+    S{0xFFFFFFFF}  // expected upper
+));
+
+} // namespace test_deinterleaving
+
 
 TEST_CASE("Old multiply version", "[deprecated][swar]") {
     SWAR<8, u32> Micand{0x5030201};
