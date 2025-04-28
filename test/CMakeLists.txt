@@ -124,6 +124,7 @@ else()
     set(
         MISCELLANEA_SOURCES
         egyptian.cpp var.cpp variant.cpp CopyMoveAbilities.cpp root/mem.cpp
+        demo/type_erasure_shared_pointer_value_manager.cpp
     )
     set(
         ZOO_TEST_SOURCES
@@ -142,7 +143,10 @@ else()
     add_executable(
         ${CURRENT_EXECUTABLE} ${ADDITIONAL_SOURCES}
     )
-    target_link_libraries(${CURRENT_EXECUTABLE} Catch2Main AlgorithmTest TypeErasureTest SWARTest Uncategorized)
+    target_link_libraries(
+        ${CURRENT_EXECUTABLE}
+        Catch2Main AlgorithmTest TypeErasureTest SWARTest Uncategorized
+    )
 
     add_executable(algorithm2 $<TARGET_OBJECTS:Catch2Main>)
     target_link_libraries(algorithm2 AlgorithmTest)
