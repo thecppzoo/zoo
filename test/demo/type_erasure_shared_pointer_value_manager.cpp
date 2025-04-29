@@ -162,11 +162,18 @@ TEST_CASE("Shared Pointer Value Manager", "[demo][type-erasure][shared-pointer-p
         auto aState =  a.state<std::string>();
         REQUIRE("foo" == *aState);
 
+        REQUIRE(user::isExclusive<std::string>(a));
+
+
         auto b = a;
+        REQUIRE(!user::isExclusive<std::string>(a));
         // proves that a and b share the same object
         REQUIRE(aState == b.state<std::string>());
-
+        // now we're going to write to b! then the copy must happen.
         b.fromString("bar");
+
+        REQUIRE(user::isExclusive<std::string>(a));
+        REQUIRE(user::isExclusive<std::string>(b));
 
         auto bState = b.state<std::string>();
         REQUIRE(aState != bState);
