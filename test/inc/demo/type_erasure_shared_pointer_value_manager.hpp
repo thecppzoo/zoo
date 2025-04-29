@@ -37,7 +37,7 @@ struct UserValueManagement {
         using VP = std::shared_ptr<V>;
         /// Abbreviation
         using SPM = SharedPointerManager;
-        
+
         // not part of the end-user interface
         VP *sharedPointer() noexcept { return this->space_.template as<VP>(); }
         // part of the end-user interface
@@ -65,6 +65,11 @@ struct UserValueManagement {
         constexpr static inline typename GP::VTable Operations = {
             AffordanceSpecifications::template Operation<SPM>...
         };
+
+        auto isExclusive() const noexcept {
+            auto sp = const_cast<SPM *>(this)->sharedPointer();
+            return 1 == sp->use_count();
+        }
 
         // not user interface
         SharedPointerManager(SharedPointerManager &&donor) noexcept:
