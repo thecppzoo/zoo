@@ -38,8 +38,9 @@ struct UserValueManagement {
         /// Abbreviation
         using SPM = SharedPointerManager;
         
-
+        // not part of the end-user interface
         VP *sharedPointer() noexcept { return this->space_.template as<VP>(); }
+        // part of the end-user interface
         V *value() noexcept { return &**sharedPointer(); }
 
         const V *value() const noexcept {
@@ -65,12 +66,14 @@ struct UserValueManagement {
             AffordanceSpecifications::template Operation<SPM>...
         };
 
+        // not user interface
         SharedPointerManager(SharedPointerManager &&donor) noexcept:
             Base(&Operations)
         {
             new(sharedPointer()) VP(std::move(*donor.sharedPointer()));
         }
 
+        // not user interface
         SharedPointerManager(const SharedPointerManager &donor) noexcept:
             Base(&Operations)
         {
@@ -78,6 +81,7 @@ struct UserValueManagement {
         }
 
 
+        // internal interface of Builder (important)
         template<typename... Args>
         SharedPointerManager(Args &&...args):
             Base(&Operations)
@@ -91,6 +95,7 @@ struct UserValueManagement {
     };
 
     struct AdaptedPolicy: GP::Policy {
+        // Builders is the old name to refer to what I now call "Value Manager"
         template<typename V>
         using Builder =
             std::conditional_t<
