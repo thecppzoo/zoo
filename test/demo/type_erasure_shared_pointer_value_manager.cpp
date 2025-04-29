@@ -4,11 +4,9 @@
 
 #include <catch2/catch.hpp>
 #include <sstream>
-#include <type_traits>
-
 
 // Primary template: defaults to false
-template <typename, typename = std::void_t<>>
+template <typename, typename = void>
 struct ExclusiveAwareTrait: std::false_type {};
 
 // Specialization: if T has T::ExclusiveAware, this will match and be true
