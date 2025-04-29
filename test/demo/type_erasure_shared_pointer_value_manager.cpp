@@ -6,6 +6,24 @@
 
 #include <catch2/catch.hpp>
 #include <sstream>
+#include <type_traits>
+
+
+// Primary template: defaults to false
+template <typename, typename = std::void_t<>>
+struct ExclusiveAwareTrait: std::false_type {};
+
+// Specialization: if T has T::ExclusiveAware, this will match and be true
+template <typename T>
+struct ExclusiveAwareTrait<T, std::void_t<typename T::ExclusiveAware>>: std::true_type {};
+
+
+struct MyCoolStruct {
+    struct ExclusiveAware {};
+};
+
+static_assert(ExclusiveAwareTrait<int>::value == false);
+static_assert(ExclusiveAwareTrait<MyCoolStruct>::value);
 
 
 struct StringInputOutput {
@@ -30,9 +48,16 @@ struct StringInputOutput {
             return oss.str();
         },
         [] (void *container, const std::string &str) {
-            std::istringstream iss{str};
             auto c = const_cast<void *>(container);
             auto cvm = static_cast<ConcreteValueManager *>(c);
+
+            if constexpr (ExclusiveAwareTrait<ConcreteValueManager>::value) {
+                if (!cvm->isExclusive()) {
+                    cvm->makeExclusive();
+                }
+            }
+
+            std::istringstream iss{str};
             iss >> *cvm->value();
         },
     };
@@ -95,31 +120,33 @@ using UAny = zoo::AnyContainer<
 
 
 TEST_CASE("Shared Pointer Value Manager", "[demo][type-erasure][shared-pointer-policy]") {
-    UAny uAny{9.9};
-    CHECK(9.9 == *uAny.state<double>());
+    SECTION("shared pointer value management basics") {
+        UAny uAny{9.9};
+        CHECK(9.9 == *uAny.state<double>());
 
-    REQUIRE(user::isExclusive<double>(uAny));
+        REQUIRE(user::isExclusive<double>(uAny));
 
-    user::ExplicitDestructor ed;
-    REQUIRE(nullptr == user::ExplicitDestructor::last);
-    uAny = ed;
-    CHECK(nullptr == user::ExplicitDestructor::last);
-    REQUIRE(typeid(user::ExplicitDestructor) == uAny.type());
-    auto spp = user::extractSharedPointer<user::ExplicitDestructor>(uAny);
-    auto sp = *spp;
+        user::ExplicitDestructor ed;
+        REQUIRE(nullptr == user::ExplicitDestructor::last);
+        uAny = ed;
+        CHECK(nullptr == user::ExplicitDestructor::last);
+        REQUIRE(typeid(user::ExplicitDestructor) == uAny.type());
+        auto spp = user::extractSharedPointer<user::ExplicitDestructor>(uAny);
+        auto sp = *spp;
 
-    REQUIRE(2 == sp.use_count());
+        REQUIRE(2 == sp.use_count());
 
-    REQUIRE(! user::isExclusive<user::ExplicitDestructor>(uAny));
+        REQUIRE(! user::isExclusive<user::ExplicitDestructor>(uAny));
 
-    CHECK(nullptr == user::ExplicitDestructor::last);
-    const auto oldAddress = uAny.state<user::ExplicitDestructor>();
-    REQUIRE(oldAddress == &*sp);
-    sp.reset();
-    REQUIRE(user::isExclusive<user::ExplicitDestructor>(uAny));
+        CHECK(nullptr == user::ExplicitDestructor::last);
+        const auto oldAddress = uAny.state<user::ExplicitDestructor>();
+        REQUIRE(oldAddress == &*sp);
+        sp.reset();
+        REQUIRE(user::isExclusive<user::ExplicitDestructor>(uAny));
 
-    uAny = 5;
-    REQUIRE(oldAddress == user::ExplicitDestructor::last);
+        uAny = 5;
+        REQUIRE(oldAddress == user::ExplicitDestructor::last);
+    }
 
     SECTION("roundtrip io affordance") {
        using IOType = zoo::AnyContainer<zoo::Policy<LocalBuffer, zoo::Destroy, zoo::Move, StringInputOutput>>;

@@ -38,6 +38,7 @@ struct UserValueManagement {
         /// Abbreviation
         using SPM = SharedPointerManager;
 
+        struct ExclusiveAware {};
         // not part of the end-user interface
         VP *sharedPointer() noexcept { return this->space_.template as<VP>(); }
         // part of the end-user interface
@@ -71,6 +72,10 @@ struct UserValueManagement {
             return 1 == sp->use_count();
         }
 
+        auto makeExclusive() {
+            *sharedPointer() = std::make_shared<V>(*value());
+        }
+
         // not user interface
         SharedPointerManager(SharedPointerManager &&donor) noexcept:
             Base(&Operations)
@@ -79,10 +84,10 @@ struct UserValueManagement {
         }
 
         // not user interface
-        SharedPointerManager(const SharedPointerManager &donor) noexcept:
+        SharedPointerManager(const SharedPointerManager &model) noexcept:
             Base(&Operations)
         {
-            new(sharedPointer()) VP(*const_cast<SPM &>(donor).sharedPointer());
+            new(sharedPointer()) VP(*const_cast<SPM &>(model).sharedPointer());
         }
 
 
