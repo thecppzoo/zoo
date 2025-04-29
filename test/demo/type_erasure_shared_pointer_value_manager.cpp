@@ -114,7 +114,7 @@ static_assert(sizeof(std::shared_ptr<int>) <= sizeof(LocalBuffer));
 using UAny = zoo::AnyContainer<
     user::SharedPointerPolicy<
         LocalBuffer,
-        zoo::Destroy, zoo::Move, zoo::Copy, zoo::RTTI
+        zoo::Destroy, zoo::Move, zoo::RTTI
     >
 >;
 
