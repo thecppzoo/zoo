@@ -1,7 +1,5 @@
 #include "demo/type_erasure_shared_pointer_value_manager.hpp"
 
-#include "zoo/Any/VTablePolicy.h"
-#include "zoo/AnyContainer.h"
 #include "zoo/FunctionPolicy.h"
 
 #include <catch2/catch.hpp>
