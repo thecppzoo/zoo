@@ -157,6 +157,20 @@ TEST_CASE("Shared Pointer Value Manager", "[demo][type-erasure][shared-pointer-p
     }
 
     SECTION("copy on write") {
+        using CopyOnWritable = zoo::AnyContainer<user::SharedPointerPolicy<LocalBuffer, zoo::Destroy, zoo::Move, zoo::Copy, StringInputOutput>>;
+        CopyOnWritable a = std::string{"foo"};
+        auto aState =  a.state<std::string>();
+        REQUIRE("foo" == *aState);
 
+        auto b = a;
+        // proves that a and b share the same object
+        REQUIRE(aState == b.state<std::string>());
+
+        b.fromString("bar");
+
+        auto bState = b.state<std::string>();
+        REQUIRE(aState != bState);
+        REQUIRE("foo" == *aState);
+        REQUIRE("bar" == *bState);
     }
 }

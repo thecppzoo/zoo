@@ -13,10 +13,16 @@ struct ExplicitDestructor {
 
 template<typename>
 struct SharedPointerOptIn: std::false_type {};
+
 template<>
 struct SharedPointerOptIn<int>: std::true_type {};
+
 template<>
 struct SharedPointerOptIn<ExplicitDestructor>: std::true_type {};
+
+template<>
+struct SharedPointerOptIn<std::string>: std::true_type {};
+
 
 template<typename HoldingModel, typename... AffordanceSpecifications>
 struct UserValueManagement {
