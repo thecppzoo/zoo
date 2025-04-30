@@ -17,7 +17,7 @@ The most important feature of this flavor of the framework is to use virtual tab
     1. Implementations are either `constexpr` data, or more typically, the pointers to the functions that implement the behaviors.  The base manager must defer to the affordances for these values, in particular to the `Default` class-members of the affordances, which are assumed to be of their `VTableEntry` type [^DefaultImplementations]
 6. The so-called "concrete value managers" provide the implementations for the value they manage.
 
-[^DefaultImplementations]:
+[^DefaultImplementations]: Code for assembling the default-constructed behaviors:
    ```c++
         constexpr static inline VTable Default = {
             AffordanceSpecifications::template Default<Container>...
