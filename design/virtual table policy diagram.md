@@ -18,10 +18,11 @@ The most important feature of this flavor of the framework is to use virtual tab
 6. The so-called "concrete value managers" provide the implementations for the value they manage.
 
 [^DefaultImplementations]: Code for assembling the default-constructed behaviors:
-   ```c++
+    The virtual table of default-constructed `AnyContainer`:
+    ```c++
         constexpr static inline VTable Default = {
             AffordanceSpecifications::template Default<Container>...
         };
-   ```
+    ```
    [from here](https://github.com/thecppzoo/zoo/blob/d6435fc984ee0bde31979f7908a73473f61ac4bd/inc/zoo/Any/VTablePolicy.h#L274-L276).
 
