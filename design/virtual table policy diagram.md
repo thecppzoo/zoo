@@ -12,7 +12,7 @@ For the sub-framework of virtual-table type switching, `zoo::Policy`, the user c
 The **implementation** uses the following members of a policy:
 1. `MemoryLayout`: this is the **base value manager**.  It's size and alignment are that of the `zoo::Policy` storage model.
 2. `template<typename ValueToManage> Builder`: indicates the concrete value manager for the given type
-3. `template<typename ConcreteAnyContainer> Affordances`: this provide bases from the affordances to the `AnyContainer`, this is how they add things to the interface of `AnyContainer`, via their template members `UserAffordance`, that use the CRTP [^user affordance CRTP]
+3. `template<typename ConcreteAnyContainer> Affordances`: this provide bases from the affordances to the `AnyContainer`, this is how they add things to the interface of `AnyContainer`, via their template members `UserAffordance`, that use the CRTP [^user_affordance_CRTP]
 
 ## The base value manager
 
@@ -38,7 +38,7 @@ The most important feature of this flavor of the framework is to use virtual tab
     ```
    [from here](https://github.com/thecppzoo/zoo/blob/d6435fc984ee0bde31979f7908a73473f61ac4bd/inc/zoo/Any/VTablePolicy.h#L274-L276).
 
-[^user affordance CRTP]: The curiously recurring template pattern accomplishes the following:
+[^user_affordance_CRTP]: The curiously recurring template pattern accomplishes the following:
     For `AnyContainer<Policy<StorageModel, A1, A2, A2>>`:
     ```c++
         using M = AnyContainer<Policy<StorageModel, A1, A2, A2>>;
