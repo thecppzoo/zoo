@@ -554,3 +554,132 @@ std::size_t neon_strlen(const char *str) {
 
 }
 #endif
+
+namespace zoo {
+
+//template<typename S>
+int c_strCmp(const char *a, const char *b) {
+    using S = swar::SWAR<8>;
+    S as, bs;
+    auto [aB, aM] = blockAlignedLoad(a, &as);
+    auto [bB, bM] = blockAlignedLoad(b, &bs);
+
+    auto misalignmentDifference = aM - bM;
+    // to establish the loop invariant there is the need to fill the
+    // bytes of the blocks that do not belong to the inputs.
+    // the bytes that do not belong are those up to the misalignment.
+    // let's say:
+    // **NOTE: THE DIAGRAMS ARE IN LITTLE ENDIAN!**
+    // [ a0, a1, a2, a3, a4, a5, a6, a7 ]
+    //   ^            ^ misalignment = 3
+    //   | base of A
+    // [ b0, b1, b2, b3, b4, b5, b6, b7 ]
+    //    ^       ^ misalignment of b = 2
+    //    | base of B
+    // The bytes that really belong to A are
+    // [  ?,  ?,  ?, a3, a4, a5, a6, a7 ]
+    // To avoid the first three bytes interfering in the comparison, we
+    // fill them with lanes of all ones:
+    // [ ~0, ~0, ~0, a3, a4, a5, a6, a7 ], for this, we do this:
+    // [ 0,  0,  0,  ~0, ...,      ~0 ] = S{S::AllOnes}.shiftLanesLeft(3) = SLL
+    // [ ~0, ~0, ~0,  0, ...,       0 ] = ~SLL
+    // [ ~0, ~0, ~0, a3, a4, a5, a6, a7 ] = ASL | ~SLL
+    // now, we can use all the bytes in as.
+    // We need to do something similar for bs, but because bs is less misaligned
+    // we will process the bytes we can in this iteration, but we have to
+    // leave a remainder:
+    // [ 0, b0, b1, b2, b3, b4, b5, b6 ] = bs.shiftLanesLeft(3 - 2) = BSL
+    // [~0, ~0, ~0, b2, b3, b4, b5, b6 ] = BSL | ~SLL
+    // [ ?,  ?,  ?,  ?,  ?,  ?,  ?, b6 ] = remainder for the next iteration
+
+    // The prefix mma means "more mis-aligned", lma "less mis-aligned"
+    const char *mmaBase, *lmaBase;
+    S mmaBytes, lmaBytes, lmaRemainder;
+    int returnMultiplier;
+    auto loopInvariantMaker =
+        [&](
+            auto largerMisalignment,
+            auto mmaBa, auto mmaBy, auto lmaBa, auto lmaBy,
+            int reM
+        ) {
+            // a is more misaligned than b, a provides less bytes
+            auto initialFiller =
+                ~S{S::AllOnes}.shiftLanesLeft(largerMisalignment);
+            mmaBase = mmaBa;
+            mmaBytes = mmaBy | initialFiller;
+            lmaBase = lmaBa;
+            auto lmaAdjusted = lmaBy.shiftLanesLeft(misalignmentDifference);
+            lmaBytes = lmaAdjusted | initialFiller;
+            lmaRemainder =
+                lmaBy |
+                S{S::AllOnes}.shiftLanesRight(S::Lanes - misalignmentDifference);
+            returnMultiplier = reM;
+        };
+    if(0 <= misalignmentDifference) {
+        loopInvariantMaker(aM, aB, as, bB, bs, 1);
+    } else {
+        misalignmentDifference = -misalignmentDifference;
+        loopInvariantMaker(bM, bB, bs, aB, as, -1);
+    }
+    auto nulls = [](S bytes) {
+        return swar::constantIsGreaterEqual<0>(bytes);
+    };
+    for(;;) {
+        // invariant:
+        // 1. ready to compare mmaBytes with lmaBytes
+        // 2. there is at least one byte of input in both mmaBytes and lmaBytes
+        // 3. mmaBytes and lmaBytes are equal
+        // 4. There is no null in the bytes
+        // 5. There is no null in the significant bytes in the remainder
+        // Step 1: determine if the swars are different
+        auto exor = mmaBytes ^ lmaBytes;
+        if(!exor.value()) {
+            // There is a difference.  Will terminate
+            // There are several cases.
+            // Is any string terminated?
+            auto
+                mNulls = nulls(mmaBytes),
+                lNulls = nulls(lmaBytes);
+            auto thereIsANull = mNulls | lNulls;
+            auto returner =
+                [&](S s) {
+                    auto firstNullIndex = s.lsbIndex();
+                    auto
+                        comparison = mmaBytes - lmaBytes,
+                        inLeast = comparison.shiftLanesRight(firstNullIndex),
+                        onlyLeast = inLeast & S{S::LeastSignificantLaneMask};
+                    return returnMultiplier * int8_t(onlyLeast.value());
+                };
+            if(thereIsANull) {
+                return returner(thereIsANull);
+            }
+            auto diffs = swar::constantIsGreaterEqual<0>(exor);
+            return returner(diffs);
+        }
+        // despite equality, we might have reached the end of the strings,
+        // this needs to be tested explicitly
+        if(nulls(mmaBytes)) { return 0; }
+        // preparation of the next iteration, grab a block from mmaBase
+        mmaBase += sizeof(S);
+        memcpy(&mmaBytes.m_v, mmaBase, sizeof(S));
+        // there can be a null in the lmaRemainder, thus we can't just
+        // load more bytes
+        if(nulls(lmaRemainder)) {
+            // prepare the next iteration knowing it will terminate:
+            lmaBytes =
+                lmaRemainder.shiftLanesRight(S::Lanes - misalignmentDifference);
+            continue;
+        }
+        lmaBase += sizeof(S);
+        auto remShifted =
+            lmaRemainder.shiftLanesRight(S::Lanes - misalignmentDifference);
+        memcpy(&lmaRemainder.m_v, lmaBase, sizeof(S));
+        auto newBytes = lmaRemainder.shiftLanesLeft(misalignmentDifference);
+        lmaBytes = remShifted | newBytes;
+            // note: if there are nulls in the lmaRemainder part that was
+            // copied to newBytes, they will be compared against mmaBytes
+            // and thus taken into account
+    }
+}
+
+}
