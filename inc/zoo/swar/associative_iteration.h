@@ -1,11 +1,14 @@
 #ifndef ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 #define ZOO_SWAR_ASSOCIATIVE_ITERATION_H
 
+#include "Operations.h"
+#include "zoo/meta/popcount.h"
 #include "zoo/swar/SWAR.h"
 
 //#define ZOO_DEVELOPMENT_DEBUGGING
 #ifdef ZOO_DEVELOPMENT_DEBUGGING
 #include <iostream>
+
 
 inline std::ostream &binary(std::ostream &out, uint64_t input, int count) {
     while(count--) {
@@ -338,7 +341,7 @@ constexpr auto negate(SWAR<NB, B> input) {
     return fullAddition(~input, Ones).result;
 }
 
-/// \brief Performs a generalized iterated application of an associative operator to a base
+/// \brief Performs a generalized iterated application of an associative operator to a bases
 ///
 /// In algebra, the repeated application of an operator to a "base" has different names depending on the
 /// operator, for example "a + a + a + ... + a" n-times would be called "repeated addition",
@@ -361,17 +364,16 @@ constexpr auto negate(SWAR<NB, B> input) {
 /// \param log2Count is to potentially reduce the number of iterations if the caller a-priori knows
 /// there are fewer iterations than what the type of exponent would allow
 template<
-    typename Base, typename IterationCount, typename Operator,
-    // the critical use of associativity is that it allows halving the
-    // iteration count
-    typename CountHalver
+    typename Base, typename IterationCount,
+    typename Operator, typename CountHalver
 >
 constexpr auto associativeOperatorIterated_regressive(
-    Base base, Base neutral, IterationCount count, IterationCount forSquaring,
-    Operator op, unsigned log2Count, CountHalver ch
+    Base base, Base neutral, IterationCount count,
+    IterationCount forSquaring, Operator op,
+    unsigned log2Count, CountHalver ch
 ) {
-    auto result = neutral;
-    if(!log2Count) { return result; }
+    auto result = neutral; // sum = 0
+    if(!log2Count) { return result; } // NBits per lane
     for(;;) {
         result = op(result, base, count);
         if(!--log2Count) { break; }
@@ -380,6 +382,55 @@ constexpr auto associativeOperatorIterated_regressive(
     }
     return result;
 }
+
+namespace count_halving {
+
+constexpr auto ConsumeMsb = [](auto counts) {
+    return counts << 1;
+};
+
+constexpr auto ConsumeLsb = [](auto counts) {
+    return counts << 1;
+};
+
+template<typename S>
+constexpr auto ConsumeMsbLaneWise = [](auto counts) {
+    auto msbCleared = counts & ~S{S::MostSignificantBit};
+    return S{msbCleared.value() << 1};
+};
+
+
+}
+
+namespace associative_iteration {
+
+template<
+    auto Operator,
+    auto CountHalver,
+    typename Base,
+    typename IterationCount
+>
+constexpr auto regressive(
+    Base base,
+    Base neutral,
+    IterationCount count,
+    IterationCount forSquaring,
+    unsigned log2Count
+) {
+    auto result = neutral; // sum = 0
+    if(!log2Count) { return result; } // NBits per lane
+    for(;;) {
+        result = Operator(result, base, count);
+        if(!--log2Count) { break; }
+        result = Operator(result, result, forSquaring);
+        count = CountHalver(count);
+    }
+    return result;
+}
+
+}
+
+namespace ai = associative_iteration;
 
 template<int ActualBits, int NB, typename T>
 constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
@@ -392,15 +443,10 @@ constexpr auto multiplication_OverflowUnsafe_SpecificBitCount(
         return left + (addendums & right);
     };
 
-    auto halver = [](auto counts) {
-        auto msbCleared = counts & ~S{S::MostSignificantBit};
-        return S{msbCleared.value() << 1};
-    };
-
     auto shifted = S{multiplier.value() << (NB - ActualBits)};
     return associativeOperatorIterated_regressive(
         multiplicand, S{0}, shifted, S{S::MostSignificantBit}, operation,
-        ActualBits, halver
+        ActualBits, count_halving::ConsumeMsbLaneWise<S>
     );
 }
 
@@ -450,7 +496,7 @@ constexpr auto exponentiation_OverflowUnsafe_SpecificBitCount(
     exponent = S{static_cast<T>(exponent.value() << (NB - ActualBits))};
     return associativeOperatorIterated_regressive(
         x,
-        S{meta::BitmaskMaker<T, 1, NB>().value}, // neutral is lane wise..
+        S{S::LeastSignificantBit},
         exponent,
         S{S::MostSignificantBit},
         operation,
@@ -484,10 +530,11 @@ constexpr SWAR<NB, T> doublingMask() {
 }
 
 template<int NB, typename T>
+
 constexpr auto doublePrecision(SWAR<NB, T> input) {
     using S = SWAR<NB, T>;
     static_assert(
-        0 == S::NSlots % 2,
+        0 == S::Lanes % 2,
         "Precision can only be doubled for SWARs of even element count"
     );
     using RV = SWAR<NB * 2, T>;
@@ -497,6 +544,25 @@ constexpr auto doublePrecision(SWAR<NB, T> input) {
         RV{(input.value() >> NB) & DM.value()}
     };
 }
+
+template <typename S>
+constexpr
+std::enable_if_t<S::Lanes >= 2 && (S::Lanes % 2) == 0, typename S::type>
+horizontalSum_lanes(S s) {
+    using STwiceWider = SWAR<S::NBits * 2, typename S::type>;
+    constexpr auto
+        Ones = STwiceWider::LeastSignificantBit,
+        ShiftBackAmount = STwiceWider::NBits * (STwiceWider::Lanes - 1);
+
+    constexpr auto sum = [](auto a) {
+        return (a.value() * Ones) >> ShiftBackAmount;
+    };
+
+    auto [even, odd] = doublePrecision(s);
+    return sum(even) + sum(odd);
+}
+
+static_assert(horizontalSum_lanes(SWAR { Literals<32, u64>, {2, 1} }) == 3, "Test failed");
 
 template<int NB, typename T>
 constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
@@ -510,6 +576,149 @@ constexpr auto halvePrecision(SWAR<NB, T> even, SWAR<NB, T> odd) {
     return evenHalf | oddHalf;
 }
 
+template <typename S>
+auto multiply_and_double_p(S a, S b) {
+    auto product = a * b;
+    return doublePrecision(product);
 }
 
+template<typename S>
+constexpr auto horizontalSum_bits(S input) {
+    constexpr auto
+        MSBs = S::MostSignificantBit,
+        Neutral =  typename S::type {0},
+        ForSquaring = Neutral,
+        Base = Neutral,
+        Log2Count = S::NBits;
+
+    auto count = input.value();
+
+    constexpr auto Operation = [](auto result, auto base, auto count) {
+        auto msb_masked = count & MSBs;
+        auto popcount = meta::basic_popcount(msb_masked);
+        result += popcount + base;
+        return result;
+    };
+
+    return ai::regressive<Operation, count_halving::ConsumeMsb> (
+        Base,
+        Neutral,
+        count,
+        ForSquaring,
+        Log2Count
+    );
+}
+
+template<typename T>
+constexpr auto is_odd(T input) {
+    return input & T{1};
+}
+
+template <typename S>
+constexpr auto horizontalSum(S input) {
+    if constexpr (is_odd(S::NBits)) {
+        return horizontalSum_bits(input);
+    } else {
+        return horizontalSum_lanes(input);
+    }
+}
+
+namespace experimental {
+
+template<typename S>
+constexpr auto horizontalSum_prog(S x) {
+    constexpr auto Ones = S::LeastSignificantBit,
+                   NBits = S::NBits,
+                   InitialSquare = typename S::type { 1 };
+
+    auto sum = 0;
+    auto square = InitialSquare;
+    auto value = x.value();
+
+    for (int i = 0; i < NBits; i++) {
+        auto msb_masked = value & Ones;
+        auto popcount = zoo::meta::basic_popcount(msb_masked);
+        auto value_at_square = popcount * square;
+        sum += value_at_square;
+        square <<= 1;
+        value >>= 1;
+    }
+
+    return sum;
+}
+
+template<typename S>
+constexpr auto horizontalSum_reg(S x) {
+    constexpr auto MSBs = S::MostSignificantBit,
+                   NBits = S::NBits,
+                   Neutral = typename S::type {0};
+    auto result = Neutral;
+    auto count = x.value();
+
+    auto operation = [](auto result, auto count) {
+        auto msb_masked = count & MSBs;
+        auto popcount = zoo::meta::basic_popcount(msb_masked);
+        result <<= 1;
+        result += popcount;
+        return result;
+    };
+
+    for (auto log2Count = NBits;;) {
+        result = operation(result, count);
+        if (!--log2Count) { break; }
+        count = count_halving::ConsumeMsb(count);
+    }
+
+    return result;
+}
+
+} // namespace experimental
+
+
+#define ZOO_PP_UNPARENTHESIZE(...) __VA_ARGS__
+#define Y(fn, TYPE, values, expected)              \
+    static_assert(fn(                              \
+        SWAR {                                     \
+            Literals<ZOO_PP_UNPARENTHESIZE TYPE>,  \
+            {ZOO_PP_UNPARENTHESIZE values}         \
+        }) ==                                      \
+        expected                                   \
+    );
+
+#define HORIZONTAL_SUM_TESTS(fn) \
+  Y(fn, (32, u64), (2, 1), 3) \
+  Y(fn, (8, u32), (255, 255, 255, 255), 1020) \
+  Y(fn, (8, u32), (255, 254, 255, 255), 1019) \
+  Y(fn, (8, u32), (255, 255, 255, 255), 1020) \
+  Y(fn, (8, u64), (255, 255, 255, 255, 255, 255, 255, 255), 2040) \
+  Y(fn, (4, u64), (15, 15, 15, 15, 15, 15, 15, 15, \
+                   15, 15, 15, 15, 15, 15, 15, 15), (15 * 16)) \
+  Y(fn, (31, u64), (1, 2), 3) \
+  Y(fn, (15, u32), (1, 1), 2) \
+  Y(fn, (11, u32), (1, 1), 2) \
+  Y(fn, (5, u32), (1, 2, 3, 4, 5, 6), 21) \
+  Y(fn, (5, u32), (6, 5, 4, 3, 2, 1), 21) \
+
+
+#define HORIZONTAL_SUM_TESTS_ALL \
+    HORIZONTAL_SUM_TESTS(horizontalSum) \
+    HORIZONTAL_SUM_TESTS(horizontalSum_bits) \
+    // HORIZONTAL_SUM_TESTS(horizontalSum_lanes) /* doesn't work in all by itself */ \
+    HORIZONTAL_SUM_TESTS(experimental::horizontalSum_prog) \
+    HORIZONTAL_SUM_TESTS(experimental::horizontalSum_reg)
+
+HORIZONTAL_SUM_TESTS_ALL
+
+#undef X
+#undef Y
+#undef HORIZONTAL_SUM_TESTS
+#undef HORIZONTAL_SUM_TESTS_ALL
+
+
+static_assert(((0x01'01 * 0x05'01) & 0xFF'00) == 0x06'00, "Test failed");
+
+}
+
+
 #endif
+
