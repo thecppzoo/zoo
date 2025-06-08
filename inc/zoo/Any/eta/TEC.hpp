@@ -33,6 +33,20 @@ struct TEC {
         space_.template build<Target>(std::forward<Params>(params)...);
     }
 
+//     AnyContainerBase(AnyContainerBase &&moveable) noexcept:
+//         SuperContainer(
+//             SuperContainer::Token,
+//             static_cast<SuperContainer &&>(moveable)
+//         )
+//     {
+//         auto source = moveable.container();
+//         source->move(container());
+//     }
+
+
+    void move(
+
+
     ~TEC() {
         space_.template as<DefaultManager>()->destroy();
     }

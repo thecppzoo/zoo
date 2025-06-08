@@ -211,7 +211,7 @@ struct CallableViaVTable<R(As...)> {
 };
 
 template<typename VirtualTable>
-struct VTableHolder {
+struct VTablePointerWrapper {
     const VirtualTable *pointer_;
 
     /// \brief from the vtable returns the entry corresponding to the affordance
@@ -221,7 +221,7 @@ struct VTableHolder {
             pointer_->template upcast<Affordance>();
     }
 
-    VTableHolder(const VirtualTable *p): pointer_(p) {}
+    VTablePointerWrapper(const VirtualTable *p): pointer_(p) {}
 
     auto pointer() const noexcept { return pointer_; }
 
@@ -251,7 +251,7 @@ struct GenericPolicy {
         }
     };
 
-    using VTHolder = VTableHolder<VTable>;
+    using VTHolder = VTablePointerWrapper<VTable>;
 
     struct MSVC_EMPTY_BASES Container:
         VTHolder,
