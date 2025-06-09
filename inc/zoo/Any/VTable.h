@@ -32,7 +32,7 @@ struct TypeErasedContainer {
     // the destructor in a derived class, to replicate the behaviour of virtual
     // inheritance or the normal or contravariant of destructors in conditions
     // of inheritance. Therefore we can not asssume that we're working directly
-    // with an `Empty.
+    // with an `Empty`.
     inline const static TypeErasureOperations Empty = {
         [](void *) noexcept {},
         reinterpret_cast<void (*)(void *, void *) noexcept>(copyVTable)
