@@ -2,6 +2,7 @@
 #include "zoo/AlignedStorage.h"
 #include "zoo/pp/platform.h"
 #include "zoo/tea/Traits.h"
+#include "zoo/tea/VTablePointerWrapper.h"
 #include "zoo/utility.h"
 
 #include "zoo/meta/copy_and_move_abilities.h"
@@ -9,12 +10,30 @@
 
 namespace zoo::tea {
 
+template<typename T, typename = void>
+struct HasVTableMember: std::false_type {};
+
+template<typename T>
+struct HasVTableMember<T, std::void_t<typename T::VTable>>: std::true_type {};
+
+struct Boo {
+    using VTable = int;
+};
+
+static_assert(!HasVTableMember<void>::value);
+static_assert(HasVTableMember<Boo>::value);
+
+
 template<typename Policy_>
 struct TEC {
     using Policy = Policy_;
 
+    // static_assert(std::
+
     TEC() = delete;
     TEC(const TEC &) = delete;
+
+
 
     using DefaultManager = typename Policy::MemoryLayout;
 
@@ -44,7 +63,7 @@ struct TEC {
 //     }
 
 
-    void move(
+ //    void move(
 
 
     ~TEC() {
