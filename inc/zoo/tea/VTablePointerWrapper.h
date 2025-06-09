@@ -2,6 +2,8 @@
 #define ZOO_VTABLE_POINTER_WRAPPER_H
 
 
+namespace zoo {
+
 template<typename VirtualTable>
 struct VTablePointerWrapper {
     const VirtualTable *pointer_;
@@ -20,6 +22,7 @@ struct VTablePointerWrapper {
     void change(const VirtualTable *p) noexcept { pointer_ = p; }
 };
 
+} // zoo
 
 #endif // ZOO_VTABLE_POINTER_WRAPPER_H
 
