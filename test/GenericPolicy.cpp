@@ -55,7 +55,7 @@ static_assert(alignof(SizedContainer<7>) == alignof(void *));
 
 // containers without copy are move-only
 using MoveOnlyPolicy = Policy<void *, Destroy, Move>;
-static_assert(!detail::AffordsCopying<MoveOnlyPolicy>::value);
+static_assert(!tea::detail::AffordsCopying<MoveOnlyPolicy>::value);
 using MOAC = AnyContainer<MoveOnlyPolicy>;
 static_assert(2 * sizeof(void *) == sizeof(MOAC));
 static_assert(!is_copy_constructible_v<MOAC>);
@@ -63,13 +63,13 @@ static_assert(is_nothrow_move_constructible_v<MOAC>);
 
 // containers with copy are copyable
 using CopyableNonComposedPolicy = Policy<void *, Destroy, Move, Copy>;
-static_assert(detail::AffordsCopying<CopyableNonComposedPolicy>::value);
+static_assert(tea::detail::AffordsCopying<CopyableNonComposedPolicy>::value);
 using CopyableNonComposedAC = AnyContainer<CopyableNonComposedPolicy>;
 static_assert(is_copy_constructible_v<CopyableNonComposedAC>);
 static_assert(is_nothrow_move_constructible_v<CopyableNonComposedAC>);
 
 using CopyableAnyContainerBasedPolicy = DerivedVTablePolicy<MOAC, Copy>;
-static_assert(detail::AffordsCopying<CopyableAnyContainerBasedPolicy>::value);
+static_assert(tea::detail::AffordsCopying<CopyableAnyContainerBasedPolicy>::value);
 using DerivedCopyableAC = AnyContainer<CopyableAnyContainerBasedPolicy>;
 static_assert(is_copy_constructible_v<DerivedCopyableAC>);
 static_assert(is_nothrow_move_constructible_v<DerivedCopyableAC>);
