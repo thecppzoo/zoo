@@ -1,13 +1,13 @@
 
 #include "zoo/AlignedStorage.h"
 #include "zoo/pp/platform.h"
-#include "zoo/Any/Traits.h"
+#include "zoo/tea/Traits.h"
 #include "zoo/utility.h"
 
 #include "zoo/meta/copy_and_move_abilities.h"
 #include <type_traits>
 
-namespace zoo::any::eta {
+namespace zoo::tea {
 
 template<typename Policy_>
 struct TEC {

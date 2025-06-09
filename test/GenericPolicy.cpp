@@ -2,7 +2,7 @@
 
 #include "zoo/FundamentalOperationTracing.h"
 
-#include "zoo/Any/DerivedVTablePolicy.h"
+#include "zoo/tea/DerivedVTablePolicy.h"
 
 #include <utility>
 #include <type_traits>

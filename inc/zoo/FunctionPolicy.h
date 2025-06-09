@@ -1,7 +1,7 @@
 #ifndef ZOO_FUNCTIONPOLICY_H
 #define ZOO_FUNCTIONPOLICY_H
 
-#include "zoo/Any/DerivedVTablePolicy.h"
+#include "zoo/tea/DerivedVTablePolicy.h"
 
 #include "zoo/AnyContainer.h"
 
