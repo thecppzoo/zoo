@@ -10,6 +10,8 @@
 
 namespace zoo::tea {
 
+namespace detail {
+
 template<typename T, typename = void>
 struct HasVTableMember: std::false_type {};
 
@@ -23,17 +25,16 @@ struct Boo {
 static_assert(!HasVTableMember<void>::value);
 static_assert(HasVTableMember<Boo>::value);
 
+} // detail
+
 
 template<typename Policy_>
 struct TEC {
     using Policy = Policy_;
-
-    // static_assert(std::
+    static_assert(zoo::tea::detail::HasVTableMember<Policy>::value);
 
     TEC() = delete;
     TEC(const TEC &) = delete;
-
-
 
     using DefaultManager = typename Policy::MemoryLayout;
 
@@ -72,10 +73,19 @@ struct TEC {
 
 };
 
-struct Foo {
-    using MemoryLayout = void *;
+
+template<typename Policy>
+struct CopyableTEC: TEC<Policy> {
+
 };
 
-static_assert(!std::is_move_constructible_v<TEC<Foo>>);
+
+struct FoolishPolicy {
+    using VTable = int;
+    struct MemoryLayout {};
+};
+
+
+static_assert(!std::is_move_constructible_v<TEC<FoolishPolicy>>);
 
 }

@@ -109,7 +109,7 @@ TEST_CASE("New zoo function", "[any][generic-policy][type-erasure][functional]")
             static_assert(is_base_of_v<CF, RCF>);
             static_assert(is_same_v<CF, typename RTTI_CF_P::Base>);
             static_assert(is_constructible_v<RCF, decltype(doubler)>);
-            static_assert(zoo::detail::AffordsCopying<RTTI_CF_P>::value);
+            static_assert(zoo::tea::detail::AffordsCopying<RTTI_CF_P>::value);
             RCF withRTTI(std::move(doubler));
             REQUIRE(2.0 == withRTTI(1));
             auto &type = withRTTI.type2();
