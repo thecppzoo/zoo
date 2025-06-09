@@ -1,5 +1,5 @@
-#ifndef Zoo_TEA_VTable_h
-#define Zoo_TEA_VTable_h
+#ifndef Zoo_Any_VTable_h
+#define Zoo_Any_VTable_h
 
 #include "zoo/AlignedStorage.h"
 #include <new>
