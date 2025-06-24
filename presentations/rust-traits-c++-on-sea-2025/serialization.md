@@ -31,5 +31,6 @@ struct SerializeWrapper: ISerialize {
         return temporary.str().length();
     }
 };
+
+}
 ```
-}```
