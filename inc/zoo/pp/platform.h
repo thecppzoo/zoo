@@ -20,8 +20,10 @@
 #endif
 
 #ifdef _MSC_VER
+#define ZOO_WINDOWS_BUILD() 1
 #define MSVC_EMPTY_BASES __declspec(empty_bases)
 #else
+#define ZOO_WINDOWS_BUILD() 0
 #define MSVC_EMPTY_BASES
 #endif
 
