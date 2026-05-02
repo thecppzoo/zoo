@@ -299,7 +299,7 @@ constexpr auto broadcast(SWAR<NBits, T> v) {
 
 /// BooleanSWAR treats the MSB of each SWAR lane as the boolean associated with that lane.
 template<int NBits, typename T>
-struct BooleanSWAR: SWAR<NBits, T> {
+struct BooleanSWAR : SWAR<NBits, T> {
     using Base = SWAR<NBits, T>;
 
     template<std::size_t N, typename = std::enable_if_t<Base::Lanes == N>>
@@ -308,8 +308,13 @@ struct BooleanSWAR: SWAR<NBits, T> {
     { this->m_v <<= (NBits - 1); }
 
     // Booleanness is stored in the MSBs
-    static constexpr auto MaskMSB =
-        broadcast<NBits, T>(Base(T(1) << (NBits -1)));
+    static constexpr auto MaskMSB = []{
+        if constexpr (SWAR<NBits, T>::Lanes == 1) {
+            return Base(T{~0}); // all on, no lanes
+        }
+        return broadcast<NBits, T>(Base(T(1) << (NBits - 1)));
+    }();
+
     static constexpr auto AllTrue = MaskMSB;
     static constexpr auto MaskLSB =
          broadcast<NBits, T>(Base(T(1)));
@@ -390,6 +395,11 @@ template <int NBits, typename T>
 BooleanSWAR(
     Literals_t<NBits, T>,
     const bool (&values)[BooleanSWAR<NBits, T>::Lanes]
+) -> BooleanSWAR<NBits, T>;
+
+template <int NBits, typename T>
+BooleanSWAR(
+    SWAR<NBits, T> arg
 ) -> BooleanSWAR<NBits, T>;
 
 template<int NBits, typename T>
@@ -585,6 +595,10 @@ constexpr SWAR<NBits, T> logarithmFloor(SWAR<NBits, T> v) noexcept {
     auto popcounts = meta::PopcountLogic<LogNBits, T>::execute(whole);
     return SWAR<NBits, T>{popcounts - ones};
 }
+
+
+
+
 
 static_assert(
     logarithmFloor(SWAR<8>{0x8040201008040201ull}).value() ==
