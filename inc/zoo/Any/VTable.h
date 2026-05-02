@@ -1,8 +1,7 @@
 #ifndef Zoo_Any_VTable_h
 #define Zoo_Any_VTable_h
 
-#include "zoo/Any/Traits.h"
-
+#include "zoo/AlignedStorage.h"
 #include <new>
 #include <typeinfo>
 #include <utility>
@@ -16,7 +15,7 @@ struct TypeErasureOperations {
 
 template<int Size, int Alignment>
 struct TypeErasedContainer {
-    alignas(Alignment) char space_[Size];
+    AlignedStorage<Size, Alignment> space_;
     const TypeErasureOperations *vTable_ = &Empty;
 
     template<typename T>
@@ -28,7 +27,12 @@ struct TypeErasedContainer {
     }
 
     // note: the policy operations do not assume an "Empty" to allow inheritance
-    // contravariance of the AnyContainer
+    // contravariance of a type erasure container.
+    // What this means is that we might want to override, for example,
+    // the destructor in a derived class, to replicate the behaviour of virtual
+    // inheritance or the normal or contravariant of destructors in conditions
+    // of inheritance. Therefore we can not asssume that we're working directly
+    // with an `Empty`.
     inline const static TypeErasureOperations Empty = {
         [](void *) noexcept {},
         reinterpret_cast<void (*)(void *, void *) noexcept>(copyVTable)
@@ -73,9 +77,9 @@ struct SmallBufferTypeEraser:
 template<int Size, int Alignment, typename V>
 struct ReferentialTypeEraser: TypeErasedContainer<Size, Alignment> {
     using Me = ReferentialTypeEraser;
-    
+
     V *&value() noexcept { return *this->template as<V *>(); }
-    
+
     inline const static TypeErasureOperations VTable = {
         [](void *who) noexcept { delete static_cast<Me *>(who)->value(); },
         [](void *from, void *to) noexcept {
@@ -86,7 +90,7 @@ struct ReferentialTypeEraser: TypeErasedContainer<Size, Alignment> {
             source->vTable = &TypeErasedContainer<Size, Alignment>::Empty;
         }
     };
-    
+
     template<typename... Args>
     ReferentialTypeEraser(Args &&...args) {
         this->vTable_ = &VTable;

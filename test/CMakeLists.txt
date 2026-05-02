@@ -110,7 +110,7 @@ else()
     set(
         TYPE_ERASURE_SOURCES
         any.cpp AlignedStorage.cpp AnyCallable.cpp AnyCallSignature.cpp
-        AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp
+        AnyExtended.cpp GenericPolicy.cpp FunctionPolicy.cpp tec/tec.cpp
     )
     set(
         SWAR_SOURCES

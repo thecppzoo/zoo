@@ -28,7 +28,7 @@ public:
     square(f32 SideInit) : Side(SideInit) {}
     f32 AreaNP() {return Side*Side;}
     virtual f32 Area() {return Side*Side;}
-    
+
 private:
     f32 Side;
 };
@@ -39,7 +39,7 @@ public:
     rectangle(f32 WidthInit, f32 HeightInit) : Width(WidthInit), Height(HeightInit) {}
     f32 AreaNP() {return Width*Height;}
     virtual f32 Area() {return Width*Height;}
-    
+
 private:
     f32 Width, Height;
 };
@@ -50,7 +50,7 @@ public:
     triangle(f32 BaseInit, f32 HeightInit) : Base(BaseInit), Height(HeightInit) {}
     f32 AreaNP() {return 0.5f*Base*Height;}
     virtual f32 Area() {return 0.5f*Base*Height;}
-    
+
 private:
     f32 Base, Height;
 };
@@ -61,7 +61,7 @@ public:
     circle(f32 RadiusInit) : Radius(RadiusInit) {}
     f32 AreaNP() {return Pi32*Radius*Radius;}
     virtual f32 Area() {return Pi32*Radius*Radius;}
-    
+
 private:
     f32 Radius;
 };
@@ -77,7 +77,7 @@ f32 TotalAreaVTBL(u32 ShapeCount, shape_base **Shapes)
     {
         Accum += Shapes[ShapeIndex]->Area();
     }
-    
+
     return Accum;
 }
 
@@ -209,7 +209,7 @@ enum shape_type : u32
     Shape_Rectangle,
     Shape_Triangle,
     Shape_Circle,
-    
+
     Shape_Count,
 };
 
@@ -223,17 +223,17 @@ struct shape_union
 f32 GetAreaSwitch(shape_union Shape)
 {
     f32 Result = 0.0f;
-    
+
     switch(Shape.Type)
     {
         case Shape_Square: {Result = Shape.Width*Shape.Width;} break;
         case Shape_Rectangle: {Result = Shape.Width*Shape.Height;} break;
         case Shape_Triangle: {Result = 0.5f*Shape.Width*Shape.Height;} break;
         case Shape_Circle: {Result = Pi32*Shape.Width*Shape.Width;} break;
-        
+
         case Shape_Count: {} break;
     }
-    
+
     return Result;
 }
 
@@ -244,7 +244,7 @@ f32 GetAreaSwitch(shape_union Shape)
 f32 TotalAreaSwitch(u32 ShapeCount, shape_union *Shapes)
 {
     f32 Accum = 0.0f;
-    
+
     for(u32 ShapeIndex = 0; ShapeIndex < ShapeCount; ++ShapeIndex)
     {
         Accum += GetAreaSwitch(Shapes[ShapeIndex]);
@@ -259,7 +259,7 @@ f32 TotalAreaSwitch4(u32 ShapeCount, shape_union *Shapes)
     f32 Accum1 = 0.0f;
     f32 Accum2 = 0.0f;
     f32 Accum3 = 0.0f;
-    
+
     ShapeCount /= 4;
     while(ShapeCount--)
     {
@@ -267,10 +267,10 @@ f32 TotalAreaSwitch4(u32 ShapeCount, shape_union *Shapes)
         Accum1 += GetAreaSwitch(Shapes[1]);
         Accum2 += GetAreaSwitch(Shapes[2]);
         Accum3 += GetAreaSwitch(Shapes[3]);
-        
+
         Shapes += 4;
     }
-    
+
     f32 Result = (Accum0 + Accum1 + Accum2 + Accum3);
     return Result;
 }

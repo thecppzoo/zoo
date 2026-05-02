@@ -1,8 +1,9 @@
 #ifndef ZOO_VTABLE_POLICY_H
 #define ZOO_VTABLE_POLICY_H
 
-#include "zoo/Any/Traits.h"
+#include "zoo/tea/Traits.h"
 
+#include "zoo/tea/VTablePointerWrapper.h"
 #include "zoo/AlignedStorage.h"
 
 #include "zoo/pp/platform.h"
@@ -210,24 +211,6 @@ struct CallableViaVTable<R(As...)> {
     };
 };
 
-template<typename VirtualTable>
-struct VTableHolder {
-    const VirtualTable *pointer_;
-
-    /// \brief from the vtable returns the entry corresponding to the affordance
-    template<typename Affordance>
-    const typename Affordance::VTableEntry *vTable() const noexcept {
-        return //static_cast<const typename Affordance::VTableEntry *>(pointer_);
-            pointer_->template upcast<Affordance>();
-    }
-
-    VTableHolder(const VirtualTable *p): pointer_(p) {}
-
-    auto pointer() const noexcept { return pointer_; }
-
-    void change(const VirtualTable *p) noexcept { pointer_ = p; }
-};
-
 template<std::size_t S, std::size_t A, typename V>
 struct BuilderDecider {
     constexpr static auto NoThrowMovable =
@@ -251,7 +234,7 @@ struct GenericPolicy {
         }
     };
 
-    using VTHolder = VTableHolder<VTable>;
+    using VTHolder = VTablePointerWrapper<VTable>;
 
     struct MSVC_EMPTY_BASES Container:
         VTHolder,

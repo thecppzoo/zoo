@@ -37,7 +37,7 @@ struct UserValueManagement {
         using VP = std::shared_ptr<V>;
         /// Abbreviation
         using SPM = SharedPointerManager;
-        
+
 
         VP *sharedPointer() noexcept { return this->space_.template as<VP>(); }
         V *value() noexcept { return &**sharedPointer(); }

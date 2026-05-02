@@ -2,7 +2,8 @@
 #define ZOO_ANYCONTAINER_H
 
 #include "zoo/pp/platform.h"
-#include "zoo/Any/Traits.h"
+#include "zoo/tea/Traits.h"
+#include "zoo/tea/AffordsCopying.hpp"
 #include "zoo/utility.h"
 
 #include "zoo/meta/NotBasedOn.h"
@@ -24,32 +25,7 @@ struct PolicyDefaultBuilder<P, std::void_t<typename P::DefaultImplementation>> {
     using type = typename P::DefaultImplementation;
 };
 
-template<typename, typename = void>
-struct MemoryLayoutHasCopy: std::false_type {};
-template<typename Policy>
-struct MemoryLayoutHasCopy<
-    Policy,
-    std::void_t<decltype(&Policy::MemoryLayout::copy)>
->: std::true_type {};
-
-template<typename, typename = void>
-struct ExtraAffordanceOfCopying: std::false_type {};
-template<typename Policy>
-struct ExtraAffordanceOfCopying<
-    Policy,
-    std::void_t<decltype(&Policy::ExtraAffordances::copy)>
->: std::true_type {};
-
-/// Copy constructibility and assignability are fundamental operations that
-/// can not be enabled/disabled with SFINAE, this trait is to detect copyability
-/// in a policy
-template<typename Policy>
-using AffordsCopying =
-    std::disjunction<
-        MemoryLayoutHasCopy<Policy>, ExtraAffordanceOfCopying<Policy>
-    >;
-
-}
+} // detail
 
 template<typename Policy, typename = void>
 struct CompositionChain {
@@ -90,7 +66,7 @@ struct MSVC_EMPTY_BASES AnyContainerBase:
     using Policy = Policy_;
     using SuperContainer = typename CompositionChain<Policy>::Base;
     using Container = typename Policy::MemoryLayout;
-    constexpr static auto Copyable = detail::AffordsCopying<Policy>::value;
+    constexpr static auto Copyable = tea::detail::AffordsCopying<Policy>::value;
 
     AnyContainerBase() noexcept:
         SuperContainer(SuperContainer::Token, nullptr)
@@ -316,10 +292,10 @@ struct AnyCopyable: AnyContainerBase<Policy> {
         Base(Base::Token, model)
     {
         auto source = model.container();
-        if constexpr(detail::MemoryLayoutHasCopy<Policy>::value) {
+        if constexpr(tea::detail::MemoryLayoutHasCopy<Policy>::value) {
             source->copy(this->container());
         } else {
-            static_assert(detail::ExtraAffordanceOfCopying<Policy>::value);
+            static_assert(tea::detail::ExtraAffordanceOfCopying<Policy>::value);
             Policy::ExtraAffordances::copy(this->container(), source);
         }
     }
@@ -334,10 +310,10 @@ struct AnyCopyable: AnyContainerBase<Policy> {
         myself->destroy();
         try {
             auto source = model.container();
-            if constexpr(detail::MemoryLayoutHasCopy<Policy>::value) {
+            if constexpr(tea::detail::MemoryLayoutHasCopy<Policy>::value) {
                 source->copy(this->container());
             } else {
-                static_assert(detail::ExtraAffordanceOfCopying<Policy>::value);
+                static_assert(tea::detail::ExtraAffordanceOfCopying<Policy>::value);
                 Policy::ExtraAffordances::copy(this->container(), source);
             }
         } catch(...) {
@@ -354,7 +330,7 @@ struct AnyCopyable: AnyContainerBase<Policy> {
 template<typename Policy>
         #define PP_BASE_TYPE \
             std::conditional_t< \
-                detail::AffordsCopying<Policy>::value, \
+                tea::detail::AffordsCopying<Policy>::value, \
                 AnyCopyable<Policy>, \
                 AnyContainerBase<Policy> \
             >
@@ -377,6 +353,7 @@ inline
 T *anyContainerCast(const AnyContainer<Policy> *ptr) noexcept {
     return const_cast<T *>(ptr->template state<T>());
 }
+
 
 }
 
