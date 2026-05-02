@@ -357,7 +357,7 @@ constexpr auto negate(SWAR<NB, B> input) {
 /// and the count to be used, the "count" is an artifact of this generalization
 /// \tparam IterationCount loosely models the "exponent" in "exponentiation", however, it may not
 /// be a number, the iteration count is part of the execution context to apply the operator
-/// \param forSquaring is an artifact of this generalization
+/// \param forSquaring should be a count in the monoid which will always "fire" the operation in question. (e.g. a boolean true, or an all-true BooleanSWAR)
 /// \param log2Count is to potentially reduce the number of iterations if the caller a-priori knows
 /// there are fewer iterations than what the type of exponent would allow
 template<
