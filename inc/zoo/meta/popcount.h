@@ -40,7 +40,7 @@ struct PopcountLogic {
     constexpr static int GroupSize = 1 << LogarithmOfGroupSize;
     constexpr static int HalvedGroupSize = GroupSize / 2;
     constexpr static auto CombiningMask =
-        BitmaskMaker<T, T(1 << HalvedGroupSize) - 1, GroupSize>::value;
+        BitmaskMaker<T, T(T(1) << HalvedGroupSize) - 1, GroupSize>::value;
     using Recursion = PopcountLogic<LogarithmOfGroupSize - 1, T>;
     constexpr static T execute(T input);
 };
