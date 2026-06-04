@@ -358,6 +358,33 @@ static_assert(0x210 == popcount<1>(0x320));
 static_assert(0x4321 == popcount<2>(0xF754));
 static_assert(0x50004 == popcount<4>(0x3E001122));
 
+// Regression: PopcountLogic<6, u64>::CombiningMask previously computed
+// `T(1 << 32) - 1`. The shift runs at `int` precision because `1` is an
+// `int`, so `1 << 32` is UB per [expr.shift] and fails as a constant
+// expression under any standards-conformant constexpr evaluator (clang,
+// MSVC /std:c++20 /permissive-). GCC happens to accept it, which is why
+// the bug was dormant. The fix is `T(T(1) << 32) - 1`. Without it,
+// `CombiningMask` fails to be a constant expression and these asserts
+// fail to compile.
+//
+// We reach PopcountLogic<6> directly rather than via popcount<6>(x),
+// because on non-MSVC platforms popcount<6> routes through the
+// PopcountIntrinsic struct (which uses __builtin_popcountll) and never
+// instantiates PopcountLogic<6, u64> — the original code path that
+// carried the bug.
+static_assert(meta::PopcountLogic<6, u64>::CombiningMask == 0x0000'0000'FFFF'FFFFull);
+static_assert(meta::PopcountLogic<6, u64>::HalvedGroupSize == 32);
+static_assert(meta::PopcountLogic<6, u64>::GroupSize == 64);
+static_assert(0  == meta::PopcountLogic<6, u64>::execute(0ull));
+static_assert(1  == meta::PopcountLogic<6, u64>::execute(1ull));
+static_assert(1  == meta::PopcountLogic<6, u64>::execute(1ull << 32));
+static_assert(1  == meta::PopcountLogic<6, u64>::execute(1ull << 63));
+static_assert(32 == meta::PopcountLogic<6, u64>::execute(0xFFFFFFFFull));
+static_assert(32 == meta::PopcountLogic<6, u64>::execute(0xFFFFFFFF00000000ull));
+static_assert(32 == meta::PopcountLogic<6, u64>::execute(0xAAAAAAAAAAAAAAAAull));
+static_assert(32 == meta::PopcountLogic<6, u64>::execute(0x0123456789ABCDEFull));
+static_assert(64 == meta::PopcountLogic<6, u64>::execute(0xFFFFFFFFFFFFFFFFull));
+
 static_assert(1 == msbIndex<u64>(1ull<<1));
 static_assert(3 == msbIndex<u64>(1ull<<3));
 static_assert(5 == msbIndex<u64>(1ull<<5));
