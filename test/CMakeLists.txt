@@ -23,11 +23,14 @@ if(MSVC)
         message(STATUS "Set policy")
     endif()
 
+    # third_party fetches Catch2 and exports TEST_THIRD_PARTY_INCLUDE_PATH.
+    add_subdirectory(third_party EXCLUDE_FROM_ALL)
+
     include_directories(
         "${PROJECT_BINARY_DIR}"
         ./inc
         ../inc
-        ./third_party/Catch2/single_include
+        ${TEST_THIRD_PARTY_INCLUDE_PATH}
     )
 
     set(
@@ -46,8 +49,6 @@ if(MSVC)
         CopyMoveAbilities.cpp
         root/mem.cpp
     )
-
-    add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
     # Simple executable for MSVC
     add_executable(ZooTest ${ZOO_TEST_SOURCES})
