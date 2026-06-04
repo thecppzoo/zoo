@@ -27,19 +27,34 @@ macro(set_xcode_properties TARGET_NAME)
     endif()
 endmacro()
 
-include_directories(
-    ../test/inc
-    dependencies/google_benchmark/include
-    ../inc
-    ../junkyard/inc
-    ../test/third_party/Catch2/single_include
-)
+# Third-party deps used to be git submodules (dependencies/google_benchmark and
+# ../test/third_party/Catch2). They are now fetched with FetchContent so the
+# repo stays submodule-free and clone/CPM friendly. Pins match the versions the
+# submodules tracked (google-benchmark v1.8.3, Catch2 v2.13.10).
+include(FetchContent)
 
-# build google benchmark (target: benchmark)
-# do not build tests of benchmarking lib
+# do not build tests of benchmarking lib (also avoids its GTest dependency)
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Suppressing benchmark's tests" FORCE)
 set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
-add_subdirectory(dependencies/google_benchmark)
+
+FetchContent_Declare(googlebenchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG        v1.8.3
+    GIT_SHALLOW    TRUE)
+FetchContent_Declare(Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v2.13.10
+    GIT_SHALLOW    TRUE)
+# google-benchmark provides the benchmark::benchmark target; Catch2 gives us
+# the single_include header path used below.
+FetchContent_MakeAvailable(googlebenchmark Catch2)
+
+include_directories(
+    ../test/inc
+    ../inc
+    ../junkyard/inc
+    ${catch2_SOURCE_DIR}/single_include
+)
 
 add_executable(
   catch2Benchmark
